@@ -1,0 +1,12 @@
+D:\Confidentialbox\ConfidentialBox.Core\bin\Debug\net8.0\ConfidentialBox.Core.deps.json
+D:\Confidentialbox\ConfidentialBox.Core\bin\Debug\net8.0\ConfidentialBox.Core.dll
+D:\Confidentialbox\ConfidentialBox.Core\bin\Debug\net8.0\ConfidentialBox.Core.pdb
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.csproj.AssemblyReference.cache
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.AssemblyInfoInputs.cache
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.AssemblyInfo.cs
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.csproj.CoreCompileInputs.cache
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.dll
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\refint\ConfidentialBox.Core.dll
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ConfidentialBox.Core.pdb
+D:\Confidentialbox\ConfidentialBox.Core\obj\Debug\net8.0\ref\ConfidentialBox.Core.dll

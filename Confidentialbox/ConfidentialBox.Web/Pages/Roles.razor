@@ -1,0 +1,236 @@
+﻿@page "/roles"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IRoleService RoleService
+
+<PageTitle>Roles y Políticas - ConfidentialBox</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-shield-alt"></i> Roles y Políticas</h1>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="fas fa-plus"></i> Crear Rol
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else if (roles != null && roles.Any())
+{
+    <div class="row">
+        @foreach (var role in roles)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card @(role.IsSystemRole ? "border-primary" : "")">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                @role.Name
+                                @if (role.IsSystemRole)
+                                {
+                                    <span class="badge bg-primary ms-2">Sistema</span>
+                                }
+                            </h5>
+
+                            @if (!role.IsSystemRole)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRole(role.Id)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <p class="text-muted">@role.Description</p>
+
+                        @if (role.Policies.Any())
+                        {
+                            <h6 class="mt-3">Políticas:</h6>
+                            <ul class="list-unstyled">
+                                @foreach (var policy in role.Policies)
+                                {
+                                    <li>
+                                        <i class="fas fa-check text-success"></i>
+                                        <strong>@policy.PolicyName:</strong> @policy.PolicyValue
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="text-muted small">Sin políticas específicas</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Modal Crear Rol -->
+@if (showCreateModal)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Crear Nuevo Rol</h5>
+                    <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@newRole" OnValidSubmit="@CreateRole">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Rol</label>
+                            <InputText @bind-Value="newRole.Name" class="form-control" />
+                            <ValidationMessage For="@(() => newRole.Name)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <InputText @bind-Value="newRole.Description" class="form-control" />
+                            <ValidationMessage For="@(() => newRole.Description)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Políticas (Opcional)</label>
+
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <input type="text"
+                                           class="form-control"
+                                           placeholder="Nombre de política"
+                                           @bind="policyName" />
+                                </div>
+                                <div class="col-md-5">
+                                    <input type="text"
+                                           class="form-control"
+                                           placeholder="Valor"
+                                           @bind="policyValue" />
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-primary w-100" @onclick="AddPolicy">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (newRole.Policies.Any())
+                            {
+                                <div class="mt-2">
+                                    @foreach (var policy in newRole.Policies)
+                                    {
+                                        <div class="badge bg-secondary me-2 mb-2">
+                                            @policy.Key: @policy.Value
+                                            <button type="button"
+                                                    class="btn-close btn-close-white ms-2"
+                                                    @onclick="() => RemovePolicy(policy.Key)">
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseCreateModal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Crear Rol</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@code {
+    private List<RoleDto>? roles;
+    private bool isLoading = true;
+    private string? successMessage;
+
+    private bool showCreateModal = false;
+    private CreateRoleRequest newRole = new();
+
+    private string policyName = "";
+    private string policyValue = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
+    {
+        isLoading = true;
+        try
+        {
+            roles = await RoleService.GetAllRolesAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        newRole = new CreateRoleRequest();
+        showCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateModal = false;
+        newRole = new CreateRoleRequest();
+        policyName = "";
+        policyValue = "";
+    }
+
+    private void AddPolicy()
+    {
+        if (!string.IsNullOrWhiteSpace(policyName) && !string.IsNullOrWhiteSpace(policyValue))
+        {
+            newRole.Policies[policyName] = policyValue;
+            policyName = "";
+            policyValue = "";
+        }
+    }
+
+    private void RemovePolicy(string key)
+    {
+        newRole.Policies.Remove(key);
+    }
+
+    private async Task CreateRole()
+    {
+        var result = await RoleService.CreateRoleAsync(newRole);
+        if (result != null)
+        {
+            successMessage = "Rol creado exitosamente";
+            CloseCreateModal();
+            await LoadRoles();
+        }
+    }
+
+    private async Task DeleteRole(string roleId)
+    {
+        await RoleService.DeleteRoleAsync(roleId);
+        successMessage = "Rol eliminado exitosamente";
+        await LoadRoles();
+    }
+}

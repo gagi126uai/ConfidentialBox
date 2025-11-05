@@ -1,0 +1,218 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject IDashboardService DashboardService
+
+<PageTitle>Dashboard - ConfidentialBox</PageTitle>
+
+<h1><i class="fas fa-chart-line"></i> Dashboard</h1>
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (stats != null)
+{
+    <div class="row mt-4">
+        <!-- Total Files -->
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total Archivos</h6>
+                            <h2 class="mb-0">@stats.TotalFiles</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-file fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Files -->
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Archivos Activos</h6>
+                            <h2 class="mb-0">@stats.ActiveFiles</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expired Files -->
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Archivos Expirados</h6>
+                            <h2 class="mb-0">@stats.ExpiredFiles</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-clock fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocked Files -->
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Archivos Bloqueados</h6>
+                            <h2 class="mb-0">@stats.BlockedFiles</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-ban fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <!-- Total Users -->
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Total Usuarios</h6>
+                    <h3>@stats.TotalUsers</h3>
+                    <small class="text-success">@stats.ActiveUsers activos</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage -->
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Almacenamiento</h6>
+                    <h3>@FormatBytes(stats.TotalStorageBytes)</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Accesses -->
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Total Accesos</h6>
+                    <h3>@stats.TotalAccesses</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unauthorized Accesses -->
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Accesos No Autorizados</h6>
+                    <h3 class="text-danger">@stats.UnauthorizedAccesses</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-history"></i> Actividad Reciente</h5>
+                </div>
+                <div class="card-body">
+                    @if (stats.RecentActivity?.Any() == true)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Acción</th>
+                                        <th>Usuario</th>
+                                        <th>Detalles</th>
+                                        <th>Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var activity in stats.RecentActivity)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-info">@activity.Action</span>
+                                            </td>
+                                            <td>@activity.UserName</td>
+                                            <td>@activity.Details</td>
+                                            <td>@activity.Timestamp.ToString("dd/MM/yyyy HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No hay actividad reciente</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-danger mt-4">
+        Error al cargar las estadísticas del dashboard
+    </div>
+}
+
+@code {
+    private DashboardStatsDto? stats;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            stats = await DashboardService.GetStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

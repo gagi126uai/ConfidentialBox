@@ -1,0 +1,200 @@
+﻿@page "/files"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IFileService FileService
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<PageTitle>Mis Archivos - ConfidentialBox</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-folder-open"></i> Mis Archivos</h1>
+    <a href="/upload" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Subir Nuevo Archivo
+    </a>
+</div>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (files != null && files.Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Tamaño</th>
+                            <th>Fecha de Subida</th>
+                            <th>Expira</th>
+                            <th>Accesos</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in files)
+                        {
+                            <tr>
+                                <td>
+                                    <i class="fas fa-file me-2"></i>
+                                    @file.OriginalFileName
+                                </td>
+                                <td>@FormatBytes(file.FileSizeBytes)</td>
+                                <td>@file.UploadedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    @if (file.ExpiresAt.HasValue)
+                                    {
+                                        <span>@file.ExpiresAt.Value.ToString("dd/MM/yyyy")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Nunca</span>
+                                    }
+                                </td>
+                                <td>
+                                    @file.CurrentAccessCount
+                                    @if (file.MaxAccessCount.HasValue)
+                                    {
+                                        <span>/ @file.MaxAccessCount</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (file.IsBlocked)
+                                    {
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-ban"></i> Bloqueado
+                                        </span>
+                                    }
+                                    else if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
+                                    {
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock"></i> Expirado
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Activo
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="() => CopyShareLink(file.ShareLink)">
+                                            <i class="fas fa-link"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" @onclick="() => ViewFileDetails(file.Id)">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteFile(file.Id)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-folder-open fa-5x text-muted mb-3"></i>
+            <h4>No tienes archivos subidos</h4>
+            <p class="text-muted">Comienza subiendo tu primer archivo</p>
+            <a href="/upload" class="btn btn-primary">
+                <i class="fas fa-cloud-upload-alt"></i> Subir Archivo
+            </a>
+        </div>
+    </div>
+}
+
+@code {
+    private List<FileDto>? files;
+    private bool isLoading = true;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFiles();
+    }
+
+    private async Task LoadFiles()
+    {
+        isLoading = true;
+        try
+        {
+            files = await FileService.GetMyFilesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading files: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CopyShareLink(string shareLink)
+    {
+        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+        var fullLink = $"{baseUri}/access/{shareLink}";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", fullLink);
+
+        successMessage = "Link copiado al portapapeles";
+        StateHasChanged();
+    }
+
+    private void ViewFileDetails(int fileId)
+    {
+        // TODO: Implementar vista de detalles
+    }
+
+    private async Task DeleteFile(int fileId)
+    {
+        var confirm = await JS.InvokeAsync<bool>("confirm", "¿Estás seguro de que deseas eliminar este archivo?");
+        if (confirm)
+        {
+            var result = await FileService.DeleteFileAsync(fileId);
+            if (result)
+            {
+                successMessage = "Archivo eliminado exitosamente";
+                await LoadFiles();
+            }
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

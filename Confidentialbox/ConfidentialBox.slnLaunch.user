@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Nuevo perfil",
+    "Projects": [
+      {
+        "Path": "ConfidentialBox.API\\ConfidentialBox.API.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

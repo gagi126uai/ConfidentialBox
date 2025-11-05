@@ -1,0 +1,221 @@
+﻿@page "/security-alerts"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient Http
+
+<PageTitle>Alertas de Seguridad - ConfidentialBox</PageTitle>
+
+<h1><i class="fas fa-shield-alt"></i> Alertas de Seguridad</h1>
+
+<div class="card mt-4">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <select class="form-select" @bind="filterSeverity">
+                    <option value="">Todas las severidades</option>
+                    <option value="Critical">Críticas</option>
+                    <option value="High">Altas</option>
+                    <option value="Medium">Medias</option>
+                    <option value="Low">Bajas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="filterReviewed">
+                    <option value="">Todas</option>
+                    <option value="false">Sin revisar</option>
+                    <option value="true">Revisadas</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="SearchAlerts">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+
+        @if (isLoading)
+        {
+            <div class="text-center my-5">
+                <div class="spinner-border" role="status"></div>
+            </div>
+        }
+        else if (alerts != null && alerts.Items.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Severidad</th>
+                            <th>Usuario</th>
+                            <th>Archivo</th>
+                            <th>Descripción</th>
+                            <th>Confianza</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var alert in alerts.Items)
+                        {
+                            <tr class="@(alert.IsReviewed ? "" : "table-warning")">
+                                <td><span class="badge bg-secondary">@alert.AlertType</span></td>
+                                <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
+                                <td>@alert.UserName</td>
+                                <td>@(alert.FileName ?? "-")</td>
+                                <td><small>@alert.Description</small></td>
+                                <td>@($"{alert.ConfidenceScore * 100:F0}%")</td>
+                                <td>@alert.DetectedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    @if (!alert.IsReviewed)
+                                    {
+                                        <button class="btn btn-sm btn-primary" @onclick="() => ShowReviewModal(alert)">
+                                            <i class="fas fa-check"></i> Revisar
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">Revisada</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <nav>
+                <ul class="pagination justify-content-center">
+                    <li class="page-item @(alerts.HasPreviousPage ? "" : "disabled")">
+                        <button class="page-link"
+                                disabled="@(alerts is null || !alerts.HasPreviousPage)"
+                                @onclick="() => ChangePage(alerts!.PageNumber - 1)">
+                            Anterior
+                        </button>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">Página @alerts.PageNumber de @alerts.TotalPages</span>
+                    </li>
+                    <li class="page-item @(alerts.HasNextPage ? "" : "disabled")">
+                        <button class="page-link"
+                                disabled="@(alerts is null || !alerts.HasNextPage)"
+                                @onclick="() => ChangePage(alerts!.PageNumber + 1)">
+                            Siguiente
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        }
+        else
+        {
+            <div class="alert alert-info">No hay alertas para mostrar</div>
+        }
+    </div>
+</div>
+
+<!-- Modal igual que el tuyo -->
+@code {
+    private PagedResult<SecurityAlertDto>? alerts;
+    private bool isLoading = true;
+    private string? error;
+
+    private string filterSeverity = "";
+    private string filterReviewed = "";
+    private int currentPage = 1;
+
+    private bool showReviewModal = false;
+    private SecurityAlertDto? selectedAlert;
+    private string reviewNotes = "";
+    private string actionTaken = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAlerts();
+    }
+
+    private async Task SearchAlerts()
+    {
+        isLoading = true;
+        error = null;
+        try
+        {
+            var url = $"api/aisecurity/alerts?pageNumber={currentPage}&pageSize=20";
+            if (!string.IsNullOrWhiteSpace(filterSeverity)) url += $"&severity={filterSeverity}";
+            if (!string.IsNullOrWhiteSpace(filterReviewed)) url += $"&isReviewed={filterReviewed}";
+
+            alerts = await Http.GetFromJsonAsync<PagedResult<SecurityAlertDto>>(url);
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudieron cargar las alertas: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ChangePage(int page)
+    {
+        if (page < 1) return;
+        if (alerts != null && page > alerts.TotalPages) return;
+
+        currentPage = page;
+        await SearchAlerts();
+    }
+
+    private void ShowReviewModal(SecurityAlertDto alert)
+    {
+        selectedAlert = alert;
+        reviewNotes = "";
+        actionTaken = "";
+        showReviewModal = true;
+    }
+
+    private void CloseReviewModal()
+    {
+        showReviewModal = false;
+        selectedAlert = null;
+    }
+
+    private async Task SubmitReview()
+    {
+        if (selectedAlert == null) return;
+
+        try
+        {
+            var request = new ReviewAlertRequest
+            {
+                AlertId = selectedAlert.Id,
+                ReviewNotes = reviewNotes,
+                ActionTaken = actionTaken
+            };
+
+            var response = await Http.PostAsJsonAsync($"api/aisecurity/alerts/{selectedAlert.Id}/review", request);
+            if (response.IsSuccessStatusCode)
+            {
+                CloseReviewModal();
+                await SearchAlerts();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Error al revisar la alerta: {ex.Message}";
+        }
+    }
+
+    private static string GetSeverityColor(string? severity) => severity switch
+    {
+        "Critical" => "danger",
+        "High" => "warning",
+        "Medium" => "info",
+        "Low" => "secondary",
+        _ => "secondary"
+    };
+}

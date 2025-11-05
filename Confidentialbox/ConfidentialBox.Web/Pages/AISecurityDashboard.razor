@@ -1,0 +1,324 @@
+﻿@page "/ai-security"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient Http
+
+<PageTitle>AI Security Dashboard - ConfidentialBox</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-brain"></i> AI Security Dashboard</h1>
+    <button class="btn btn-primary" @onclick="RunFullScan">
+        <i class="fas fa-search"></i> Escanear Sistema
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+        <p class="mt-2">Analizando sistema con IA...</p>
+    </div>
+}
+else if (dashboard != null)
+{
+    <!-- Threat Level Indicator -->
+    <div class="card mb-4 border-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5>Nivel de Amenaza del Sistema</h5>
+                    <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
+                        @GetThreatLevelText(dashboard.SystemThreatLevel)
+                    </h2>
+                </div>
+                <div>
+                    <div class="progress" style="width: 200px; height: 30px;">
+                        <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)"
+                             style="width: @($"{dashboard.SystemThreatLevel * 100:F0}%")">
+                            <td>@($"{dashboard.SystemThreatLevel * 100:F0}%")</td>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6>Alertas Críticas</h6>
+                            <h2>@dashboard.CriticalAlertsUnreviewed</h2>
+                            <small>Sin revisar</small>
+                        </div>
+                        <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6>Usuarios Alto Riesgo</h6>
+                            <h2>@dashboard.HighRiskUsers</h2>
+                            <small>Requieren atención</small>
+                        </div>
+                        <i class="fas fa-user-shield fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6>Archivos Sospechosos</h6>
+                            <h2>@dashboard.SuspiciousFilesDetected</h2>
+                            <small>Detectados hoy</small>
+                        </div>
+                        <i class="fas fa-file-medical-alt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6>Alertas Hoy</h6>
+                            <h2>@dashboard.TotalAlertsToday</h2>
+                            <small>Total del día</small>
+                        </div>
+                        <i class="fas fa-bell fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Alerts by Type -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Alertas por Tipo</h5>
+                </div>
+                <div class="card-body">
+                    @if (dashboard.AlertsByType?.Any() == true)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    @foreach (var alert in dashboard.AlertsByType.OrderByDescending(a => a.Value))
+                                    {
+                                        <tr>
+                                            <td>@alert.Key</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar"
+                                                         style="width: @($"{GetPercentage(alert.Value, dashboard.AlertsByType.Values.Max()):F0}%")">
+                                                        @alert.Value
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center">No hay alertas para mostrar</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Threat Trends -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-line"></i> Tendencia de Amenazas (7 días)</h5>
+                </div>
+                <div class="card-body">
+                    @if (dashboard.ThreatTrends?.Any() == true)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    @foreach (var trend in dashboard.ThreatTrends)
+                                    {
+                                        <tr>
+                                            <td><strong>@trend.Key</strong></td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar bg-info"
+                                                         style="width: @($"{GetPercentage(trend.Value, dashboard.ThreatTrends.Values.Max()):F0}%")">
+                                                        @trend.Value
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center">No hay datos de tendencias</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-bell"></i> Alertas Recientes</h5>
+            <a href="/security-alerts" class="btn btn-sm btn-outline-primary">Ver Todas</a>
+        </div>
+        <div class="card-body">
+            @if (dashboard.RecentAlerts?.Any() == true)
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Severidad</th>
+                                <th>Usuario</th>
+                                <th>Archivo</th>
+                                <th>Descripción</th>
+                                <th>Confianza</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var alert in dashboard.RecentAlerts)
+                            {
+                                <tr>
+                                    <td><span class="badge bg-secondary">@alert.AlertType</span></td>
+                                    <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
+                                    <td>@alert.UserName</td>
+                                    <td>@(alert.FileName ?? "-")</td>
+                                    <td><small>@alert.Description</small></td>
+                                    <td>
+                                        <div class="progress" style="width: 80px; height: 20px;">
+                                            <div class="progress-bar"
+                                                 style="width: @($"{alert.ConfidenceScore * 100:F0}%")">
+                                                <td>@($"{alert.ConfidenceScore * 100:F0}%")</td>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><small>@alert.DetectedAt.ToString("dd/MM HH:mm")</small></td>
+                                    <td>
+                                        @if (alert.IsReviewed)
+                                        {
+                                            <span class="badge bg-success">Revisada</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning">Pendiente</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> No hay alertas recientes. El sistema está seguro.
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private AISecurityDashboardDto? dashboard;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboard();
+    }
+
+    private async Task LoadDashboard()
+    {
+        isLoading = true;
+        try
+        {
+            dashboard = await Http.GetFromJsonAsync<AISecurityDashboardDto>("api/aisecurity/dashboard");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading AI dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RunFullScan()
+    {
+        isLoading = true;
+        try
+        {
+            await Http.PostAsync("api/aisecurity/scan-all", null);
+            await LoadDashboard();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error running scan: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetThreatLevelColor(double level)
+    {
+        if (level >= 0.7) return "danger";
+        if (level >= 0.4) return "warning";
+        return "success";
+    }
+
+    private string GetThreatLevelText(double level)
+    {
+        if (level >= 0.7) return "CRÍTICO";
+        if (level >= 0.4) return "MEDIO";
+        return "BAJO";
+    }
+
+    private string GetSeverityColor(string severity) => severity switch
+    {
+        "Critical" => "danger",
+        "High" => "warning",
+        "Medium" => "info",
+        "Low" => "secondary",
+        _ => "secondary"
+    };
+
+    private double GetPercentage(int value, int max)
+        => max == 0 ? 0 : (value / (double)max) * 100;
+}

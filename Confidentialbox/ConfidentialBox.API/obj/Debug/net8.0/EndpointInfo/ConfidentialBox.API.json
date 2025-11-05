@@ -1,0 +1,3049 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ConfidentialBox API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/AISecurity/dashboard": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISecurityDashboardDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISecurityDashboardDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISecurityDashboardDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/alerts": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "parameters": [
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isReviewed",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAlertDtoPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAlertDtoPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAlertDtoPagedResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/alerts/{id}/review": {
+      "post": {
+        "tags": [
+          "AISecurity"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAlertRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAlertRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAlertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/AISecurity/user-behavior/{userId}": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/user-behavior/my-profile": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/high-risk-users": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/scan-all": {
+      "post": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/AISecurity/update-behavior-profile": {
+      "post": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/AISecurity/file-scan/{fileId}": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileScanResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileScanResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileScanResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/AISecurity/threat-statistics": {
+      "get": {
+        "tags": [
+          "AISecurity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Audit": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "parameters": [
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogDtoPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogDtoPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogDtoPagedResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Dashboard/stats": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/{id}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Files/my-files": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/search": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSearchRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSearchRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDtoPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDtoPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDtoPagedResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/upload": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/access/{shareLink}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "shareLink",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "masterPassword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/block": {
+      "put": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/unblock": {
+      "put": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/accesses": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileAccess"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileAccess"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileAccess"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/start-session": {
+      "post": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartViewerSessionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartViewerSessionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartViewerSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartViewerSessionResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartViewerSessionResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartViewerSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/record-event": {
+      "post": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewerEventRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewerEventRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewerEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/suspicious-sessions": {
+      "get": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/end-session": {
+      "post": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSessionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSessionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/session-stats/{fileId}": {
+      "get": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewerSessionStatsDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/update-pdf-settings": {
+      "put": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePDFSettingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePDFSettingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePDFSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Roles": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Roles"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Roles/{id}": {
+      "delete": {
+        "tags": [
+          "Roles"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/toggle-active": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/roles": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AISecurityDashboardDto": {
+        "type": "object",
+        "properties": {
+          "totalAlertsToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "criticalAlertsUnreviewed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "highRiskUsers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suspiciousFilesDetected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "systemThreatLevel": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          },
+          "recentAlerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAlertDto"
+            },
+            "nullable": true
+          },
+          "HighRiskUsersDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserBehaviorAnalysisDto"
+            },
+            "nullable": true
+          },
+          "alertsByType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          },
+          "threatTrends": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApplicationRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "normalizedName": {
+            "type": "string",
+            "nullable": true
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isSystemRole": {
+            "type": "boolean"
+          },
+          "rolePolicies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolePolicy"
+            },
+            "nullable": true
+          },
+          "filePermissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilePermission"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApplicationUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "normalizedUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "normalizedEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailConfirmed": {
+            "type": "boolean"
+          },
+          "passwordHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "securityStamp": {
+            "type": "string",
+            "nullable": true
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumberConfirmed": {
+            "type": "boolean"
+          },
+          "twoFactorEnabled": {
+            "type": "boolean"
+          },
+          "lockoutEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lockoutEnabled": {
+            "type": "boolean"
+          },
+          "accessFailedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "requiresMFA": {
+            "type": "boolean"
+          },
+          "mfaSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedFile"
+            },
+            "nullable": true
+          },
+          "fileAccesses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileAccess"
+            },
+            "nullable": true
+          },
+          "auditLogs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLog"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/ApplicationUser"
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "oldValues": {
+            "type": "string",
+            "nullable": true
+          },
+          "newValues": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLogDtoPagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRoleRequest": {
+        "required": [
+          "description",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "policies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateUserRequest": {
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "minLength": 6,
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DashboardStatsDto": {
+        "type": "object",
+        "properties": {
+          "totalFiles": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeFiles": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expiredFiles": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blockedFiles": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalUsers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeUsers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalStorageBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalAccesses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unauthorizedAccesses": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recentActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentActivityDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EndSessionRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileAccess": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFile": {
+            "$ref": "#/components/schemas/SharedFile"
+          },
+          "accessedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessedByUser": {
+            "$ref": "#/components/schemas/ApplicationUser"
+          },
+          "accessedByIP": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "wasAuthorized": {
+            "type": "boolean"
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "originalFileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileExtension": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileSizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shareLink": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "maxAccessCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentAccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isBlocked": {
+            "type": "boolean"
+          },
+          "blockReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMasterPassword": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileDtoPagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FilePermission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFile": {
+            "$ref": "#/components/schemas/SharedFile"
+          },
+          "roleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/ApplicationRole"
+          },
+          "canView": {
+            "type": "boolean"
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileScanResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedFile": {
+            "$ref": "#/components/schemas/SharedFile"
+          },
+          "scannedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isSuspicious": {
+            "type": "boolean"
+          },
+          "suspiciousReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "threatScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "hasSuspiciousExtension": {
+            "type": "boolean"
+          },
+          "hasMaliciousPatterns": {
+            "type": "boolean"
+          },
+          "exceedsSizeThreshold": {
+            "type": "boolean"
+          },
+          "uploadedOutsideBusinessHours": {
+            "type": "boolean"
+          },
+          "fileHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "detectedFileType": {
+            "type": "string",
+            "nullable": true
+          },
+          "analysisDetails": {
+            "type": "string",
+            "nullable": true
+          },
+          "malwareProbability": {
+            "type": "number",
+            "format": "double"
+          },
+          "dataExfiltrationProbability": {
+            "type": "number",
+            "format": "double"
+          },
+          "socialEngineeringProbability": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileSearchRequest": {
+        "type": "object",
+        "properties": {
+          "searchTerm": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedAfter": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "uploadedBefore": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "uploadedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isBlocked": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isDeleted": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileUploadRequest": {
+        "type": "object",
+        "properties": {
+          "originalFileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "encryptedFileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileExtension": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileSizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "encryptionKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "masterPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "maxAccessCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "allowedRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "fileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "shareLink": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rememberMe": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PDFViewerConfigDto": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasWatermark": {
+            "type": "boolean"
+          },
+          "watermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "screenshotProtectionEnabled": {
+            "type": "boolean"
+          },
+          "printProtectionEnabled": {
+            "type": "boolean"
+          },
+          "copyProtectionEnabled": {
+            "type": "boolean"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aiMonitoringEnabled": {
+            "type": "boolean"
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolicyDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyValue": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecentActivityDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterRequest": {
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "minLength": 6,
+            "type": "string"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewAlertRequest": {
+        "type": "object",
+        "properties": {
+          "alertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reviewNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionTaken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isSystemRole": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RolePolicy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/ApplicationRole"
+          },
+          "policyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SecurityAlertDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alertType": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "confidenceScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isReviewed": {
+            "type": "boolean"
+          },
+          "actionTaken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SecurityAlertDtoPagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAlertDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SharedFile": {
+        "required": [
+          "encryptedFileName",
+          "originalFileName",
+          "shareLink"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "originalFileName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "encryptedFileName": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "fileExtension": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileSizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shareLink": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "masterPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "encryptionKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "maxAccessCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentAccessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isBlocked": {
+            "type": "boolean"
+          },
+          "blockReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedByUser": {
+            "$ref": "#/components/schemas/ApplicationUser"
+          },
+          "isPDF": {
+            "type": "boolean"
+          },
+          "hasWatermark": {
+            "type": "boolean"
+          },
+          "watermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "screenshotProtectionEnabled": {
+            "type": "boolean"
+          },
+          "printProtectionEnabled": {
+            "type": "boolean"
+          },
+          "copyProtectionEnabled": {
+            "type": "boolean"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aiMonitoringEnabled": {
+            "type": "boolean"
+          },
+          "fileAccesses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileAccess"
+            },
+            "nullable": true
+          },
+          "filePermissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilePermission"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartViewerSessionRequest": {
+        "type": "object",
+        "properties": {
+          "shareLink": {
+            "type": "string",
+            "nullable": true
+          },
+          "masterPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartViewerSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "config": {
+            "$ref": "#/components/schemas/PDFViewerConfigDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TimeSpan": {
+        "type": "object",
+        "properties": {
+          "ticks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hours": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "milliseconds": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "microseconds": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "nanoseconds": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "seconds": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "totalDays": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalHours": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalMilliseconds": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalMicroseconds": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalNanoseconds": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalMinutes": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          },
+          "totalSeconds": {
+            "type": "number",
+            "format": "double",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePDFSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasWatermark": {
+            "type": "boolean"
+          },
+          "watermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "screenshotProtectionEnabled": {
+            "type": "boolean"
+          },
+          "printProtectionEnabled": {
+            "type": "boolean"
+          },
+          "copyProtectionEnabled": {
+            "type": "boolean"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aiMonitoringEnabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserBehaviorAnalysisDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "riskScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "riskLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "anomaliesDetected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "lastAnalyzed": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "averageFilesPerDay": {
+            "type": "number",
+            "format": "double"
+          },
+          "currentFilesPerDay": {
+            "type": "number",
+            "format": "double"
+          },
+          "hasUnusualUploadPattern": {
+            "type": "boolean"
+          },
+          "hasUnusualAccessPattern": {
+            "type": "boolean"
+          },
+          "accessingOutsideHours": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ViewerEventRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "eventType": {
+            "type": "string",
+            "nullable": true
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "eventData": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ViewerSessionStatsDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "viewerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pageViewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalViewTime": {
+            "$ref": "#/components/schemas/TimeSpan"
+          },
+          "screenshotAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "printAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "copyAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wasBlocked": {
+            "type": "boolean"
+          },
+          "blockReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "suspicionScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "isSuspicious": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "apiKey",
+        "description": "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IAuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center">
+                        <span class="me-3">
+                            <i class="fas fa-user-circle"></i> @context.User.Identity?.Name
+                        </span>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="Logout">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        </button>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+
+        ((CustomAuthStateProvider)AuthStateProvider)
+            .NotifyUserLogout();
+
+        NavigationManager.NavigateTo("/login", replace: true);
+    }
+}
