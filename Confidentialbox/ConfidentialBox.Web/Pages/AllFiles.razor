@@ -1,0 +1,119 @@
+@page "/all-files"
+@attribute [Authorize(Roles = "Admin")]
+@inject IFileService FileService
+
+<PageTitle>Todos los archivos - ConfidentialBox</PageTitle>
+
+<h1><i class="fas fa-folder"></i> Archivos de la organización</h1>
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+        <p class="mt-3">Cargando archivos seguros...</p>
+    </div>
+}
+else if (loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i> @loadError
+    </div>
+}
+else if (files is null || !files.Any())
+{
+    <div class="alert alert-info" role="alert">
+        No se encontraron archivos compartidos.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th>Propietario</th>
+                            <th>Fecha de subida</th>
+                            <th>Estado</th>
+                            <th>Accesos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in files)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@file.OriginalFileName</strong>
+                                    <div class="text-muted small">@FormatBytes(file.FileSizeBytes)</div>
+                                </td>
+                                <td>@file.UploadedByUserName</td>
+                                <td>@file.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    @if (file.IsBlocked)
+                                    {
+                                        <span class="badge bg-danger"><i class="fas fa-ban me-1"></i> Bloqueado</span>
+                                    }
+                                    else if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
+                                    {
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i> Expirado</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i> Activo</span>
+                                    }
+                                </td>
+                                <td>@file.CurrentAccessCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<FileDto>? files;
+    private bool isLoading = true;
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFilesAsync();
+    }
+
+    private async Task LoadFilesAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            files = await FileService.GetAllFilesAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = "No se pudieron cargar los archivos: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        if (bytes == 0)
+        {
+            return "0 B";
+        }
+
+        var order = (int)Math.Floor(Math.Log(bytes, 1024));
+        order = Math.Min(order, sizes.Length - 1);
+        var adjusted = bytes / Math.Pow(1024, order);
+        return $"{adjusted:0.##} {sizes[order]}";
+    }
+}

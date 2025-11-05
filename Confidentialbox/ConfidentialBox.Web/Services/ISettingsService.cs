@@ -12,4 +12,6 @@ public interface ISettingsService
     Task<bool> UpdateEmailServerSettingsAsync(EmailServerSettingsDto request);
     Task<EmailNotificationSettingsDto?> GetEmailNotificationSettingsAsync();
     Task<bool> UpdateEmailNotificationSettingsAsync(EmailNotificationSettingsDto request);
+    Task<RegistrationSettingsDto?> GetRegistrationSettingsAsync();
+    Task<bool> UpdateRegistrationSettingsAsync(bool isEnabled);
 }

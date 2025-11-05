@@ -11,7 +11,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
 // Configurar HttpClient con la URL base del API
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7001/";
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7233/";
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 
 // Agregar Blazored LocalStorage

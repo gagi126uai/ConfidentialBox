@@ -2,6 +2,7 @@
 using ConfidentialBox.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
 
 namespace ConfidentialBox.Infrastructure.Services;
 
@@ -17,11 +18,25 @@ public class DatabaseSeeder
         await CreateRoleIfNotExists(roleManager, "User", "Usuario estándar", true);
         await CreateRoleIfNotExists(roleManager, "Guest", "Usuario invitado", true);
 
-        // Crear usuario administrador
-        await CreateUserIfNotExists(userManager, "admin@confidentialbox.com", "Admin123!", "Admin", "System", new[] { "Admin" });
+        // Crear usuario administrador predeterminado
+        await CreateUserIfNotExists(
+            userManager,
+            "admin",
+            "admin@confidentialbox.local",
+            "admin",
+            "Admin",
+            "Principal",
+            new[] { "Admin" });
 
-        // Crear usuario estándar
-        await CreateUserIfNotExists(userManager, "user@confidentialbox.com", "User123!", "John", "Doe", new[] { "User" });
+        // Crear usuario estándar de ejemplo
+        await CreateUserIfNotExists(
+            userManager,
+            "user",
+            "user@confidentialbox.com",
+            "User123!",
+            "John",
+            "Doe",
+            new[] { "User" });
     }
 
     private static async Task CreateRoleIfNotExists(RoleManager<ApplicationRole> roleManager, string roleName, string description, bool isSystemRole)
@@ -39,14 +54,26 @@ public class DatabaseSeeder
         }
     }
 
-    private static async Task CreateUserIfNotExists(UserManager<ApplicationUser> userManager, string email, string password, string firstName, string lastName, string[] roles)
+    private static async Task CreateUserIfNotExists(
+        UserManager<ApplicationUser> userManager,
+        string userName,
+        string email,
+        string password,
+        string firstName,
+        string lastName,
+        string[] roles)
     {
-        var user = await userManager.FindByEmailAsync(email);
+        var user = await userManager.FindByNameAsync(userName);
+        if (user == null)
+        {
+            user = await userManager.FindByEmailAsync(email);
+        }
+
         if (user == null)
         {
             user = new ApplicationUser
             {
-                UserName = email,
+                UserName = userName,
                 Email = email,
                 FirstName = firstName,
                 LastName = lastName,
@@ -59,6 +86,16 @@ public class DatabaseSeeder
             if (result.Succeeded)
             {
                 await userManager.AddToRolesAsync(user, roles);
+            }
+        }
+        else
+        {
+            // Asegurar que el usuario tenga los roles esperados
+            var existingRoles = await userManager.GetRolesAsync(user);
+            var missingRoles = roles.Except(existingRoles);
+            if (missingRoles.Any())
+            {
+                await userManager.AddToRolesAsync(user, missingRoles);
             }
         }
     }

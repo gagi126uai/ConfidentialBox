@@ -5,12 +5,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ConfidentialBox.API.Controllers;
 
@@ -22,23 +25,46 @@ public class AuthController : ControllerBase
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _configuration;
     private readonly IEmailNotificationService _emailNotificationService;
+    private readonly ISystemSettingsService _systemSettingsService;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IConfiguration configuration,
-        IEmailNotificationService emailNotificationService)
+        IEmailNotificationService emailNotificationService,
+        ISystemSettingsService systemSettingsService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _configuration = configuration;
         _emailNotificationService = emailNotificationService;
+        _systemSettingsService = systemSettingsService;
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByEmailAsync(request.Email);
+        var identifier = request.Identifier?.Trim() ?? string.Empty;
+        ApplicationUser? user = null;
+
+        if (!string.IsNullOrWhiteSpace(identifier) && identifier.Contains('@'))
+        {
+            user = await _userManager.FindByEmailAsync(identifier);
+        }
+
+        if (user == null && !string.IsNullOrWhiteSpace(identifier))
+        {
+            user = await _userManager.FindByNameAsync(identifier);
+        }
+
+        if (user == null && !string.IsNullOrWhiteSpace(identifier))
+        {
+            user = await _userManager.Users.FirstOrDefaultAsync(
+                u => u.Email == identifier,
+                cancellationToken);
+        }
+
         if (user == null || !user.IsActive)
         {
             return Ok(new LoginResponse
@@ -78,8 +104,18 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<LoginResponse>> Register([FromBody] RegisterRequest request)
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
+        if (!await _systemSettingsService.IsUserRegistrationEnabledAsync(cancellationToken))
+        {
+            return Ok(new LoginResponse
+            {
+                Success = false,
+                ErrorMessage = "El registro de usuarios está deshabilitado por el administrador"
+            });
+        }
+
         var existingUser = await _userManager.FindByEmailAsync(request.Email);
         if (existingUser != null)
         {
@@ -128,6 +164,14 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpGet("registration-status")]
+    [AllowAnonymous]
+    public async Task<ActionResult<RegistrationSettingsDto>> GetRegistrationStatus(CancellationToken cancellationToken)
+    {
+        var enabled = await _systemSettingsService.IsUserRegistrationEnabledAsync(cancellationToken);
+        return Ok(new RegistrationSettingsDto { IsRegistrationEnabled = enabled });
+    }
+
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
@@ -146,7 +190,7 @@ public class AuthController : ControllerBase
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
         var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
-        var baseUrl = _configuration["ClientApp:BaseUrl"] ?? "https://localhost:7002";
+        var baseUrl = _configuration["ClientApp:BaseUrl"] ?? "https://localhost:5001";
         var resetUrl = BuildResetUrl(baseUrl, user.Email!, encodedToken);
 
         try

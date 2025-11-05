@@ -3,7 +3,6 @@
 @using ConfidentialBox.Core.DTOs
 @inject IAuthService AuthService
 @inject NavigationManager NavigationManager
-@inject AuthenticationStateProvider AuthStateProvider
 @layout EmptyLayout
 
 <div class="container">
@@ -26,9 +25,9 @@
                         <DataAnnotationsValidator />
 
                         <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <InputText @bind-Value="loginRequest.Email" class="form-control" placeholder="tu@email.com" />
-                            <ValidationMessage For="@(() => loginRequest.Email)" />
+                            <label class="form-label">Email o usuario</label>
+                            <InputText @bind-Value="loginRequest.Identifier" class="form-control" placeholder="tu@email.com" />
+                            <ValidationMessage For="@(() => loginRequest.Identifier)" />
                         </div>
 
                         <div class="mb-3">
@@ -77,6 +76,14 @@
     private string? errorMessage;
     private bool isLoading;
 
+    protected override async Task OnInitializedAsync()
+    {
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
     private async Task HandleLogin()
     {
         isLoading = true;
@@ -88,9 +95,6 @@
 
             if (result.Success)
             {
-                ((CustomAuthStateProvider)AuthStateProvider)
-                    .NotifyUserAuthentication(result.Token);
-
                 NavigationManager.NavigateTo("/");
             }
             else
