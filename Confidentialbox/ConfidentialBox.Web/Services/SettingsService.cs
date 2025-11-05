@@ -48,6 +48,20 @@ public class SettingsService : ISettingsService
         return await ParseOperationResultAsync(response);
     }
 
+    public async Task<RegistrationSettingsDto?> GetRegistrationSettingsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<RegistrationSettingsDto>("api/settings/auth/registration");
+    }
+
+    public async Task<bool> UpdateRegistrationSettingsAsync(bool isEnabled)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/settings/auth/registration", new RegistrationSettingsDto
+        {
+            IsRegistrationEnabled = isEnabled
+        });
+        return await ParseOperationResultAsync(response);
+    }
+
     private static async Task<bool> ParseOperationResultAsync(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)

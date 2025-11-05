@@ -1,9 +1,9 @@
-﻿<CascadingAuthenticationState>
+<CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" Context="authContext">
                 <NotAuthorized>
-                    @if (context.User.Identity?.IsAuthenticated == true)
+                    @if (authContext.User.Identity?.IsAuthenticated == true)
                     {
                         <p>No tienes permisos para acceder a esta página.</p>
                     }

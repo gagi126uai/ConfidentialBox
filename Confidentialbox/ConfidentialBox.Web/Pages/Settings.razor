@@ -191,6 +191,43 @@ else
                 </div>
             </div>
         </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Seguridad de acceso</h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(registrationMessage))
+                    {
+                        <div class="alert @(registrationSuccess ? "alert-success" : "alert-danger")">@registrationMessage</div>
+                    }
+
+                    <div class="form-check form-switch mb-3">
+                        <InputCheckbox @bind-Value="registrationSettings.IsRegistrationEnabled" class="form-check-input" id="registrationToggle" />
+                        <label class="form-check-label" for="registrationToggle">
+                            Permitir registro público de usuarios
+                        </label>
+                    </div>
+
+                    <p class="text-muted small">
+                        Cuando esta opción está desactivada, solo un administrador puede dar de alta nuevas cuentas desde este panel.
+                    </p>
+
+                    <button class="btn btn-outline-primary w-100" @onclick="UpdateRegistrationSettingsAsync" disabled="@registrationSaving">
+                        @if (registrationSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            Guardando cambios...
+                        }
+                        else
+                        {
+                            Guardar preferencia
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 }
 
@@ -198,11 +235,13 @@ else
     private FileStorageSettings storageSettings = new();
     private EmailServerSettingsDto emailServer = new();
     private EmailNotificationSettingsDto notifications = new();
+    private RegistrationSettingsDto registrationSettings = new();
 
     private bool isLoading = true;
     private bool storageSaving;
     private bool emailSaving;
     private bool notificationsSaving;
+    private bool registrationSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -210,6 +249,8 @@ else
     private bool emailSuccess;
     private string? notificationMessage;
     private bool notificationSuccess;
+    private string? registrationMessage;
+    private bool registrationSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -223,6 +264,7 @@ else
             storageSettings = await SettingsService.GetStorageSettingsAsync() ?? new FileStorageSettings();
             emailServer = await SettingsService.GetEmailServerSettingsAsync() ?? new EmailServerSettingsDto();
             notifications = await SettingsService.GetEmailNotificationSettingsAsync() ?? new EmailNotificationSettingsDto();
+            registrationSettings = await SettingsService.GetRegistrationSettingsAsync() ?? new RegistrationSettingsDto();
         }
         finally
         {
@@ -297,6 +339,35 @@ else
         finally
         {
             notificationsSaving = false;
+        }
+    }
+
+    private async Task UpdateRegistrationSettingsAsync()
+    {
+        registrationMessage = null;
+        registrationSaving = true;
+
+        try
+        {
+            registrationSuccess = await SettingsService.UpdateRegistrationSettingsAsync(registrationSettings.IsRegistrationEnabled);
+            registrationMessage = registrationSuccess
+                ? (registrationSettings.IsRegistrationEnabled
+                    ? "El registro público está habilitado."
+                    : "El registro público fue deshabilitado.")
+                : "No se pudo actualizar la preferencia de registro.";
+
+            if (registrationSuccess)
+            {
+                var refreshed = await SettingsService.GetRegistrationSettingsAsync();
+                if (refreshed is not null)
+                {
+                    registrationSettings = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            registrationSaving = false;
         }
     }
 }

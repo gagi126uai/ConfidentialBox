@@ -42,6 +42,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<List<FileDto>>> GetAll()
     {
         var files = await _fileRepository.GetAllAsync(includeDeleted: false);

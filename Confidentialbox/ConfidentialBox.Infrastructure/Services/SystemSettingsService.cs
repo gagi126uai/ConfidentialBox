@@ -17,6 +17,8 @@ public class SystemSettingsService : ISystemSettingsService
     private const string StorageCategory = "Storage";
     private const string EmailServerCategory = "EmailServer";
     private const string EmailNotificationCategory = "EmailNotifications";
+    private const string SecurityCategory = "Security";
+    private const string RegistrationEnabledKey = "UserRegistrationEnabled";
 
     private readonly ApplicationDbContext _context;
     private readonly IEncryptionService _encryptionService;
@@ -167,6 +169,25 @@ public class SystemSettingsService : ISystemSettingsService
 
         var serialized = JsonSerializer.Serialize(settings);
         await UpsertSettingAsync(EmailNotificationCategory, "Channels", serialized, false, updatedByUserId, cancellationToken);
+    }
+
+    public async Task<bool> IsUserRegistrationEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        var setting = await _context.SystemSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Category == SecurityCategory && s.Key == RegistrationEnabledKey, cancellationToken);
+
+        if (setting == null || string.IsNullOrWhiteSpace(setting.Value))
+        {
+            return true;
+        }
+
+        return bool.TryParse(setting.Value, out var value) ? value : true;
+    }
+
+    public async Task UpdateUserRegistrationEnabledAsync(bool isEnabled, string? updatedByUserId, CancellationToken cancellationToken = default)
+    {
+        await UpsertSettingAsync(SecurityCategory, RegistrationEnabledKey, isEnabled.ToString(), false, updatedByUserId, cancellationToken);
     }
 
     private async Task UpsertSettingAsync(string category, string key, string value, bool isSensitive, string? updatedByUserId, CancellationToken cancellationToken)

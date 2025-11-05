@@ -12,4 +12,6 @@ public interface ISystemSettingsService
 
     Task<EmailNotificationSettings> GetEmailNotificationSettingsAsync(CancellationToken cancellationToken = default);
     Task UpdateEmailNotificationSettingsAsync(EmailNotificationSettings settings, string? updatedByUserId, CancellationToken cancellationToken = default);
+    Task<bool> IsUserRegistrationEnabledAsync(CancellationToken cancellationToken = default);
+    Task UpdateUserRegistrationEnabledAsync(bool isEnabled, string? updatedByUserId, CancellationToken cancellationToken = default);
 }

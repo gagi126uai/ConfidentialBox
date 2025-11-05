@@ -12,4 +12,5 @@ public interface IAuthService
     Task<bool> IsAuthenticatedAsync();
     Task<bool> ForgotPasswordAsync(ForgotPasswordRequest request);
     Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
+    Task<bool> IsRegistrationEnabledAsync();
 }

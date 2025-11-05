@@ -45,41 +45,64 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        var token = await _localStorage.GetItemAsync<string>("authToken");
+        var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
 
-        if (string.IsNullOrEmpty(token))
+        string? token = null;
+        try
         {
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            token = await _localStorage.GetItemAsync<string>("authToken");
+        }
+        catch (InvalidOperationException)
+        {
+            // Durante el prerender todavía no está disponible el almacenamiento local
+            return new AuthenticationState(anonymous);
         }
 
-        var claims = ParseClaimsFromJwt(token);
-        var identity = new ClaimsIdentity(claims, "jwt");
-        var user = new ClaimsPrincipal(identity);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+            return new AuthenticationState(anonymous);
+        }
 
+        var principal = BuildPrincipalFromToken(token);
         _httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        return new AuthenticationState(user);
+        return new AuthenticationState(principal);
     }
 
     public void NotifyUserAuthentication(string token)
     {
-        var claims = ParseClaimsFromJwt(token);
-        var identity = new ClaimsIdentity(claims, "jwt");
-        var user = new ClaimsPrincipal(identity);
+        _httpClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+        var principal = BuildPrincipalFromToken(token);
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
     }
 
     public void NotifyUserLogout()
     {
-        var identity = new ClaimsIdentity();
-        var user = new ClaimsPrincipal(identity);
+        _httpClient.DefaultRequestHeaders.Authorization = null;
 
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+        var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymous)));
     }
 
-    private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
+    private ClaimsPrincipal BuildPrincipalFromToken(string token)
+    {
+        try
+        {
+            var claims = ParseClaimsFromJwt(token);
+            var identity = new ClaimsIdentity(claims, "jwt");
+            return new ClaimsPrincipal(identity);
+        }
+        catch
+        {
+            return new ClaimsPrincipal(new ClaimsIdentity());
+        }
+    }
+
+    private static IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
     {
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(jwt);

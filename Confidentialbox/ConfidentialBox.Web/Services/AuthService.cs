@@ -1,3 +1,4 @@
+using System;
 using Blazored.LocalStorage;
 using ConfidentialBox.Core.DTOs;
 using System.Net.Http;
@@ -11,12 +12,14 @@ public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
     private readonly ILocalStorageService _localStorage;
+    private readonly CustomAuthStateProvider _authStateProvider;
     private const string TOKEN_KEY = "authToken";
 
-    public AuthService(HttpClient httpClient, ILocalStorageService localStorage)
+    public AuthService(HttpClient httpClient, ILocalStorageService localStorage, CustomAuthStateProvider authStateProvider)
     {
         _httpClient = httpClient;
         _localStorage = localStorage;
+        _authStateProvider = authStateProvider;
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
@@ -29,6 +32,7 @@ public class AuthService : IAuthService
             await _localStorage.SetItemAsync(TOKEN_KEY, result.Token);
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", result.Token);
+            _authStateProvider.NotifyUserAuthentication(result.Token);
         }
 
         return result ?? new LoginResponse { Success = false, ErrorMessage = "Error desconocido" };
@@ -44,6 +48,7 @@ public class AuthService : IAuthService
             await _localStorage.SetItemAsync(TOKEN_KEY, result.Token);
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", result.Token);
+            _authStateProvider.NotifyUserAuthentication(result.Token);
         }
 
         return result ?? new LoginResponse { Success = false, ErrorMessage = "Error desconocido" };
@@ -53,11 +58,20 @@ public class AuthService : IAuthService
     {
         await _localStorage.RemoveItemAsync(TOKEN_KEY);
         _httpClient.DefaultRequestHeaders.Authorization = null;
+        _authStateProvider.NotifyUserLogout();
     }
 
     public async Task<string?> GetTokenAsync()
     {
-        return await _localStorage.GetItemAsync<string>(TOKEN_KEY);
+        try
+        {
+            return await _localStorage.GetItemAsync<string>(TOKEN_KEY);
+        }
+        catch (InvalidOperationException)
+        {
+            // El almacenamiento local no está disponible durante el prerender
+            return null;
+        }
     }
 
     public async Task<bool> IsAuthenticatedAsync()
@@ -88,5 +102,18 @@ public class AuthService : IAuthService
 
         var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
         return result?.Success == true;
+    }
+
+    public async Task<bool> IsRegistrationEnabledAsync()
+    {
+        try
+        {
+            var result = await _httpClient.GetFromJsonAsync<RegistrationSettingsDto>("api/auth/registration-status");
+            return result?.IsRegistrationEnabled ?? true;
+        }
+        catch
+        {
+            return true;
+        }
     }
 }

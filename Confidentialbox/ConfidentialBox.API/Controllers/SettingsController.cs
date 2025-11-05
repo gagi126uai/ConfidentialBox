@@ -133,6 +133,20 @@ public class SettingsController : ControllerBase
         return Ok(new OperationResultDto { Success = true });
     }
 
+    [HttpGet("auth/registration")]
+    public async Task<ActionResult<RegistrationSettingsDto>> GetRegistrationSettings(CancellationToken cancellationToken)
+    {
+        var isEnabled = await _systemSettingsService.IsUserRegistrationEnabledAsync(cancellationToken);
+        return Ok(new RegistrationSettingsDto { IsRegistrationEnabled = isEnabled });
+    }
+
+    [HttpPost("auth/registration")]
+    public async Task<ActionResult<OperationResultDto>> UpdateRegistrationSettings([FromBody] RegistrationSettingsDto request, CancellationToken cancellationToken)
+    {
+        await _systemSettingsService.UpdateUserRegistrationEnabledAsync(request.IsRegistrationEnabled, GetUserId(), cancellationToken);
+        return Ok(new OperationResultDto { Success = true });
+    }
+
     private string? GetUserId()
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier);
