@@ -21,6 +21,7 @@ public class FilesController : ControllerBase
     private readonly IShareLinkGenerator _linkGenerator;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAISecurityService _aiSecurityService;
+    private readonly IFileStorageService _fileStorageService;
 
     public FilesController(
         IFileRepository fileRepository,
@@ -28,7 +29,8 @@ public class FilesController : ControllerBase
         IAuditLogRepository auditLogRepository,
         IShareLinkGenerator linkGenerator,
         UserManager<ApplicationUser> userManager,
-        IAISecurityService aiSecurityService)
+        IAISecurityService aiSecurityService,
+        IFileStorageService fileStorageService)
     {
         _fileRepository = fileRepository;
         _fileAccessRepository = fileAccessRepository;
@@ -36,6 +38,7 @@ public class FilesController : ControllerBase
         _linkGenerator = linkGenerator;
         _userManager = userManager;
         _aiSecurityService = aiSecurityService;
+        _fileStorageService = fileStorageService;
     }
 
     [HttpGet]
@@ -118,6 +121,13 @@ public class FilesController : ControllerBase
             // Detectar si es PDF
             var isPDF = request.FileExtension.Equals(".pdf", StringComparison.OrdinalIgnoreCase);
 
+            if (string.IsNullOrWhiteSpace(request.EncryptedContent))
+            {
+                return BadRequest("El contenido cifrado es obligatorio");
+            }
+
+            var encryptedBytes = Convert.FromBase64String(request.EncryptedContent);
+
             var file = new SharedFile
             {
                 OriginalFileName = request.OriginalFileName,
@@ -132,13 +142,17 @@ public class FilesController : ControllerBase
                 UploadedByUserId = userId,
                 UploadedAt = DateTime.UtcNow,
                 IsPDF = isPDF,
-                // Configuración por defecto para PDFs
-                HasWatermark = isPDF, // Activar marca de agua por defecto para PDFs
-                ScreenshotProtectionEnabled = isPDF,
-                PrintProtectionEnabled = isPDF,
-                CopyProtectionEnabled = isPDF,
-                AIMonitoringEnabled = isPDF
+                // Configuración del visor seguro
+                HasWatermark = isPDF && request.EnableWatermark,
+                WatermarkText = string.IsNullOrWhiteSpace(request.WatermarkText) ? "CONFIDENTIAL" : request.WatermarkText,
+                ScreenshotProtectionEnabled = isPDF && (request.ScreenshotProtection || request.EnableWatermark),
+                PrintProtectionEnabled = isPDF && (request.PrintProtection || request.ScreenshotProtection),
+                CopyProtectionEnabled = isPDF && (request.CopyProtection || request.ScreenshotProtection),
+                AIMonitoringEnabled = isPDF && (request.AiMonitoring || request.ScreenshotProtection),
+                MaxViewTimeMinutes = request.MaxViewTimeMinutes
             };
+
+            await _fileStorageService.StoreFileAsync(file, encryptedBytes, HttpContext.RequestAborted);
 
             var savedFile = await _fileRepository.AddAsync(file);
 
@@ -206,51 +220,52 @@ public class FilesController : ControllerBase
             return NotFound("Archivo no encontrado");
         }
 
-        // Verificar si está bloqueado
-        if (file.IsBlocked)
+        var validation = await ValidateFileAccessAsync(file, masterPassword, incrementCounter: false);
+        if (!validation.Success)
         {
-            await LogFileAccess(file.Id, "AccessBlocked", false);
-            return BadRequest("Este archivo ha sido bloqueado");
+            return BadRequest(validation.ErrorMessage);
         }
 
-        // Verificar si está eliminado
-        if (file.IsDeleted)
-        {
-            return NotFound("Archivo no encontrado");
-        }
-
-        // Verificar expiración
-        if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
-        {
-            await LogFileAccess(file.Id, "AccessExpired", false);
-            return BadRequest("Este archivo ha expirado");
-        }
-
-        // Verificar límite de accesos
-        if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
-        {
-            await LogFileAccess(file.Id, "AccessLimitReached", false);
-            return BadRequest("Se ha alcanzado el límite de accesos para este archivo");
-        }
-
-        // Verificar contraseña maestra
-        if (!string.IsNullOrEmpty(file.MasterPassword))
-        {
-            if (string.IsNullOrEmpty(masterPassword) || file.MasterPassword != masterPassword)
-            {
-                await LogFileAccess(file.Id, "InvalidPassword", false);
-                return BadRequest("Contraseña incorrecta");
-            }
-        }
-
-        // Incrementar contador de accesos
-        file.CurrentAccessCount++;
-        await _fileRepository.UpdateAsync(file);
-
-        // Registrar acceso exitoso
         await LogFileAccess(file.Id, "AccessGranted", true);
 
         return Ok(MapToDto(file));
+    }
+
+    [HttpGet("content/{shareLink}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<FileContentResponse>> GetFileContent(string shareLink, [FromQuery] string? masterPassword)
+    {
+        var file = await _fileRepository.GetByShareLinkAsync(shareLink);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        var validation = await ValidateFileAccessAsync(file, masterPassword, incrementCounter: true);
+        if (!validation.Success)
+        {
+            return Ok(validation);
+        }
+
+        var encryptedBytes = await _fileStorageService.GetFileAsync(file, HttpContext.RequestAborted);
+        await LogFileAccess(file.Id, file.IsPDF ? "ContentRetrievedForViewer" : "ContentDownloaded", true);
+
+        return Ok(new FileContentResponse
+        {
+            Success = true,
+            FileName = file.OriginalFileName,
+            FileExtension = file.FileExtension,
+            EncryptedContent = Convert.ToBase64String(encryptedBytes),
+            EncryptionKey = file.EncryptionKey,
+            IsPdf = file.IsPDF,
+            HasWatermark = file.HasWatermark,
+            WatermarkText = file.WatermarkText,
+            ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled,
+            PrintProtectionEnabled = file.PrintProtectionEnabled,
+            CopyProtectionEnabled = file.CopyProtectionEnabled,
+            AimMonitoringEnabled = file.AIMonitoringEnabled,
+            MaxViewTimeMinutes = file.MaxViewTimeMinutes
+        });
     }
 
     [HttpPut("{id}/block")]
@@ -366,6 +381,69 @@ public class FilesController : ControllerBase
         });
     }
 
+    private async Task<FileContentResponse> ValidateFileAccessAsync(SharedFile file, string? masterPassword, bool incrementCounter)
+    {
+        if (file.IsBlocked)
+        {
+            await LogFileAccess(file.Id, "AccessBlocked", false);
+            return new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "Este archivo ha sido bloqueado"
+            };
+        }
+
+        if (file.IsDeleted)
+        {
+            return new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "Archivo no disponible"
+            };
+        }
+
+        if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
+        {
+            await LogFileAccess(file.Id, "AccessExpired", false);
+            return new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "Este archivo ha expirado"
+            };
+        }
+
+        if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
+        {
+            await LogFileAccess(file.Id, "AccessLimitReached", false);
+            return new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "Se alcanzó el límite de accesos"
+            };
+        }
+
+        if (!string.IsNullOrEmpty(file.MasterPassword))
+        {
+            if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
+            {
+                await LogFileAccess(file.Id, "InvalidPassword", false);
+                return new FileContentResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Contraseña incorrecta"
+                };
+            }
+        }
+
+        if (incrementCounter)
+        {
+            file.CurrentAccessCount++;
+            await _fileRepository.UpdateAsync(file);
+        }
+
+        return new FileContentResponse { Success = true };
+    }
+
     private FileDto MapToDto(SharedFile file)
     {
         return new FileDto
@@ -382,7 +460,11 @@ public class FilesController : ControllerBase
             IsBlocked = file.IsBlocked,
             BlockReason = file.BlockReason,
             UploadedByUserName = $"{file.UploadedByUser?.FirstName} {file.UploadedByUser?.LastName}",
-            HasMasterPassword = !string.IsNullOrEmpty(file.MasterPassword)
+            HasMasterPassword = !string.IsNullOrEmpty(file.MasterPassword),
+            IsPdf = file.IsPDF,
+            HasWatermark = file.HasWatermark,
+            ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled,
+            AimMonitoringEnabled = file.AIMonitoringEnabled
         };
     }
 }

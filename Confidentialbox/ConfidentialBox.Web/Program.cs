@@ -23,13 +23,15 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IPdfViewerService, PdfViewerService>();
+builder.Services.AddScoped<ISettingsService, SettingsService>();
 
-// Configurar autenticación
+// Configurar autenticaciÃ³n
 builder.Services.AddScoped<CustomAuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(provider =>
     provider.GetRequiredService<CustomAuthStateProvider>());
 
-// Agregar autorización
+// Agregar autorizaciÃ³n
 builder.Services.AddAuthorizationCore();
 
 var app = builder.Build();
@@ -49,49 +51,3 @@ app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
-
-
-//using ConfidentialBox.Web.Services;
-//using Microsoft.AspNetCore.Components.Authorization;
-//using Blazored.LocalStorage;
-
-//var builder = WebApplication.CreateBuilder(args);
-
-//// Add services to the container.
-//builder.Services.AddRazorPages();
-//builder.Services.AddServerSideBlazor();
-
-//// Configurar HttpClient para API
-//builder.Services.AddScoped(sp => new HttpClient
-//{
-//    BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7001/")
-//});
-
-//// Servicios personalizados
-//builder.Services.AddScoped<IAuthService, AuthService>();
-//builder.Services.AddScoped<IFileService, FileService>();
-//builder.Services.AddScoped<IUserService, UserService>();
-//builder.Services.AddScoped<IDashboardService, DashboardService>();
-//builder.Services.AddScoped<IRoleService, RoleService>();
-//builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
-
-//// Local Storage
-//builder.Services.AddBlazoredLocalStorage();
-
-//var app = builder.Build();
-
-//// Configure the HTTP request pipeline.
-//if (!app.Environment.IsDevelopment())
-//{
-//    app.UseExceptionHandler("/Error");
-//    app.UseHsts();
-//}
-
-//app.UseHttpsRedirection();
-//app.UseStaticFiles();
-//app.UseRouting();
-
-//app.MapBlazorHub();
-//app.MapFallbackToPage("/_Host");
-
-//app.Run();

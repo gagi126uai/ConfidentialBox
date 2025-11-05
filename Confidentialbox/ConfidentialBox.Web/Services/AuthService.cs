@@ -1,4 +1,4 @@
-﻿using Blazored.LocalStorage;
+using Blazored.LocalStorage;
 using ConfidentialBox.Core.DTOs;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -64,5 +64,29 @@ public class AuthService : IAuthService
     {
         var token = await GetTokenAsync();
         return !string.IsNullOrEmpty(token);
+    }
+
+    public async Task<bool> ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/auth/forgot-password", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return false;
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        return result?.Success == true;
+    }
+
+    public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/auth/reset-password", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return false;
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        return result?.Success == true;
     }
 }

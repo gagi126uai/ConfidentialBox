@@ -1,5 +1,6 @@
 ﻿
 using ConfidentialBox.Core.DTOs;
+using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
 using ConfidentialBox.Infrastructure.Repositories;
 using ConfidentialBox.Infrastructure.Services;
@@ -16,15 +17,21 @@ public class PDFViewerController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IFileRepository _fileRepository;
+    private readonly IFileStorageService _fileStorageService;
+    private readonly IFileAccessRepository _fileAccessRepository;
     private readonly IPDFViewerAIService _pdfViewerAI;
 
     public PDFViewerController(
         ApplicationDbContext context,
         IFileRepository fileRepository,
+        IFileStorageService fileStorageService,
+        IFileAccessRepository fileAccessRepository,
         IPDFViewerAIService pdfViewerAI)
     {
         _context = context;
         _fileRepository = fileRepository;
+        _fileStorageService = fileStorageService;
+        _fileAccessRepository = fileAccessRepository;
         _pdfViewerAI = pdfViewerAI;
     }
 
@@ -73,12 +80,30 @@ public class PDFViewerController : ControllerBase
                 });
             }
 
+            if (file.IsDeleted)
+            {
+                return Ok(new StartViewerSessionResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Este archivo ya no está disponible"
+                });
+            }
+
             if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
             {
                 return Ok(new StartViewerSessionResponse
                 {
                     Success = false,
                     ErrorMessage = "Este archivo ha expirado"
+                });
+            }
+
+            if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
+            {
+                return Ok(new StartViewerSessionResponse
+                {
+                    Success = false,
+                    ErrorMessage = "Se alcanzó el límite de accesos para este archivo"
                 });
             }
 
@@ -100,6 +125,20 @@ public class PDFViewerController : ControllerBase
             var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
 
             var session = await _pdfViewerAI.StartSessionAsync(file, userId, ipAddress, userAgent);
+
+            file.CurrentAccessCount++;
+            await _fileRepository.UpdateAsync(file);
+
+            await _fileAccessRepository.AddAsync(new FileAccess
+            {
+                SharedFileId = file.Id,
+                AccessedByUserId = userId,
+                AccessedAt = DateTime.UtcNow,
+                AccessedByIP = ipAddress,
+                Action = "PdfViewerStart",
+                WasAuthorized = true,
+                UserAgent = userAgent
+            });
 
             var config = new PDFViewerConfigDto
             {
@@ -153,10 +192,14 @@ public class PDFViewerController : ControllerBase
 
             if (session?.WasBlocked == true)
             {
-                return Ok(new { blocked = true, reason = session.BlockReason });
+                return Ok(new ViewerEventResultDto
+                {
+                    Blocked = true,
+                    Reason = session.BlockReason
+                });
             }
 
-            return Ok(new { blocked = false });
+            return Ok(new ViewerEventResultDto { Blocked = false });
         }
         catch (Exception ex)
         {
@@ -309,6 +352,91 @@ public class PDFViewerController : ControllerBase
             if (!string.IsNullOrWhiteSpace(first)) return first.Trim();
         }
         return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+    }
+
+    [HttpGet("content/{sessionId}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<FileContentResponse>> GetContent(string sessionId, CancellationToken ct)
+    {
+        var session = await _context.PDFViewerSessions
+            .Include(s => s.SharedFile)
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId, ct);
+
+        if (session == null)
+        {
+            return NotFound();
+        }
+
+        if (session.WasBlocked)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = session.BlockReason ?? "La sesión fue bloqueada por motivos de seguridad"
+            });
+        }
+
+        var file = session.SharedFile ?? await _fileRepository.GetByIdAsync(session.SharedFileId);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (file.IsBlocked)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "El archivo fue bloqueado por el administrador"
+            });
+        }
+
+        if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "El enlace ha expirado"
+            });
+        }
+
+        var encryptedBytes = await _fileStorageService.GetFileAsync(file, ct);
+
+        await _fileAccessRepository.AddAsync(new FileAccess
+        {
+            SharedFileId = file.Id,
+            AccessedByUserId = session.ViewerUserId,
+            AccessedAt = DateTime.UtcNow,
+            AccessedByIP = session.ViewerIP ?? "Unknown",
+            Action = "PdfViewerContent",
+            WasAuthorized = true,
+            UserAgent = session.UserAgent
+        });
+
+        return Ok(new FileContentResponse
+        {
+            Success = true,
+            FileName = file.OriginalFileName,
+            FileExtension = file.FileExtension,
+            EncryptedContent = Convert.ToBase64String(encryptedBytes),
+            EncryptionKey = file.EncryptionKey,
+            IsPdf = file.IsPDF,
+            HasWatermark = file.HasWatermark,
+            WatermarkText = file.WatermarkText,
+            ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled,
+            PrintProtectionEnabled = file.PrintProtectionEnabled,
+            CopyProtectionEnabled = file.CopyProtectionEnabled,
+            AimMonitoringEnabled = file.AIMonitoringEnabled,
+            MaxViewTimeMinutes = file.MaxViewTimeMinutes
+        });
+    }
+
+    [HttpPost("end-session/{sessionId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EndSession(string sessionId)
+    {
+        await _pdfViewerAI.EndSessionAsync(sessionId);
+        return Ok();
     }
 }
 

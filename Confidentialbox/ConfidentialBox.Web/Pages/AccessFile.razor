@@ -1,0 +1,257 @@
+@page "/access/{ShareLink}"
+@attribute [AllowAnonymous]
+@inject IFileService FileService
+@inject IJSRuntime JS
+@using System.Security.Cryptography
+
+<PageTitle>Acceso Seguro - ConfidentialBox</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-3"><i class="fas fa-shield-alt text-primary"></i> Acceso a Archivo Compartido</h1>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(infoMessage))
+                    {
+                        <div class="alert alert-info">@infoMessage</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success">@successMessage</div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        if (fileMetadata != null)
+                        {
+                            <div class="mb-4">
+                                <h5 class="fw-bold">@fileMetadata.OriginalFileName</h5>
+                                <p class="text-muted mb-1"><i class="fas fa-file"></i> Tipo: @fileMetadata.FileExtension</p>
+                                <p class="text-muted mb-1"><i class="fas fa-database"></i> Tamaño: @FormatBytes(fileMetadata.FileSizeBytes)</p>
+                                <p class="text-muted"><i class="fas fa-calendar-alt"></i> Subido: @fileMetadata.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                            </div>
+
+                            if (fileMetadata.HasMasterPassword && !hasValidatedPassword)
+                            {
+                                <div class="alert alert-info">
+                                    <i class="fas fa-lock"></i> Este archivo requiere una contraseña maestra proporcionada por el remitente.
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                Ingresa la contraseña maestra para validar el acceso a este archivo.
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Contraseña Maestra (si es requerida)</label>
+                            <input type="password" class="form-control" @bind="masterPassword" />
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" @onclick="ValidateAccess" disabled="@isProcessing">
+                                @if (isProcessing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                <i class="fas fa-check"></i> Validar Acceso
+                            </button>
+
+                            <button class="btn btn-success" disabled="@(!hasValidatedPassword || isProcessing)" @onclick="DownloadFile">
+                                <i class="fas fa-download"></i> Descargar Archivo
+                            </button>
+
+                            @if (fileMetadata?.IsPdf == true)
+                            {
+                                <a class="btn btn-outline-secondary" href="/view-pdf/@ShareLink">
+                                    <i class="fas fa-eye"></i> Abrir en visor seguro
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string ShareLink { get; set; } = string.Empty;
+
+    private FileDto? fileMetadata;
+    private string? masterPassword;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? infoMessage;
+    private bool isLoading = true;
+    private bool isProcessing;
+    private bool hasValidatedPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetadata();
+    }
+
+    private async Task LoadMetadata()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            successMessage = null;
+            hasValidatedPassword = false;
+
+            fileMetadata = await FileService.AccessFileAsync(ShareLink, null);
+
+            if (fileMetadata == null)
+            {
+                infoMessage = "Introduce la contraseña maestra para continuar con la validación.";
+            }
+            else
+            {
+                infoMessage = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            infoMessage = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ValidateAccess()
+    {
+        if (fileMetadata == null)
+        {
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            successMessage = null;
+            errorMessage = null;
+            infoMessage = null;
+
+            var response = await FileService.AccessFileAsync(ShareLink, masterPassword);
+
+            if (response == null)
+            {
+                errorMessage = "No se pudo validar el acceso al archivo.";
+                return;
+            }
+            fileMetadata = response;
+            successMessage = "Acceso validado correctamente. Puedes descargar el archivo.";
+            hasValidatedPassword = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            infoMessage = null;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task DownloadFile()
+    {
+        if (fileMetadata == null)
+        {
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            infoMessage = null;
+            successMessage = null;
+
+            var contentResponse = await FileService.GetFileContentAsync(ShareLink, masterPassword);
+            if (contentResponse == null)
+            {
+                errorMessage = "No se pudo obtener el archivo.";
+                hasValidatedPassword = false;
+                return;
+            }
+
+            if (!contentResponse.Success)
+            {
+                errorMessage = contentResponse.ErrorMessage ?? "Acceso denegado.";
+                hasValidatedPassword = false;
+                return;
+            }
+
+            var decryptedBytes = DecryptContent(contentResponse.EncryptedContent, contentResponse.EncryptionKey);
+            var base64 = Convert.ToBase64String(decryptedBytes);
+            await JS.InvokeVoidAsync("confidentialBox.downloadFile", fileMetadata.OriginalFileName, base64);
+            successMessage = "Descarga iniciada.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private static byte[] DecryptContent(string encryptedContent, string encryptionKey)
+    {
+        var fullCipher = Convert.FromBase64String(encryptedContent);
+        var keyBytes = Convert.FromBase64String(encryptionKey);
+
+        using var aes = Aes.Create();
+        aes.Key = keyBytes;
+
+        var iv = new byte[aes.BlockSize / 8];
+        Buffer.BlockCopy(fullCipher, 0, iv, 0, iv.Length);
+        aes.IV = iv;
+
+        using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+        using var ms = new MemoryStream(fullCipher, iv.Length, fullCipher.Length - iv.Length);
+        using var cryptoStream = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
+        using var resultStream = new MemoryStream();
+        cryptoStream.CopyTo(resultStream);
+        return resultStream.ToArray();
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

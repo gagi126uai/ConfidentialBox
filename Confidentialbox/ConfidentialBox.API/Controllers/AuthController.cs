@@ -1,9 +1,14 @@
-﻿using ConfidentialBox.Core.DTOs;
+using ConfidentialBox.Core.DTOs;
 using ConfidentialBox.Core.Entities;
+using ConfidentialBox.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 
@@ -16,15 +21,18 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _configuration;
+    private readonly IEmailNotificationService _emailNotificationService;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IEmailNotificationService emailNotificationService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _configuration = configuration;
+        _emailNotificationService = emailNotificationService;
     }
 
     [HttpPost("login")]
@@ -120,6 +128,82 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user == null || !user.IsActive)
+        {
+            return Ok(new OperationResultDto { Success = true });
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+
+        var baseUrl = _configuration["ClientApp:BaseUrl"] ?? "https://localhost:7002";
+        var resetUrl = BuildResetUrl(baseUrl, user.Email!, encodedToken);
+
+        try
+        {
+            await _emailNotificationService.SendPasswordResetAsync(user, resetUrl, HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new OperationResultDto
+            {
+                Success = false,
+                Error = "No fue posible enviar el correo de recuperación. Verifique la configuración del servidor de correo.",
+                Detail = ex.Message
+            });
+        }
+
+        return Ok(new OperationResultDto { Success = true });
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user == null)
+        {
+            return Ok(new OperationResultDto { Success = true });
+        }
+
+        string decodedToken;
+        try
+        {
+            decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+        }
+        catch
+        {
+            return BadRequest(new OperationResultDto { Success = false, Error = "Token inválido" });
+        }
+
+        var resetResult = await _userManager.ResetPasswordAsync(user, decodedToken, request.NewPassword);
+        if (!resetResult.Succeeded)
+        {
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Detail = string.Join("; ", resetResult.Errors.Select(e => e.Description))
+            });
+        }
+
+        return Ok(new OperationResultDto { Success = true });
+    }
+
     private string GenerateJwtToken(ApplicationUser user, List<string> roles)
     {
         var claims = new List<Claim>
@@ -148,5 +232,13 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static string BuildResetUrl(string baseUrl, string email, string token)
+    {
+        var normalizedBase = baseUrl.TrimEnd('/');
+        var emailParam = Uri.EscapeDataString(email);
+        var tokenParam = Uri.EscapeDataString(token);
+        return $"{normalizedBase}/reset-password?email={emailParam}&token={tokenParam}";
     }
 }

@@ -96,7 +96,7 @@ else if (files != null && files.Any())
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" @onclick="() => CopyShareLink(file.ShareLink)">
+                                        <button class="btn btn-outline-primary" @onclick="() => CopyShareLink(file.ShareLink, file.IsPdf)">
                                             <i class="fas fa-link"></i>
                                         </button>
                                         <button class="btn btn-outline-info" @onclick="() => ViewFileDetails(file.Id)">
@@ -156,10 +156,12 @@ else
         }
     }
 
-    private async Task CopyShareLink(string shareLink)
+    private async Task CopyShareLink(string shareLink, bool isPdf)
     {
         var baseUri = NavigationManager.BaseUri.TrimEnd('/');
-        var fullLink = $"{baseUri}/access/{shareLink}";
+        var fullLink = isPdf
+            ? $"{baseUri}/view-pdf/{shareLink}"
+            : $"{baseUri}/access/{shareLink}";
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", fullLink);
 
         successMessage = "Link copiado al portapapeles";

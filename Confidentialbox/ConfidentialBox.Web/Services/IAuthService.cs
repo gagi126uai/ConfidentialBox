@@ -10,4 +10,6 @@ public interface IAuthService
     Task LogoutAsync();
     Task<string?> GetTokenAsync();
     Task<bool> IsAuthenticatedAsync();
+    Task<bool> ForgotPasswordAsync(ForgotPasswordRequest request);
+    Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
 }

@@ -1,0 +1,302 @@
+@page "/settings"
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Authorization
+@using ConfidentialBox.Core.Configuration
+@using ConfidentialBox.Core.DTOs
+@inject ISettingsService SettingsService
+
+<PageTitle>Configuración avanzada - ConfidentialBox</PageTitle>
+
+<h1 class="mb-4"><i class="fas fa-cogs"></i> Configuración de la plataforma</h1>
+
+@if (isLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+        <p class="mt-3">Cargando ajustes seguros...</p>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Almacenamiento de archivos</h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="storageSettings" OnValidSubmit="UpdateStorageSettingsAsync">
+                        <DataAnnotationsValidator />
+
+                        @if (!string.IsNullOrEmpty(storageMessage))
+                        {
+                            <div class="alert @(storageSuccess ? "alert-success" : "alert-danger")">@storageMessage</div>
+                        }
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="storageSettings.StoreInDatabase" class="form-check-input" id="dbStorage" />
+                            <label class="form-check-label" for="dbStorage">Guardar en base de datos encriptada</label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="storageSettings.StoreOnFileSystem" class="form-check-input" id="fsStorage" />
+                            <label class="form-check-label" for="fsStorage">Guardar en almacenamiento seguro del servidor</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Directorio seguro</label>
+                            <InputText @bind-Value="storageSettings.FileSystemDirectory" class="form-control" />
+                            <div class="form-text">Ruta local o UNC con permisos restringidos. Siempre cifrado.</div>
+                        </div>
+
+                        <button class="btn btn-primary w-100" disabled="@storageSaving">
+                            @if (storageSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span> Guardando...
+                            }
+                            else
+                            {
+                                <span>Actualizar almacenamiento</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Servidor de correo seguro</h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="emailServer" OnValidSubmit="UpdateEmailServerAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(emailMessage))
+                        {
+                            <div class="alert @(emailSuccess ? "alert-success" : "alert-danger")">@emailMessage</div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Servidor SMTP</label>
+                            <InputText @bind-Value="emailServer.SmtpHost" class="form-control" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Puerto</label>
+                            <InputNumber @bind-Value="emailServer.Port" class="form-control" />
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="emailServer.UseSsl" class="form-check-input" id="useSsl" />
+                            <label class="form-check-label" for="useSsl">Usar conexión cifrada (SSL/TLS)</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Usuario</label>
+                            <InputText @bind-Value="emailServer.Username" class="form-control" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Correo remitente</label>
+                            <InputText @bind-Value="emailServer.FromEmail" class="form-control" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre remitente</label>
+                            <InputText @bind-Value="emailServer.FromName" class="form-control" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Clave SMTP (dejar vacía para conservar)</label>
+                            <InputText @bind-Value="emailServer.NewPassword" type="password" class="form-control" />
+                            @if (emailServer.HasPassword)
+                            {
+                                <div class="form-text text-success">Existe una clave almacenada de forma cifrada.</div>
+                            }
+                        </div>
+
+                        <button class="btn btn-primary w-100" disabled="@emailSaving">
+                            @if (emailSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span> Guardando...
+                            }
+                            else
+                            {
+                                <span>Actualizar servidor</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Notificaciones automáticas</h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="notifications" OnValidSubmit="UpdateNotificationSettingsAsync">
+                        <DataAnnotationsValidator />
+
+                        @if (!string.IsNullOrEmpty(notificationMessage))
+                        {
+                            <div class="alert @(notificationSuccess ? "alert-success" : "alert-danger")">@notificationMessage</div>
+                        }
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="notifications.SendSecurityAlerts" class="form-check-input" id="securityAlerts" />
+                            <label class="form-check-label" for="securityAlerts">Enviar alertas críticas de seguridad</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Destinatarios alertas (separar por coma)</label>
+                            <InputText @bind-Value="notifications.SecurityAlertRecipients" class="form-control" />
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="notifications.SendPasswordRecovery" class="form-check-input" id="pwdRecovery" />
+                            <label class="form-check-label" for="pwdRecovery">Notificar recuperaciones de contraseña</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Destinatarios recuperación</label>
+                            <InputText @bind-Value="notifications.PasswordRecoveryRecipients" class="form-control" />
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="notifications.SendUserInvitations" class="form-check-input" id="userInvites" />
+                            <label class="form-check-label" for="userInvites">Enviar invitaciones y altas de usuarios</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Destinatarios invitaciones</label>
+                            <InputText @bind-Value="notifications.UserInvitationRecipients" class="form-control" />
+                        </div>
+
+                        <button class="btn btn-primary w-100" disabled="@notificationsSaving">
+                            @if (notificationsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span> Guardando...
+                            }
+                            else
+                            {
+                                <span>Actualizar notificaciones</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private FileStorageSettings storageSettings = new();
+    private EmailServerSettingsDto emailServer = new();
+    private EmailNotificationSettingsDto notifications = new();
+
+    private bool isLoading = true;
+    private bool storageSaving;
+    private bool emailSaving;
+    private bool notificationsSaving;
+
+    private string? storageMessage;
+    private bool storageSuccess;
+    private string? emailMessage;
+    private bool emailSuccess;
+    private string? notificationMessage;
+    private bool notificationSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettingsAsync();
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            storageSettings = await SettingsService.GetStorageSettingsAsync() ?? new FileStorageSettings();
+            emailServer = await SettingsService.GetEmailServerSettingsAsync() ?? new EmailServerSettingsDto();
+            notifications = await SettingsService.GetEmailNotificationSettingsAsync() ?? new EmailNotificationSettingsDto();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateStorageSettingsAsync()
+    {
+        storageMessage = null;
+        storageSaving = true;
+        try
+        {
+            storageSuccess = await SettingsService.UpdateStorageSettingsAsync(storageSettings);
+            storageMessage = storageSuccess ? "Política de almacenamiento actualizada." : "No se pudo guardar la configuración de almacenamiento.";
+            if (storageSuccess)
+            {
+                var refreshed = await SettingsService.GetStorageSettingsAsync();
+                if (refreshed is not null)
+                {
+                    storageSettings = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            storageSaving = false;
+        }
+    }
+
+    private async Task UpdateEmailServerAsync()
+    {
+        emailMessage = null;
+        emailSaving = true;
+        try
+        {
+            emailSuccess = await SettingsService.UpdateEmailServerSettingsAsync(emailServer);
+            emailMessage = emailSuccess ? "Servidor SMTP actualizado." : "No fue posible guardar el servidor SMTP.";
+            if (emailSuccess)
+            {
+                emailServer.NewPassword = string.Empty;
+                var refreshed = await SettingsService.GetEmailServerSettingsAsync();
+                if (refreshed is not null)
+                {
+                    emailServer = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            emailSaving = false;
+        }
+    }
+
+    private async Task UpdateNotificationSettingsAsync()
+    {
+        notificationMessage = null;
+        notificationsSaving = true;
+        try
+        {
+            notificationSuccess = await SettingsService.UpdateEmailNotificationSettingsAsync(notifications);
+            notificationMessage = notificationSuccess ? "Destinatarios actualizados." : "No pudimos guardar las notificaciones.";
+            if (notificationSuccess)
+            {
+                var refreshed = await SettingsService.GetEmailNotificationSettingsAsync();
+                if (refreshed is not null)
+                {
+                    notifications = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            notificationsSaving = false;
+        }
+    }
+}

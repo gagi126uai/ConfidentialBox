@@ -1,3 +1,4 @@
+using ConfidentialBox.Core.Configuration;
 using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
 using ConfidentialBox.Infrastructure.Repositories;
@@ -15,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Configurar Swagger con autenticaci�n JWT
+// Configurar Swagger con autenticación JWT
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "ConfidentialBox API", Version = "v1" });
@@ -35,7 +36,7 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    Id = "Bearer",
                 }
             },
             Array.Empty<string>()
@@ -84,6 +85,9 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Configuración de almacenamiento seguro de archivos
+builder.Services.Configure<FileStorageSettings>(builder.Configuration.GetSection("FileStorage"));
+
 // Registrar repositorios y servicios
 builder.Services.AddScoped<IFileRepository, FileRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -92,6 +96,9 @@ builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IShareLinkGenerator, ShareLinkGenerator>();
 builder.Services.AddScoped<IAISecurityService, AISecurityService>();
 builder.Services.AddScoped<IPDFViewerAIService, PDFViewerAIService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
+builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 
 // Configurar CORS
 builder.Services.AddCors(options =>

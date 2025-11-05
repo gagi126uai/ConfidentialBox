@@ -267,7 +267,11 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     PrintProtectionEnabled = table.Column<bool>(type: "bit", nullable: false),
                     CopyProtectionEnabled = table.Column<bool>(type: "bit", nullable: false),
                     MaxViewTimeMinutes = table.Column<int>(type: "int", nullable: false),
-                    AIMonitoringEnabled = table.Column<bool>(type: "bit", nullable: false)
+                    AIMonitoringEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    EncryptedFileContent = table.Column<byte[]>(type: "varbinary(max)", nullable: true),
+                    StoreInDatabase = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    StoreOnFileSystem = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    StoragePath = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -308,6 +312,30 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SystemSettings",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Category = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsSensitive = table.Column<bool>(type: "bit", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedByUserId = table.Column<string>(type: "nvarchar(450)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SystemSettings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SystemSettings_AspNetUsers_UpdatedByUserId",
+                        column: x => x.UpdatedByUserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -734,6 +762,17 @@ namespace ConfidentialBox.Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SystemSettings_Category_Key",
+                table: "SystemSettings",
+                columns: new[] { "Category", "Key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SystemSettings_UpdatedByUserId",
+                table: "SystemSettings",
+                column: "UpdatedByUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SharedFiles_ShareLink",
                 table: "SharedFiles",
                 column: "ShareLink",
@@ -803,6 +842,9 @@ namespace ConfidentialBox.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "UserBehaviorProfiles");
+
+            migrationBuilder.DropTable(
+                name: "SystemSettings");
 
             migrationBuilder.DropTable(
                 name: "PDFViewerSessions");

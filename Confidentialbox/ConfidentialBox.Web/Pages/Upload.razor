@@ -5,6 +5,7 @@
 @inject IFileService FileService
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
+@using System.Security.Cryptography
 
 <PageTitle>Subir Archivo - ConfidentialBox</PageTitle>
 
@@ -155,12 +156,12 @@
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
                                     @:Cifrando y Subiendo...
-                                                        }
+                                }
                                 else
                                 {
                                     <i class="fas fa-lock"></i>
-                                    @:ifrar y Subir Archivo
-                                                        }
+                                    @:Cifrar y Subir Archivo
+                                }
                             </button>
                         </div>
                     </div>
@@ -275,11 +276,7 @@
             await readStream.CopyToAsync(ms);
             var buffer = ms.ToArray();
 
-            // Generar clave de cifrado (placeholder; en producción usar WebCrypto)
-            var encryptionKey = GenerateRandomKey();
-
-            // Simular cifrado (placeholder - no cifrado real)
-            var encryptedContent = Convert.ToBase64String(buffer);
+            var (encryptionKey, encryptedContent) = EncryptBuffer(buffer);
 
             var request = new FileUploadRequest
             {
@@ -288,13 +285,17 @@
                 FileExtension = Path.GetExtension(selectedFile.Name),
                 FileSizeBytes = selectedFile.Size,
                 EncryptionKey = encryptionKey,
+                EncryptedContent = encryptedContent,
                 MasterPassword = string.IsNullOrWhiteSpace(masterPassword) ? null : masterPassword,
                 ExpiresAt = expirationDate?.ToUniversalTime(),
-                MaxAccessCount = maxAccesses
-                // Si tu API lo soporta, enviar también:
-                // EnableWatermark = enableWatermark,
-                // ScreenshotProtection = screenshotProtection,
-                // AiMonitoring = aiMonitoring
+                MaxAccessCount = maxAccesses,
+                EnableWatermark = isPdf && enableWatermark,
+                WatermarkText = isPdf && enableWatermark ? "CONFIDENTIAL" : null,
+                ScreenshotProtection = isPdf && screenshotProtection,
+                PrintProtection = isPdf && screenshotProtection,
+                CopyProtection = isPdf && screenshotProtection,
+                AiMonitoring = isPdf && aiMonitoring,
+                MaxViewTimeMinutes = 0
             };
 
             var result = await FileService.UploadFileAsync(request);
@@ -321,12 +322,27 @@
         }
     }
 
-    private string GenerateRandomKey()
+    private (string encryptionKey, string encryptedPayload) EncryptBuffer(byte[] buffer)
     {
-        var random = new Random();
-        var bytes = new byte[32];
-        random.NextBytes(bytes);
-        return Convert.ToBase64String(bytes);
+        using var aes = Aes.Create();
+        aes.KeySize = 256;
+        aes.GenerateKey();
+        aes.GenerateIV();
+
+        using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+        using var ms = new MemoryStream();
+        using (var cryptoStream = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+        {
+            cryptoStream.Write(buffer, 0, buffer.Length);
+            cryptoStream.FlushFinalBlock();
+        }
+
+        var cipherBytes = ms.ToArray();
+        var payload = new byte[aes.IV.Length + cipherBytes.Length];
+        Buffer.BlockCopy(aes.IV, 0, payload, 0, aes.IV.Length);
+        Buffer.BlockCopy(cipherBytes, 0, payload, aes.IV.Length, cipherBytes.Length);
+
+        return (Convert.ToBase64String(aes.Key), Convert.ToBase64String(payload));
     }
 
     private string GetFullShareLink()

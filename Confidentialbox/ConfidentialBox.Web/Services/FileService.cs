@@ -62,6 +62,24 @@ public class FileService : IFileService
         }
     }
 
+    public async Task<FileContentResponse?> GetFileContentAsync(string shareLink, string? masterPassword)
+    {
+        var url = $"api/files/content/{shareLink}";
+        if (!string.IsNullOrEmpty(masterPassword))
+        {
+            url += $"?masterPassword={Uri.EscapeDataString(masterPassword)}";
+        }
+
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<FileContentResponse>(url);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> BlockFileAsync(int id, string reason)
     {
         var response = await _httpClient.PutAsJsonAsync($"api/files/{id}/block", reason);

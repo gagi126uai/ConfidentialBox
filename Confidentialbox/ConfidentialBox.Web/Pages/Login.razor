@@ -1,4 +1,6 @@
-﻿@page "/login"
+@page "/login"
+@using System
+@using ConfidentialBox.Core.DTOs
 @inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
@@ -14,18 +16,15 @@
                         <p class="text-muted">Inicia sesión en tu cuenta</p>
                     </div>
 
-                    
-                        @if
-                         
-                        (!string.IsNullOrEmpty(errorMessage))
-                        {                       
-                        <div class ="alert alert-danger" role="alert">                            
-                        @errorMessage                      
-                        </div>                
-                        }
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
                     <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin">
                         <DataAnnotationsValidator />
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Email</label>
                             <InputText @bind-Value="loginRequest.Email" class="form-control" placeholder="tu@email.com" />
@@ -46,16 +45,21 @@
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
-                            
-                            @if
-                             
-                            (isLoading)                            
-                            {                              
-                            <span class="spinner-border spinner-border-sm me-2"></span>                           
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Iniciando...</span>
                             }
-                            Iniciar Sesión
+                            else
+                            {
+                                <span>Iniciar sesión</span>
+                            }
                         </button>
                     </EditForm>
+
+                    <div class="text-end mt-2">
+                        <a href="/forgot-password">¿Olvidaste tu contraseña?</a>
+                    </div>
 
                     <hr class="my-4">
 
@@ -68,16 +72,15 @@
     </div>
 </div>
 
-@code
- 
-{
-    private LoginRequest loginRequest = new();
-
+@code {
+    private readonly LoginRequest loginRequest = new();
     private string? errorMessage;
+    private bool isLoading;
 
-    private bool isLoading = false;
-
-    private async Task HandleLogin() { isLoading = true; errorMessage = null;
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
 
         try
         {
@@ -104,4 +107,4 @@
             isLoading = false;
         }
     }
-    }
+}

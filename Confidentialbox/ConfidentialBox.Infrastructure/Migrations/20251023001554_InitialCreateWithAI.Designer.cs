@@ -715,6 +715,9 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<byte[]>("EncryptedFileContent")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("datetime2");
 
@@ -757,10 +760,20 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<bool>("ScreenshotProtectionEnabled")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("StoreInDatabase")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("StoreOnFileSystem")
+                        .HasColumnType("bit");
+
                     b.Property<string>("ShareLink")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("StoragePath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
@@ -781,6 +794,47 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.HasIndex("UploadedByUserId");
 
                     b.ToTable("SharedFiles");
+                });
+
+            modelBuilder.Entity("ConfidentialBox.Core.Entities.SystemSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsSensitive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("Category", "Key")
+                        .IsUnique();
+
+                    b.ToTable("SystemSettings");
                 });
 
             modelBuilder.Entity("ConfidentialBox.Core.Entities.UserBehaviorProfile", b =>
@@ -1090,6 +1144,14 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("ConfidentialBox.Core.Entities.SystemSetting", b =>
+                {
+                    b.HasOne("ConfidentialBox.Core.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("ConfidentialBox.Core.Entities.UserBehaviorProfile", b =>

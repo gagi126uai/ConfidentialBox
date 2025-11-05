@@ -12,6 +12,7 @@ public interface IFileService
     Task<FileDto?> GetFileByIdAsync(int id);
     Task<FileUploadResponse> UploadFileAsync(FileUploadRequest request);
     Task<FileDto?> AccessFileAsync(string shareLink, string? masterPassword);
+    Task<FileContentResponse?> GetFileContentAsync(string shareLink, string? masterPassword);
     Task<bool> BlockFileAsync(int id, string reason);
     Task<bool> UnblockFileAsync(int id);
     Task<bool> DeleteFileAsync(int id);

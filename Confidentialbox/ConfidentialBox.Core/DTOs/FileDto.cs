@@ -21,5 +21,9 @@ namespace ConfidentialBox.Core.DTOs
         public string? BlockReason { get; set; }
         public string UploadedByUserName { get; set; } = string.Empty;
         public bool HasMasterPassword { get; set; }
+        public bool IsPdf { get; set; }
+        public bool HasWatermark { get; set; }
+        public bool ScreenshotProtectionEnabled { get; set; }
+        public bool AimMonitoringEnabled { get; set; }
     }
 }

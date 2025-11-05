@@ -53,6 +53,12 @@ public class SharedFile
     public int MaxViewTimeMinutes { get; set; } = 0; // 0 = ilimitado
     public bool AIMonitoringEnabled { get; set; } = true;
 
+    // Almacenamiento seguro
+    public byte[]? EncryptedFileContent { get; set; }
+    public bool StoreInDatabase { get; set; } = false;
+    public bool StoreOnFileSystem { get; set; } = false;
+    public string? StoragePath { get; set; }
+
     // Relaciones
     public virtual ICollection<FileAccess> FileAccesses { get; set; } = new List<FileAccess>();
     public virtual ICollection<FilePermission> FilePermissions { get; set; } = new List<FilePermission>();

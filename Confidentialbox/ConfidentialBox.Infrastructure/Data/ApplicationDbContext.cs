@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<FilePermission> FilePermissions { get; set; }
     public DbSet<RolePolicy> RolePolicies { get; set; }
+    public DbSet<SystemSetting> SystemSettings { get; set; }
     public DbSet<RecycleBinItem> RecycleBinItems { get; set; }
 
 
@@ -41,6 +42,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.EncryptedFileName).IsRequired().HasMaxLength(500);
             entity.Property(e => e.ShareLink).IsRequired().HasMaxLength(100);
             entity.HasIndex(e => e.ShareLink).IsUnique();
+            entity.Property(e => e.StoragePath).HasMaxLength(1024);
+            entity.Property(e => e.EncryptedFileContent).HasColumnType("varbinary(max)");
 
             entity.HasOne(e => e.UploadedByUser)
                   .WithMany(u => u.UploadedFiles)
@@ -249,6 +252,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.EventType);
             entity.HasIndex(e => new { e.SessionId, e.Timestamp });
+        });
+
+        builder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Key).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Value).IsRequired();
+            entity.HasIndex(e => new { e.Category, e.Key }).IsUnique();
         });
     }
 

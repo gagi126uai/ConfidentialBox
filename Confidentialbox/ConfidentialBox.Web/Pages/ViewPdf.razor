@@ -1,0 +1,296 @@
+@page "/view-pdf/{ShareLink}"
+@attribute [AllowAnonymous]
+@inject IFileService FileService
+@inject IPdfViewerService PdfViewerService
+@inject IJSRuntime JS
+@using System.Security.Cryptography
+@implements IAsyncDisposable
+
+<PageTitle>Visor Seguro - ConfidentialBox</PageTitle>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-xl-10">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h4 mb-3"><i class="fas fa-file-pdf text-danger"></i> Visor Seguro de PDF</h1>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(infoMessage))
+                    {
+                        <div class="alert alert-info">@infoMessage</div>
+                    }
+
+                    @if (viewerBlocked)
+                    {
+                        <div class="alert alert-danger">
+                            <i class="fas fa-ban"></i> Acceso bloqueado por IA: @blockedReason
+                        </div>
+                    }
+
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        if (fileMetadata != null)
+                        {
+                            <div class="mb-3">
+                                <h5 class="fw-bold">@fileMetadata.OriginalFileName</h5>
+                                <p class="text-muted mb-1"><i class="fas fa-user"></i> Propietario: @fileMetadata.UploadedByUserName</p>
+                                <p class="text-muted mb-1"><i class="fas fa-database"></i> Tamaño: @FormatBytes(fileMetadata.FileSizeBytes)</p>
+                                <p class="text-muted"><i class="fas fa-calendar"></i> Subido: @fileMetadata.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                Ingresa la contraseña maestra para abrir el documento en el visor seguro.
+                            </div>
+                        }
+
+                        if (sessionId == null)
+                        {
+                            <EditForm OnValidSubmit="StartSecureViewer">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Contraseña maestra (si corresponde)</label>
+                                        <InputText @bind-Value="masterPassword" type="password" class="form-control" />
+                                    </div>
+                                    <div class="col-md-6 text-md-end">
+                                        <button class="btn btn-danger" type="submit" disabled="@isStarting">
+                                            @if (isStarting)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                            }
+                                            <i class="fas fa-shield-alt"></i> Abrir visor seguro
+                                        </button>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        }
+                    }
+
+                    @if (!string.IsNullOrEmpty(pdfDataUrl) && viewerConfig != null)
+                    {
+                        <div class="secure-pdf-container mt-4" id="secureViewerContainer">
+                            <iframe class="secure-pdf-frame" src="@pdfDataUrl"></iframe>
+                        </div>
+                        <p class="text-muted small mt-2">
+                            <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string ShareLink { get; set; } = string.Empty;
+
+    private FileDto? fileMetadata;
+    private PDFViewerConfigDto? viewerConfig;
+    private string? sessionId;
+    private string? pdfDataUrl;
+    private string? masterPassword;
+    private string? errorMessage;
+    private string? infoMessage;
+    private bool isLoading = true;
+    private bool isStarting;
+    private bool viewerBlocked;
+    private string? blockedReason;
+    private DotNetObjectReference<ViewPdf>? dotNetReference;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetadata();
+    }
+
+    private async Task LoadMetadata()
+    {
+        try
+        {
+            isLoading = true;
+            fileMetadata = await FileService.AccessFileAsync(ShareLink, null);
+            if (fileMetadata == null || !fileMetadata.IsPdf)
+            {
+                errorMessage = "No fue posible cargar la información del PDF.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task StartSecureViewer()
+    {
+        if (fileMetadata == null)
+        {
+            errorMessage = "Archivo no disponible.";
+            return;
+        }
+
+        try
+        {
+            isStarting = true;
+            viewerBlocked = false;
+            blockedReason = null;
+            errorMessage = null;
+            infoMessage = null;
+            pdfDataUrl = null;
+
+            var startResponse = await PdfViewerService.StartSessionAsync(new StartViewerSessionRequest
+            {
+                ShareLink = ShareLink,
+                MasterPassword = masterPassword
+            });
+
+            if (startResponse == null || !startResponse.Success || startResponse.Config == null || string.IsNullOrEmpty(startResponse.SessionId))
+            {
+                errorMessage = startResponse?.ErrorMessage ?? "No fue posible iniciar la sesión segura.";
+                return;
+            }
+
+            viewerConfig = startResponse.Config;
+            sessionId = startResponse.SessionId;
+
+            var content = await PdfViewerService.GetSessionContentAsync(sessionId);
+            if (content == null || !content.Success)
+            {
+                errorMessage = content?.ErrorMessage ?? "No fue posible recuperar el PDF cifrado.";
+                return;
+            }
+
+            var decryptedBytes = DecryptContent(content.EncryptedContent, content.EncryptionKey);
+            pdfDataUrl = $"data:application/pdf;base64,{Convert.ToBase64String(decryptedBytes)}";
+
+            fileMetadata ??= new FileDto
+            {
+                OriginalFileName = content.FileName,
+                FileExtension = content.FileExtension,
+                FileSizeBytes = decryptedBytes.LongLength,
+                ShareLink = ShareLink,
+                IsPdf = true
+            };
+
+            dotNetReference?.Dispose();
+            dotNetReference = DotNetObjectReference.Create(this);
+
+            await JS.InvokeVoidAsync(
+                "confidentialBox.initSecurePdfViewer",
+                "secureViewerContainer",
+                new
+                {
+                    sessionId,
+                    dotNetRef = dotNetReference,
+                    watermarkText = viewerConfig.HasWatermark ? viewerConfig.WatermarkText : string.Empty,
+                    disableContextMenu = viewerConfig.ScreenshotProtectionEnabled,
+                    maxViewMinutes = viewerConfig.MaxViewTimeMinutes
+                });
+
+            await JS.InvokeVoidAsync("confidentialBox.notifyPdfPage", sessionId, 1);
+            infoMessage = "Visor seguro inicializado. La IA monitorea en tiempo real.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isStarting = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task ReportViewerEvent(string eventType, int? pageNumber, string? eventData)
+    {
+        if (sessionId == null)
+        {
+            return;
+        }
+
+        var result = await PdfViewerService.RecordEventAsync(new ViewerEventRequest
+        {
+            SessionId = sessionId,
+            EventType = eventType,
+            PageNumber = pageNumber,
+            EventData = eventData
+        });
+
+        if (result?.Blocked == true)
+        {
+            viewerBlocked = true;
+            blockedReason = result.Reason ?? "Comportamiento bloqueado.";
+            infoMessage = null;
+            pdfDataUrl = null;
+
+            if (sessionId != null)
+            {
+                await PdfViewerService.EndSessionAsync(sessionId);
+                await JS.InvokeVoidAsync("confidentialBox.disposeSecurePdfViewer", sessionId);
+                sessionId = null;
+            }
+        }
+    }
+
+    private static byte[] DecryptContent(string encryptedContent, string encryptionKey)
+    {
+        var cipher = Convert.FromBase64String(encryptedContent);
+        var key = Convert.FromBase64String(encryptionKey);
+
+        using var aes = Aes.Create();
+        aes.Key = key;
+
+        var iv = new byte[aes.BlockSize / 8];
+        Buffer.BlockCopy(cipher, 0, iv, 0, iv.Length);
+        aes.IV = iv;
+
+        using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+        using var ms = new MemoryStream(cipher, iv.Length, cipher.Length - iv.Length);
+        using var cryptoStream = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
+        using var result = new MemoryStream();
+        cryptoStream.CopyTo(result);
+        return result.ToArray();
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (sessionId != null)
+        {
+            await PdfViewerService.EndSessionAsync(sessionId);
+            await JS.InvokeVoidAsync("confidentialBox.disposeSecurePdfViewer", sessionId);
+            sessionId = null;
+        }
+
+        dotNetReference?.Dispose();
+    }
+}
