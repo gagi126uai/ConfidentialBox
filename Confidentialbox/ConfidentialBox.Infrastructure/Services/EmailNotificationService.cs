@@ -33,12 +33,11 @@ public class EmailNotificationService : IEmailNotificationService
         var notificationSettings = await _systemSettingsService.GetEmailNotificationSettingsAsync(cancellationToken);
 
         var subject = "ConfidentialBox - Restablecer contraseña";
-        var body = $@"<p>Hola {user.FirstName},</p>
-<p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en <strong>ConfidentialBox</strong>.</p>
-<p>Para continuar, haz clic en el siguiente enlace seguro (válido por un tiempo limitado):</p>
-<p><a href=\"{resetLink}\">Restablecer contraseña</a></p>
-<p>Si no solicitaste este cambio, puedes ignorar este mensaje, pero te recomendamos avisar al equipo de seguridad.</p>
-<p>— Equipo ConfidentialBox</p>";
+        var body = "<p>Hola " + WebUtility.HtmlEncode(user?.FirstName ?? string.Empty) + ",</p>"
+         + "<p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en <strong>ConfidentialBox</strong>.</p>"
+         + "<p>Para continuar, haz clic en el siguiente enlace seguro (válido por un tiempo limitado):</p>"
+         + $"<p><a href=\"{WebUtility.HtmlEncode(resetLink ?? string.Empty)}\">Restablecer contraseña</a></p>"
+         + "<p>Si no solicitaste este cambio, puedes ignorar este mensaje, pero te recomendamos avisar al equipo de seguridad.</p>";
 
         await SendEmailAsync(
             serverSettings,

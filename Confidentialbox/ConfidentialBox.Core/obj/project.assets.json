@@ -921,11 +921,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
+      "projectUniqueName": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
       "projectName": "ConfidentialBox.Core",
-      "projectPath": "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
+      "projectPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
       "packagesPath": "C:\\Users\\Thermaltake\\.nuget\\packages\\",
-      "outputPath": "D:\\Confidentialbox\\ConfidentialBox.Core\\obj\\",
+      "outputPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

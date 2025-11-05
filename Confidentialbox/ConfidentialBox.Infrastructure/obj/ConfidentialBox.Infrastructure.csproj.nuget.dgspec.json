@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj": {}
+    "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj": {}
   },
   "projects": {
-    "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj": {
+    "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
+        "projectUniqueName": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
         "projectName": "ConfidentialBox.Core",
-        "projectPath": "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
+        "projectPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj",
         "packagesPath": "C:\\Users\\Thermaltake\\.nuget\\packages\\",
-        "outputPath": "D:\\Confidentialbox\\ConfidentialBox.Core\\obj\\",
+        "outputPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -80,14 +80,14 @@
         }
       }
     },
-    "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj": {
+    "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
+        "projectUniqueName": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
         "projectName": "ConfidentialBox.Infrastructure",
-        "projectPath": "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
+        "projectPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
         "packagesPath": "C:\\Users\\Thermaltake\\.nuget\\packages\\",
-        "outputPath": "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\obj\\",
+        "outputPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -109,8 +109,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj": {
-                "projectPath": "D:\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj"
+              "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj": {
+                "projectPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Core\\ConfidentialBox.Core.csproj"
               }
             }
           }

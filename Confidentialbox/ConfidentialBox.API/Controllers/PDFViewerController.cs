@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using FileAccess = ConfidentialBox.Core.Entities.FileAccess;
 
 namespace ConfidentialBox.API.Controllers;
 

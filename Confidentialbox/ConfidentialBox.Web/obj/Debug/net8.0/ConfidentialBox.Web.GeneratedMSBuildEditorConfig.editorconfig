@@ -9,101 +9,121 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = ConfidentialBox.Web
 build_property.RootNamespace = ConfidentialBox.Web
-build_property.ProjectDir = D:\Confidentialbox\ConfidentialBox.Web\
+build_property.ProjectDir = D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = D:\Confidentialbox\ConfidentialBox.Web
+build_property.MSBuildProjectDirectory = D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 8.0
 build_property.EnableCodeStyleSeverity = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/App.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/App.razor]
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/AISecurityDashboard.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/AccessFile.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWNjZXNzRmlsZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/AISecurityDashboard.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQUlTZWN1cml0eURhc2hib2FyZC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Audit.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Audit.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQXVkaXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Counter.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/EmptyLayout.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/EmptyLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRW1wdHlMYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/FetchData.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/FetchData.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmV0Y2hEYXRhLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Files.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Files.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmlsZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Index.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/ForgotPassword.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRm9yZ290UGFzc3dvcmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Index.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Login.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Login.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG9naW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/RedirectToLogin.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/RedirectToLogin.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVkaXJlY3RUb0xvZ2luLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Register.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Register.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVnaXN0ZXIucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Roles.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/ResetPassword.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVzZXRQYXNzd29yZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Roles.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUm9sZXMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/SecurityAlerts.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/SecurityAlerts.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2VjdXJpdHlBbGVydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Upload.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Settings.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2V0dGluZ3MucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Upload.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVXBsb2FkLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Users.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Users.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVXNlcnMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Shared/SurveyPrompt.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/ViewPdf.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmlld1BkZi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Shared/SurveyPrompt.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXFN1cnZleVByb21wdC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/_Imports.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Shared/MainLayout.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Shared/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE1haW5MYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-46363jc757
 
-[D:/Confidentialbox/ConfidentialBox.Web/Shared/NavMenu.razor]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Shared/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE5hdk1lbnUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-254ll4bdlr
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/Error.cshtml]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/_Host.cshtml]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/_Host.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0hvc3QuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Confidentialbox/ConfidentialBox.Web/Pages/_Layout.cshtml]
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/_Layout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0xheW91dC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 

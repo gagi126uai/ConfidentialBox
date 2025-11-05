@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "FUM1E0b1qkw=",
+  "dgSpecHash": "5VQNJrREKmQ=",
   "success": true,
-  "projectFilePath": "D:\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
+  "projectFilePath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Thermaltake\\.nuget\\packages\\blazored.localstorage\\4.5.0\\blazored.localstorage.4.5.0.nupkg.sha512",
     "C:\\Users\\Thermaltake\\.nuget\\packages\\microsoft.aspnetcore.authorization\\8.0.0\\microsoft.aspnetcore.authorization.8.0.0.nupkg.sha512",
@@ -44,9 +44,9 @@
       "code": "NU1902",
       "level": "Warning",
       "message": "El paquete \"System.IdentityModel.Tokens.Jwt\" 7.0.3 tiene una vulnerabilidad de gravedad moderada conocida, https://github.com/advisories/GHSA-59j7-ghrg-fj52",
-      "projectPath": "D:\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
+      "projectPath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
       "warningLevel": 1,
-      "filePath": "D:\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
+      "filePath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Web\\ConfidentialBox.Web.csproj",
       "libraryId": "System.IdentityModel.Tokens.Jwt",
       "targetGraphs": [
         "net8.0"

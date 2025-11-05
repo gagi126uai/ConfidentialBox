@@ -466,6 +466,68 @@
         }
       }
     },
+    "/api/Auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Auth/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
     "/api/Dashboard/stats": {
       "get": {
         "tags": [
@@ -767,6 +829,52 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Files/content/{shareLink}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "shareLink",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "masterPassword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
                 }
               }
             }
@@ -1116,6 +1224,67 @@
         }
       }
     },
+    "/api/PDFViewer/content/{sessionId}": {
+      "get": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/PDFViewer/end-session/{sessionId}": {
+      "post": {
+        "tags": [
+          "PDFViewer"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
     "/api/Roles": {
       "get": {
         "tags": [
@@ -1218,6 +1387,231 @@
         "responses": {
           "200": {
             "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Settings/storage": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileStorageSettings"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileStorageSettings"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileStorageSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileStorageSettings"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileStorageSettings"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileStorageSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Settings/email/server": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailServerSettingsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailServerSettingsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailServerSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailServerSettingsDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailServerSettingsDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailServerSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Settings/email/notifications": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1887,6 +2281,88 @@
         },
         "additionalProperties": false
       },
+      "EmailNotificationSettingsDto": {
+        "type": "object",
+        "properties": {
+          "sendSecurityAlerts": {
+            "type": "boolean"
+          },
+          "securityAlertRecipients": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "sendPasswordRecovery": {
+            "type": "boolean"
+          },
+          "passwordRecoveryRecipients": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "sendUserInvitations": {
+            "type": "boolean"
+          },
+          "userInvitationRecipients": {
+            "maxLength": 1024,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmailServerSettingsDto": {
+        "required": [
+          "smtpHost",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "smtpHost": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "useSsl": {
+            "type": "boolean"
+          },
+          "username": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string"
+          },
+          "fromEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "fromName": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "hasPassword": {
+            "type": "boolean"
+          },
+          "newPassword": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "EndSessionRequest": {
         "type": "object",
         "properties": {
@@ -1936,6 +2412,61 @@
           "userAgent": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileContentResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileExtension": {
+            "type": "string",
+            "nullable": true
+          },
+          "encryptedContent": {
+            "type": "string",
+            "nullable": true
+          },
+          "encryptionKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPdf": {
+            "type": "boolean"
+          },
+          "hasWatermark": {
+            "type": "boolean"
+          },
+          "watermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "screenshotProtectionEnabled": {
+            "type": "boolean"
+          },
+          "printProtectionEnabled": {
+            "type": "boolean"
+          },
+          "copyProtectionEnabled": {
+            "type": "boolean"
+          },
+          "aimMonitoringEnabled": {
+            "type": "boolean"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -1993,6 +2524,18 @@
             "nullable": true
           },
           "hasMasterPassword": {
+            "type": "boolean"
+          },
+          "isPdf": {
+            "type": "boolean"
+          },
+          "hasWatermark": {
+            "type": "boolean"
+          },
+          "screenshotProtectionEnabled": {
+            "type": "boolean"
+          },
+          "aimMonitoringEnabled": {
             "type": "boolean"
           }
         },
@@ -2181,6 +2724,22 @@
         },
         "additionalProperties": false
       },
+      "FileStorageSettings": {
+        "type": "object",
+        "properties": {
+          "storeInDatabase": {
+            "type": "boolean"
+          },
+          "storeOnFileSystem": {
+            "type": "boolean"
+          },
+          "fileSystemDirectory": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "FileUploadRequest": {
         "type": "object",
         "properties": {
@@ -2204,6 +2763,10 @@
             "type": "string",
             "nullable": true
           },
+          "encryptedContent": {
+            "type": "string",
+            "nullable": true
+          },
           "masterPassword": {
             "type": "string",
             "nullable": true
@@ -2217,6 +2780,29 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "enableWatermark": {
+            "type": "boolean"
+          },
+          "watermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "screenshotProtection": {
+            "type": "boolean"
+          },
+          "printProtection": {
+            "type": "boolean"
+          },
+          "copyProtection": {
+            "type": "boolean"
+          },
+          "aiMonitoring": {
+            "type": "boolean"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
           },
           "allowedRoles": {
             "type": "array",
@@ -2245,6 +2831,20 @@
           "errorMessage": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ForgotPasswordRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
           }
         },
         "additionalProperties": false
@@ -2301,6 +2901,23 @@
             "nullable": true
           },
           "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperationResultDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
             "type": "string",
             "nullable": true
           }
@@ -2417,6 +3034,31 @@
           "confirmPassword": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetPasswordRequest": {
+        "required": [
+          "email",
+          "newPassword",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "token": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 100,
+            "minLength": 8,
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -2688,6 +3330,21 @@
           },
           "aiMonitoringEnabled": {
             "type": "boolean"
+          },
+          "encryptedFileContent": {
+            "type": "string",
+            "format": "byte",
+            "nullable": true
+          },
+          "storeInDatabase": {
+            "type": "boolean"
+          },
+          "storeOnFileSystem": {
+            "type": "boolean"
+          },
+          "storagePath": {
+            "type": "string",
+            "nullable": true
           },
           "fileAccesses": {
             "type": "array",

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "OhV3vJ9/VSw=",
+  "dgSpecHash": "99wAhks3pVs=",
   "success": true,
-  "projectFilePath": "D:\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
+  "projectFilePath": "D:\\Documentos\\GitHub\\ConfidentialBox\\Confidentialbox\\ConfidentialBox.Infrastructure\\ConfidentialBox.Infrastructure.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Thermaltake\\.nuget\\packages\\azure.core\\1.25.0\\azure.core.1.25.0.nupkg.sha512",
     "C:\\Users\\Thermaltake\\.nuget\\packages\\azure.identity\\1.7.0\\azure.identity.1.7.0.nupkg.sha512",

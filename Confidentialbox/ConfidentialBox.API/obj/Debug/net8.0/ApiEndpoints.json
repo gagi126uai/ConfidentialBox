@@ -236,6 +236,22 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.AuthController",
+    "Method": "ForgotPassword",
+    "RelativePath": "api/Auth/forgot-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.ForgotPasswordRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.AuthController",
     "Method": "Login",
     "RelativePath": "api/Auth/login",
     "HttpMethod": "POST",
@@ -285,6 +301,22 @@
         "StatusCode": 200
       }
     ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.AuthController",
+    "Method": "ResetPassword",
+    "RelativePath": "api/Auth/reset-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.ResetPasswordRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.DashboardController",
@@ -464,6 +496,37 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "GetFileContent",
+    "RelativePath": "api/Files/content/{shareLink}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "shareLink",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "masterPassword",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.FileContentResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
     "Method": "GetMyFiles",
     "RelativePath": "api/Files/my-files",
     "HttpMethod": "GET",
@@ -536,6 +599,32 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.PDFViewerController",
+    "Method": "GetContent",
+    "RelativePath": "api/PDFViewer/content/{sessionId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.FileContentResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.PDFViewerController",
     "Method": "EndSession",
     "RelativePath": "api/PDFViewer/end-session",
     "HttpMethod": "POST",
@@ -545,6 +634,22 @@
       {
         "Name": "request",
         "Type": "ConfidentialBox.API.Controllers.EndSessionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.PDFViewerController",
+    "Method": "EndSession",
+    "RelativePath": "api/PDFViewer/end-session/{sessionId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
         "IsRequired": true
       }
     ],
@@ -715,6 +820,144 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetEmailNotificationSettings",
+    "RelativePath": "api/Settings/email/notifications",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.EmailNotificationSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateEmailNotificationSettings",
+    "RelativePath": "api/Settings/email/notifications",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.EmailNotificationSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetEmailServerSettings",
+    "RelativePath": "api/Settings/email/server",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.EmailServerSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateEmailServerSettings",
+    "RelativePath": "api/Settings/email/server",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.EmailServerSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetStorageSettings",
+    "RelativePath": "api/Settings/storage",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.Configuration.FileStorageSettings",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateStorageSettings",
+    "RelativePath": "api/Settings/storage",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.Configuration.FileStorageSettings",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
