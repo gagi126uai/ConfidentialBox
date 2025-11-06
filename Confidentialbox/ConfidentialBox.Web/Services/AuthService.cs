@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 
 namespace ConfidentialBox.Web.Services;
 
@@ -26,7 +27,7 @@ public class AuthService : IAuthService
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync("api/auth/login", request);
-        var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        var result = await ReadLoginResponseAsync(response);
 
         if (result?.Success == true && !string.IsNullOrEmpty(result.Token))
         {
@@ -48,7 +49,7 @@ public class AuthService : IAuthService
     public async Task<LoginResponse> RegisterAsync(RegisterRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync("api/auth/register", request);
-        var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        var result = await ReadLoginResponseAsync(response);
 
         if (result?.Success == true && !string.IsNullOrEmpty(result.Token))
         {
@@ -71,6 +72,38 @@ public class AuthService : IAuthService
     {
         await ClearTokenAsync(false);
         _authStateProvider.NotifyUserLogout();
+    }
+
+    private async Task<LoginResponse?> ReadLoginResponseAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<LoginResponse>();
+        }
+        catch (NotSupportedException)
+        {
+            // Contenido no JSON
+        }
+        catch (JsonException)
+        {
+            // Contenido JSON inválido
+        }
+
+        var rawContent = await response.Content.ReadAsStringAsync();
+        var message = string.IsNullOrWhiteSpace(rawContent)
+            ? $"Error {(int)response.StatusCode} al comunicarse con el servidor. Intenta nuevamente."
+            : rawContent.Trim();
+
+        if (message.StartsWith("<"))
+        {
+            message = $"Error {(int)response.StatusCode} al comunicarse con el servidor. Intenta nuevamente.";
+        }
+
+        return new LoginResponse
+        {
+            Success = false,
+            ErrorMessage = message
+        };
     }
 
     public async Task<string?> GetTokenAsync()
