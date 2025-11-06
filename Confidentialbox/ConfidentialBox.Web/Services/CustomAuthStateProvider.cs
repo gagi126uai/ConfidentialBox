@@ -1,4 +1,4 @@
-﻿using Blazored.LocalStorage;
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
@@ -12,36 +12,13 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 {
     private readonly ILocalStorageService _localStorage;
     private readonly HttpClient _httpClient;
+    private const string TokenKey = "authToken";
 
     public CustomAuthStateProvider(ILocalStorageService localStorage, HttpClient httpClient)
     {
         _localStorage = localStorage;
         _httpClient = httpClient;
     }
-
-    //public override async Task<AuthenticationState> GetAuthenticationStateAsync()
-    //{
-    //    var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
-
-    //    string? token = null;
-    //    try
-    //    {
-    //        token = await _localStorage.GetItemAsync<string>("authToken");
-    //    }
-    //    catch (InvalidOperationException)
-    //    {
-    //        // Estamos en prerender; JS aún no está disponible
-    //        return new AuthenticationState(anonymous);
-    //    }
-
-    //    if (string.IsNullOrWhiteSpace(token))
-    //        return new AuthenticationState(anonymous);
-
-    //    // construir ClaimsIdentity desde el token...
-    //    var identity = /* ... */
-    //    return new AuthenticationState(new ClaimsPrincipal(identity));
-    //}
-
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -50,7 +27,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         string? token = null;
         try
         {
-            token = await _localStorage.GetItemAsync<string>("authToken");
+            token = await _localStorage.GetItemAsync<string>(TokenKey);
         }
         catch (InvalidOperationException)
         {
@@ -64,6 +41,13 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
             return new AuthenticationState(anonymous);
         }
 
+        if (IsTokenExpired(token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+            await RemoveTokenAsync();
+            return new AuthenticationState(anonymous);
+        }
+
         var principal = BuildPrincipalFromToken(token);
         _httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -73,6 +57,12 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 
     public void NotifyUserAuthentication(string token)
     {
+        if (IsTokenExpired(token))
+        {
+            NotifyUserLogout();
+            return;
+        }
+
         _httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
@@ -107,5 +97,36 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(jwt);
         return token.Claims;
+    }
+
+    private static bool IsTokenExpired(string token)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(token))
+            {
+                return true;
+            }
+
+            var jwt = handler.ReadJwtToken(token);
+            return jwt.ValidTo <= DateTime.UtcNow;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private async Task RemoveTokenAsync()
+    {
+        try
+        {
+            await _localStorage.RemoveItemAsync(TokenKey);
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignorar errores cuando el almacenamiento no está disponible
+        }
     }
 }

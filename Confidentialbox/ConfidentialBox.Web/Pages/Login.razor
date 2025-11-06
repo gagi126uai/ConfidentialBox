@@ -80,7 +80,7 @@
     {
         if (await AuthService.IsAuthenticatedAsync())
         {
-            NavigationManager.NavigateTo("/");
+            NavigationManager.NavigateTo("/dashboard", replace: true);
         }
     }
 
@@ -95,7 +95,7 @@
 
             if (result.Success)
             {
-                NavigationManager.NavigateTo("/");
+                NavigationManager.NavigateTo("/dashboard", replace: true);
             }
             else
             {

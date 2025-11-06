@@ -62,6 +62,28 @@ public class SettingsService : ISettingsService
         return await ParseOperationResultAsync(response);
     }
 
+    public async Task<TokenSettingsDto?> GetTokenSettingsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<TokenSettingsDto>("api/settings/auth/token");
+    }
+
+    public async Task<bool> UpdateTokenSettingsAsync(TokenSettingsDto request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/settings/auth/token", request);
+        return await ParseOperationResultAsync(response);
+    }
+
+    public async Task<AIScoringSettingsDto?> GetAIScoringSettingsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<AIScoringSettingsDto>("api/settings/ai/scoring");
+    }
+
+    public async Task<bool> UpdateAIScoringSettingsAsync(AIScoringSettingsDto request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/settings/ai/scoring", request);
+        return await ParseOperationResultAsync(response);
+    }
+
     private static async Task<bool> ParseOperationResultAsync(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)

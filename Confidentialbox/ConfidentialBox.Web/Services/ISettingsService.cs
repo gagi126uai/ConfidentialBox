@@ -14,4 +14,8 @@ public interface ISettingsService
     Task<bool> UpdateEmailNotificationSettingsAsync(EmailNotificationSettingsDto request);
     Task<RegistrationSettingsDto?> GetRegistrationSettingsAsync();
     Task<bool> UpdateRegistrationSettingsAsync(bool isEnabled);
+    Task<TokenSettingsDto?> GetTokenSettingsAsync();
+    Task<bool> UpdateTokenSettingsAsync(TokenSettingsDto request);
+    Task<AIScoringSettingsDto?> GetAIScoringSettingsAsync();
+    Task<bool> UpdateAIScoringSettingsAsync(AIScoringSettingsDto request);
 }

@@ -90,7 +90,7 @@ public class AuthController : ControllerBase
 
         // Generar JWT token
         var roles = await _userManager.GetRolesAsync(user);
-        var token = GenerateJwtToken(user, roles.ToList());
+        var (token, expiresAt) = await GenerateJwtTokenAsync(user, roles.ToList(), cancellationToken);
 
         return Ok(new LoginResponse
         {
@@ -99,7 +99,8 @@ public class AuthController : ControllerBase
             UserId = user.Id,
             Email = user.Email!,
             FullName = $"{user.FirstName} {user.LastName}",
-            Roles = roles.ToList()
+            Roles = roles.ToList(),
+            ExpiresAt = expiresAt
         });
     }
 
@@ -151,7 +152,7 @@ public class AuthController : ControllerBase
 
         // Generar token
         var roles = new List<string> { "User" };
-        var token = GenerateJwtToken(user, roles);
+        var (token, expiresAt) = await GenerateJwtTokenAsync(user, roles, cancellationToken);
 
         return Ok(new LoginResponse
         {
@@ -160,7 +161,8 @@ public class AuthController : ControllerBase
             UserId = user.Id,
             Email = user.Email,
             FullName = $"{user.FirstName} {user.LastName}",
-            Roles = roles
+            Roles = roles,
+            ExpiresAt = expiresAt
         });
     }
 
@@ -248,7 +250,7 @@ public class AuthController : ControllerBase
         return Ok(new OperationResultDto { Success = true });
     }
 
-    private string GenerateJwtToken(ApplicationUser user, List<string> roles)
+    private async Task<(string Token, DateTime ExpiresAt)> GenerateJwtTokenAsync(ApplicationUser user, List<string> roles, CancellationToken cancellationToken)
     {
         var claims = new List<Claim>
         {
@@ -263,6 +265,9 @@ public class AuthController : ControllerBase
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
+        var securitySettings = await _systemSettingsService.GetSecuritySettingsAsync(cancellationToken);
+        var expiration = DateTime.UtcNow.AddHours(Math.Max(1, securitySettings.TokenLifetimeHours));
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
             _configuration["Jwt:Key"] ?? "SuperSecretKeyForConfidentialBox2024WithMinimum32Characters!"));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -271,11 +276,12 @@ public class AuthController : ControllerBase
             issuer: _configuration["Jwt:Issuer"] ?? "ConfidentialBoxAPI",
             audience: _configuration["Jwt:Audience"] ?? "ConfidentialBoxClient",
             claims: claims,
-            expires: DateTime.Now.AddDays(7),
+            expires: expiration,
             signingCredentials: creds
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var encodedToken = new JwtSecurityTokenHandler().WriteToken(token);
+        return (encodedToken, expiration);
     }
 
     private static string BuildResetUrl(string baseUrl, string email, string token)

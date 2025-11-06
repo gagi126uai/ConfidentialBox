@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace ConfidentialBox.Web.Services;
 
@@ -29,6 +30,12 @@ public class AuthService : IAuthService
 
         if (result?.Success == true && !string.IsNullOrEmpty(result.Token))
         {
+            if (IsTokenExpired(result.Token))
+            {
+                await ClearTokenAsync(true);
+                return new LoginResponse { Success = false, ErrorMessage = "El token recibido ya expiró. Intenta nuevamente." };
+            }
+
             await _localStorage.SetItemAsync(TOKEN_KEY, result.Token);
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", result.Token);
@@ -45,6 +52,12 @@ public class AuthService : IAuthService
 
         if (result?.Success == true && !string.IsNullOrEmpty(result.Token))
         {
+            if (IsTokenExpired(result.Token))
+            {
+                await ClearTokenAsync(true);
+                return new LoginResponse { Success = false, ErrorMessage = "El token recibido ya expiró. Intenta nuevamente." };
+            }
+
             await _localStorage.SetItemAsync(TOKEN_KEY, result.Token);
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", result.Token);
@@ -56,8 +69,7 @@ public class AuthService : IAuthService
 
     public async Task LogoutAsync()
     {
-        await _localStorage.RemoveItemAsync(TOKEN_KEY);
-        _httpClient.DefaultRequestHeaders.Authorization = null;
+        await ClearTokenAsync(false);
         _authStateProvider.NotifyUserLogout();
     }
 
@@ -65,7 +77,19 @@ public class AuthService : IAuthService
     {
         try
         {
-            return await _localStorage.GetItemAsync<string>(TOKEN_KEY);
+            var token = await _localStorage.GetItemAsync<string>(TOKEN_KEY);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            if (IsTokenExpired(token))
+            {
+                await ClearTokenAsync(true);
+                return null;
+            }
+
+            return token;
         }
         catch (InvalidOperationException)
         {
@@ -114,6 +138,44 @@ public class AuthService : IAuthService
         catch
         {
             return true;
+        }
+    }
+
+    private bool IsTokenExpired(string token)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(token))
+            {
+                return true;
+            }
+
+            var jwt = handler.ReadJwtToken(token);
+            return jwt.ValidTo <= DateTime.UtcNow;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private async Task ClearTokenAsync(bool notifyAuthProvider)
+    {
+        try
+        {
+            await _localStorage.RemoveItemAsync(TOKEN_KEY);
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignorar: el almacenamiento puede no estar disponible durante el prerender
+        }
+
+        _httpClient.DefaultRequestHeaders.Authorization = null;
+
+        if (notifyAuthProvider)
+        {
+            _authStateProvider.NotifyUserLogout();
         }
     }
 }
