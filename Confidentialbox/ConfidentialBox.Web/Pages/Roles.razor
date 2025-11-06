@@ -1,4 +1,4 @@
-﻿@page "/roles"
+@page "/roles"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IRoleService RoleService
@@ -6,7 +6,7 @@
 <PageTitle>Roles y Políticas - ConfidentialBox</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-shield-alt"></i> Roles y Políticas</h1>
+    <h1 class="mb-0"><i class="fas fa-shield-alt"></i> Roles y Políticas</h1>
     <button class="btn btn-primary" @onclick="ShowCreateModal">
         <i class="fas fa-plus"></i> Crear Rol
     </button>
@@ -24,25 +24,25 @@
 {
     <div class="text-center my-5">
         <div class="spinner-border" role="status"></div>
+        <p class="mt-3 text-muted">Cargando políticas seguras…</p>
     </div>
 }
-else if (roles != null && roles.Any())
+else if (roles.Any())
 {
-    <div class="row">
+    <div class="row g-4">
         @foreach (var role in roles)
         {
-            <div class="col-md-4 mb-3">
-                <div class="card @(role.IsSystemRole ? "border-primary" : "")">
-                    <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                @role.Name
-                                @if (role.IsSystemRole)
-                                {
-                                    <span class="badge bg-primary ms-2">Sistema</span>
-                                }
-                            </h5>
-
+            <div class="col-xl-4 col-lg-6">
+                <div class="card h-100 @(role.IsSystemRole ? "border-primary" : string.Empty)">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">@role.Name</h5>
+                            <small class="text-muted">@role.Description</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowPolicyModal(role)">
+                                <i class="fas fa-sliders-h"></i>
+                            </button>
                             @if (!role.IsSystemRole)
                             {
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRole(role.Id)">
@@ -51,104 +51,75 @@ else if (roles != null && roles.Any())
                             }
                         </div>
                     </div>
-
                     <div class="card-body">
-                        <p class="text-muted">@role.Description</p>
-
                         @if (role.Policies.Any())
                         {
-                            <h6 class="mt-3">Políticas:</h6>
-                            <ul class="list-unstyled">
-                                @foreach (var policy in role.Policies)
+                            <h6 class="text-muted text-uppercase small">Políticas activas</h6>
+                            <ul class="list-unstyled small mb-0">
+                                @foreach (var policy in role.Policies.OrderBy(p => p.DisplayName))
                                 {
-                                    <li>
-                                        <i class="fas fa-check text-success"></i>
-                                        <strong>@policy.PolicyName:</strong> @policy.PolicyValue
+                                    <li class="mb-1">
+                                        <span class="fw-semibold">@GetPolicyLabel(policy)</span>
+                                        <span class="text-muted">@FormatPolicyValue(policy)</span>
                                     </li>
                                 }
                             </ul>
                         }
                         else
                         {
-                            <p class="text-muted small">Sin políticas específicas</p>
+                            <p class="text-muted small mb-0">Este rol aún no tiene políticas configuradas.</p>
                         }
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-outline-primary btn-sm" @onclick="() => ShowPolicyModal(role)">
+                            <i class="fas fa-pen"></i> Editar políticas
+                        </button>
                     </div>
                 </div>
             </div>
         }
     </div>
 }
+else
+{
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No se encontraron roles configurados.
+    </div>
+}
 
-<!-- Modal Crear Rol -->
 @if (showCreateModal)
 {
     <div class="modal show d-block" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Crear Nuevo Rol</h5>
+                    <h5 class="modal-title">Crear nuevo rol</h5>
                     <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
                 </div>
                 <div class="modal-body">
-                    <EditForm Model="@newRole" OnValidSubmit="@CreateRole">
+                    <EditForm Model="newRole" OnValidSubmit="CreateRole">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
                         <div class="mb-3">
-                            <label class="form-label">Nombre del Rol</label>
+                            <label class="form-label">Nombre del rol</label>
                             <InputText @bind-Value="newRole.Name" class="form-control" />
-                            <ValidationMessage For="@(() => newRole.Name)" />
+                            <ValidationMessage For="() => newRole.Name" />
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label">Descripción</label>
-                            <InputText @bind-Value="newRole.Description" class="form-control" />
-                            <ValidationMessage For="@(() => newRole.Description)" />
+                            <InputTextArea @bind-Value="newRole.Description" class="form-control" rows="3" />
+                            <ValidationMessage For="() => newRole.Description" />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Políticas (Opcional)</label>
-
-                            <div class="row g-2">
-                                <div class="col-md-5">
-                                    <input type="text"
-                                           class="form-control"
-                                           placeholder="Nombre de política"
-                                           @bind="policyName" />
-                                </div>
-                                <div class="col-md-5">
-                                    <input type="text"
-                                           class="form-control"
-                                           placeholder="Valor"
-                                           @bind="policyValue" />
-                                </div>
-                                <div class="col-md-2">
-                                    <button type="button" class="btn btn-primary w-100" @onclick="AddPolicy">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            @if (newRole.Policies.Any())
-                            {
-                                <div class="mt-2">
-                                    @foreach (var policy in newRole.Policies)
-                                    {
-                                        <div class="badge bg-secondary me-2 mb-2">
-                                            @policy.Key: @policy.Value
-                                            <button type="button"
-                                                    class="btn-close btn-close-white ms-2"
-                                                    @onclick="() => RemovePolicy(policy.Key)">
-                                            </button>
-                                        </div>
-                                    }
-                                </div>
-                            }
+                        <div class="alert alert-light small">
+                            <i class="fas fa-info-circle"></i> Las políticas predeterminadas se asignarán automáticamente. Podrás ajustarlas luego desde el panel.
                         </div>
 
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" @onclick="CloseCreateModal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary">Crear Rol</button>
+                        <div class="modal-footer px-0">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CloseCreateModal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Crear rol</button>
                         </div>
                     </EditForm>
                 </div>
@@ -158,19 +129,90 @@ else if (roles != null && roles.Any())
     <div class="modal-backdrop show"></div>
 }
 
+@if (showPolicyModal && editingRole != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Políticas de "@editingRole.Name"</h5>
+                    <button type="button" class="btn-close" @onclick="ClosePolicyModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(policyMessage))
+                    {
+                        <div class="alert @(policySuccess ? "alert-success" : "alert-danger")" role="alert">
+                            @policyMessage
+                        </div>
+                    }
+
+                    <div class="row g-4">
+                        @foreach (var policy in editablePolicies)
+                        {
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <label class="form-label fw-semibold">@policy.DisplayName</label>
+
+                                    @switch (policy.ValueType)
+                                    {
+                                        case "Boolean":
+                                            <div class="form-check form-switch">
+                                                <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="policy-@policy.PolicyName" />
+                                                <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
+                                            </div>
+                                            break;
+                                        case "Number":
+                                            <InputNumber<decimal> @bind-Value="policy.NumericValue" class="form-control" />
+                                            break;
+                                        default:
+                                            <InputText @bind-Value="policy.Value" class="form-control" />
+                                            break;
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(policy.Description))
+                                    {
+                                        <p class="form-text">@policy.Description</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" @onclick="ClosePolicyModal" disabled="@savingPolicies">Cerrar</button>
+                    <button class="btn btn-primary" @onclick="SavePolicies" disabled="@savingPolicies">
+                        @if (savingPolicies)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        Guardar cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
 @code {
-    private List<RoleDto>? roles;
+    private readonly List<RoleDto> roles = new();
+    private List<RolePolicyDefinitionDto> policyDefinitions = new();
     private bool isLoading = true;
     private string? successMessage;
 
-    private bool showCreateModal = false;
+    private bool showCreateModal;
     private CreateRoleRequest newRole = new();
 
-    private string policyName = "";
-    private string policyValue = "";
+    private bool showPolicyModal;
+    private RoleDto? editingRole;
+    private List<PolicyEditModel> editablePolicies = new();
+    private bool savingPolicies;
+    private string? policyMessage;
+    private bool policySuccess;
 
     protected override async Task OnInitializedAsync()
     {
+        policyDefinitions = await RoleService.GetPolicyDefinitionsAsync();
         await LoadRoles();
     }
 
@@ -179,7 +221,9 @@ else if (roles != null && roles.Any())
         isLoading = true;
         try
         {
-            roles = await RoleService.GetAllRolesAsync();
+            roles.Clear();
+            var fetched = await RoleService.GetAllRolesAsync();
+            roles.AddRange(fetched.OrderBy(r => r.Name));
         }
         finally
         {
@@ -196,41 +240,155 @@ else if (roles != null && roles.Any())
     private void CloseCreateModal()
     {
         showCreateModal = false;
-        newRole = new CreateRoleRequest();
-        policyName = "";
-        policyValue = "";
-    }
-
-    private void AddPolicy()
-    {
-        if (!string.IsNullOrWhiteSpace(policyName) && !string.IsNullOrWhiteSpace(policyValue))
-        {
-            newRole.Policies[policyName] = policyValue;
-            policyName = "";
-            policyValue = "";
-        }
-    }
-
-    private void RemovePolicy(string key)
-    {
-        newRole.Policies.Remove(key);
     }
 
     private async Task CreateRole()
     {
-        var result = await RoleService.CreateRoleAsync(newRole);
-        if (result != null)
+        var created = await RoleService.CreateRoleAsync(newRole);
+        if (created != null)
         {
-            successMessage = "Rol creado exitosamente";
-            CloseCreateModal();
-            await LoadRoles();
+            roles.Add(created);
+            roles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            successMessage = $"Rol '{created.Name}' creado correctamente.";
         }
+        showCreateModal = false;
     }
 
     private async Task DeleteRole(string roleId)
     {
-        await RoleService.DeleteRoleAsync(roleId);
-        successMessage = "Rol eliminado exitosamente";
-        await LoadRoles();
+        if (!await RoleService.DeleteRoleAsync(roleId))
+        {
+            successMessage = "No se pudo eliminar el rol.";
+            return;
+        }
+
+        var index = roles.FindIndex(r => r.Id == roleId);
+        if (index >= 0)
+        {
+            var removed = roles[index];
+            roles.RemoveAt(index);
+            successMessage = $"Rol '{removed.Name}' eliminado.";
+        }
+    }
+
+    private void ShowPolicyModal(RoleDto role)
+    {
+        editingRole = role;
+        BuildEditablePolicies(role);
+        policyMessage = null;
+        policySuccess = false;
+        showPolicyModal = true;
+    }
+
+    private void ClosePolicyModal()
+    {
+        showPolicyModal = false;
+        editingRole = null;
+        editablePolicies.Clear();
+        policyMessage = null;
+    }
+
+    private async Task SavePolicies()
+    {
+        if (editingRole == null)
+        {
+            return;
+        }
+
+        savingPolicies = true;
+        policyMessage = null;
+        try
+        {
+            var payload = editablePolicies.ToDictionary(p => p.PolicyName, p => p.Value);
+            var updated = await RoleService.UpdatePoliciesAsync(editingRole.Id, payload);
+            if (updated == null)
+            {
+                policySuccess = false;
+                policyMessage = "No se pudieron guardar los cambios.";
+                return;
+            }
+
+            var index = roles.FindIndex(r => r.Id == updated.Id);
+            if (index >= 0)
+            {
+                roles[index] = updated;
+            }
+
+            editingRole = updated;
+            BuildEditablePolicies(updated);
+            policySuccess = true;
+            policyMessage = "Políticas actualizadas correctamente.";
+        }
+        finally
+        {
+            savingPolicies = false;
+        }
+    }
+
+    private void BuildEditablePolicies(RoleDto role)
+    {
+        editablePolicies = policyDefinitions
+            .Select(definition =>
+            {
+                var existing = role.Policies.FirstOrDefault(p => p.PolicyName.Equals(definition.PolicyName, StringComparison.OrdinalIgnoreCase));
+                return new PolicyEditModel
+                {
+                    PolicyName = definition.PolicyName,
+                    DisplayName = string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.PolicyName : definition.DisplayName,
+                    Description = definition.Description,
+                    ValueType = definition.ValueType,
+                    Options = definition.Options,
+                    Value = existing?.PolicyValue ?? definition.DefaultValue ?? string.Empty
+                };
+            })
+            .ToList();
+
+        foreach (var extra in role.Policies.Where(p => policyDefinitions.All(d => !d.PolicyName.Equals(p.PolicyName, StringComparison.OrdinalIgnoreCase))))
+        {
+            editablePolicies.Add(new PolicyEditModel
+            {
+                PolicyName = extra.PolicyName,
+                DisplayName = extra.DisplayName ?? extra.PolicyName,
+                Description = extra.Description ?? string.Empty,
+                ValueType = extra.ValueType ?? "Text",
+                Options = Array.Empty<string>(),
+                Value = extra.PolicyValue
+            });
+        }
+    }
+
+    private static string GetPolicyLabel(PolicyDto policy)
+        => string.IsNullOrWhiteSpace(policy.DisplayName) ? policy.PolicyName : policy.DisplayName;
+
+    private static string FormatPolicyValue(PolicyDto policy)
+    {
+        return policy.ValueType switch
+        {
+            "Boolean" => policy.PolicyValue.Equals("true", StringComparison.OrdinalIgnoreCase) ? "Habilitado" : "Deshabilitado",
+            "Number" => policy.PolicyValue,
+            _ => string.IsNullOrWhiteSpace(policy.PolicyValue) ? "(Sin valor)" : policy.PolicyValue
+        };
+    }
+
+    private class PolicyEditModel
+    {
+        public string PolicyName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ValueType { get; set; } = string.Empty;
+        public IReadOnlyList<string> Options { get; set; } = Array.Empty<string>();
+        public string Value { get; set; } = string.Empty;
+
+        public bool BooleanValue
+        {
+            get => Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+            set => Value = value.ToString().ToLowerInvariant();
+        }
+
+        public decimal NumericValue
+        {
+            get => decimal.TryParse(Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var number) ? number : 0;
+            set => Value = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
     }
 }

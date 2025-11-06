@@ -1,19 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ConfidentialBox.Core.DTOs;
 
-namespace ConfidentialBox.Core.DTOs
+public class RolePolicyDefinitionDto
 {
-public class PolicyDto
-{
-    public int Id { get; set; }
     public string PolicyName { get; set; } = string.Empty;
-    public string PolicyValue { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string ValueType { get; set; } = string.Empty;
+    public string? DefaultValue { get; set; }
     public IReadOnlyList<string> Options { get; set; } = Array.Empty<string>();
-}
 }

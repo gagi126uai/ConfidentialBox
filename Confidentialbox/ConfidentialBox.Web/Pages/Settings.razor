@@ -18,58 +18,105 @@
 }
 else
 {
-    <div class="row g-4">
-        <div class="col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Almacenamiento de archivos</h5>
-                </div>
-                <div class="card-body">
-                    <EditForm Model="storageSettings" OnValidSubmit="UpdateStorageSettingsAsync">
-                        <DataAnnotationsValidator />
-
-                        @if (!string.IsNullOrEmpty(storageMessage))
-                        {
-                            <div class="alert @(storageSuccess ? "alert-success" : "alert-danger")">@storageMessage</div>
-                        }
-
-                        <div class="form-check form-switch mb-3">
-                            <InputCheckbox @bind-Value="storageSettings.StoreInDatabase" class="form-check-input" id="dbStorage" />
-                            <label class="form-check-label" for="dbStorage">Guardar en base de datos encriptada</label>
-                        </div>
-
-                        <div class="form-check form-switch mb-3">
-                            <InputCheckbox @bind-Value="storageSettings.StoreOnFileSystem" class="form-check-input" id="fsStorage" />
-                            <label class="form-check-label" for="fsStorage">Guardar en almacenamiento seguro del servidor</label>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Directorio seguro</label>
-                            <InputText @bind-Value="storageSettings.FileSystemDirectory" class="form-control" />
-                            <div class="form-text">Ruta local o UNC con permisos restringidos. Siempre cifrado.</div>
-                        </div>
-
-                        <button class="btn btn-primary w-100" disabled="@storageSaving">
-                            @if (storageSaving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando...</span>
-                            }
-                            else
-                            {
-                                <span>Actualizar almacenamiento</span>
-                            }
-                        </button>
-                    </EditForm>
-                </div>
-            </div>
+    <div class="card shadow-sm">
+        <div class="card-header bg-white border-bottom">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "storage" ? "active" : string.Empty)" @onclick="() => SetActiveTab("storage")">
+                        <i class="fas fa-database"></i> Almacenamiento
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "email" ? "active" : string.Empty)" @onclick="() => SetActiveTab("email")">
+                        <i class="fas fa-envelope"></i> Correo seguro
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "notifications" ? "active" : string.Empty)" @onclick="() => SetActiveTab("notifications")">
+                        <i class="fas fa-bell"></i> Notificaciones
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "security" ? "active" : string.Empty)" @onclick="() => SetActiveTab("security")">
+                        <i class="fas fa-user-shield"></i> Seguridad de acceso
+                    </button>
+                </li>
+            </ul>
         </div>
+        <div class="card-body">
+            @switch (activeTab)
+            {
+                case "storage":
+                    <div class="row g-4">
+                        <div class="col-lg-7">
+                            <EditForm Model="storageSettings" OnValidSubmit="UpdateStorageSettingsAsync">
+                                <DataAnnotationsValidator />
 
-        <div class="col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Servidor de correo seguro</h5>
-                </div>
-                <div class="card-body">
+                                @if (!string.IsNullOrEmpty(storageMessage))
+                                {
+                                    <div class="alert @(storageSuccess ? "alert-success" : "alert-danger")">@storageMessage</div>
+                                }
+
+                                <div class="form-check form-switch mb-3">
+                                    <InputCheckbox @bind-Value="storageSettings.StoreInDatabase" class="form-check-input" id="dbStorage" />
+                                    <label class="form-check-label" for="dbStorage">Guardar en base de datos encriptada</label>
+                                </div>
+
+                                <div class="form-check form-switch mb-3">
+                                    <InputCheckbox @bind-Value="storageSettings.StoreOnFileSystem" class="form-check-input" id="fsStorage" />
+                                    <label class="form-check-label" for="fsStorage">Guardar en almacenamiento seguro del servidor</label>
+                                </div>
+
+                                <div class="form-check form-switch mb-3">
+                                    <InputCheckbox @bind-Value="storageSettings.UseUserScopedDirectories" class="form-check-input" id="userDirs" />
+                                    <label class="form-check-label" for="userDirs">Crear carpetas aisladas por usuario</label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Directorio seguro</label>
+                                    <InputText @bind-Value="storageSettings.FileSystemDirectory" class="form-control" />
+                                    <div class="form-text">Ruta local o UNC con permisos restringidos. Se crea automáticamente si no existe.</div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Límite total (GB)</label>
+                                        <InputNumber @bind-Value="storageSettings.TotalStorageLimitGb" class="form-control" min="0" />
+                                        <div class="form-text">0 = ilimitado. Controla el uso de disco global.</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Límite por usuario (GB)</label>
+                                        <InputNumber @bind-Value="storageSettings.PerUserStorageLimitGb" class="form-control" min="0" />
+                                        <div class="form-text">0 = ilimitado. Cuota individual por cuenta.</div>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-primary" disabled="@storageSaving">
+                                    @if (storageSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        Guardando…
+                                    }
+                                    else
+                                    {
+                                        <span>Actualizar almacenamiento</span>
+                                    }
+                                </button>
+                            </EditForm>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="alert alert-info">
+                                <h6 class="fw-semibold"><i class="fas fa-info-circle"></i> Resumen</h6>
+                                <ul class="small mb-0">
+                                    <li>Las cuotas se aplican antes de aceptar nuevas subidas.</li>
+                                    <li>Las carpetas por usuario evitan colisiones y simplifican auditorías.</li>
+                                    <li>Siempre puedes combinar base de datos + sistema de archivos para redundancia.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    break;
+                case "email":
                     <EditForm Model="emailServer" OnValidSubmit="UpdateEmailServerAsync">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
@@ -79,49 +126,52 @@ else
                             <div class="alert @(emailSuccess ? "alert-success" : "alert-danger")">@emailMessage</div>
                         }
 
-                        <div class="mb-3">
-                            <label class="form-label">Servidor SMTP</label>
-                            <InputText @bind-Value="emailServer.SmtpHost" class="form-control" />
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Servidor SMTP</label>
+                                <InputText @bind-Value="emailServer.SmtpHost" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Puerto</label>
+                                <InputNumber @bind-Value="emailServer.Port" class="form-control" />
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Puerto</label>
-                            <InputNumber @bind-Value="emailServer.Port" class="form-control" />
-                        </div>
-
-                        <div class="form-check form-switch mb-3">
+                        <div class="form-check form-switch my-3">
                             <InputCheckbox @bind-Value="emailServer.UseSsl" class="form-check-input" id="useSsl" />
                             <label class="form-check-label" for="useSsl">Usar conexión cifrada (SSL/TLS)</label>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Usuario</label>
-                            <InputText @bind-Value="emailServer.Username" class="form-control" />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Usuario</label>
+                                <InputText @bind-Value="emailServer.Username" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo remitente</label>
+                                <InputText @bind-Value="emailServer.FromEmail" class="form-control" />
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Correo remitente</label>
-                            <InputText @bind-Value="emailServer.FromEmail" class="form-control" />
+                        <div class="row g-3 mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre remitente</label>
+                                <InputText @bind-Value="emailServer.FromName" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Clave SMTP (dejar vacía para conservar)</label>
+                                <InputText @bind-Value="emailServer.NewPassword" type="password" class="form-control" />
+                                @if (emailServer.HasPassword)
+                                {
+                                    <div class="form-text text-success">Existe una clave almacenada de forma cifrada.</div>
+                                }
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Nombre remitente</label>
-                            <InputText @bind-Value="emailServer.FromName" class="form-control" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Clave SMTP (dejar vacía para conservar)</label>
-                            <InputText @bind-Value="emailServer.NewPassword" type="password" class="form-control" />
-                            @if (emailServer.HasPassword)
-                            {
-                                <div class="form-text text-success">Existe una clave almacenada de forma cifrada.</div>
-                            }
-                        </div>
-
-                        <button class="btn btn-primary w-100" disabled="@emailSaving">
+                        <button class="btn btn-primary mt-4" disabled="@emailSaving">
                             @if (emailSaving)
                             {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando...</span>
+                                <span class="spinner-border spinner-border-sm me-2"></span>Guardando…
                             }
                             else
                             {
@@ -129,16 +179,8 @@ else
                             }
                         </button>
                     </EditForm>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Notificaciones automáticas</h5>
-                </div>
-                <div class="card-body">
+                    break;
+                case "notifications":
                     <EditForm Model="notifications" OnValidSubmit="UpdateNotificationSettingsAsync">
                         <DataAnnotationsValidator />
 
@@ -177,10 +219,10 @@ else
                             <InputText @bind-Value="notifications.UserInvitationRecipients" class="form-control" />
                         </div>
 
-                        <button class="btn btn-primary w-100" disabled="@notificationsSaving">
+                        <button class="btn btn-primary" disabled="@notificationsSaving">
                             @if (notificationsSaving)
                             {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando...</span>
+                                <span class="spinner-border spinner-border-sm me-2"></span>Guardando…
                             }
                             else
                             {
@@ -188,252 +230,72 @@ else
                             }
                         </button>
                     </EditForm>
-                </div>
-            </div>
-        </div>
+                    break;
+                case "security":
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <EditForm Model="tokenSettings" OnValidSubmit="UpdateTokenSettingsAsync">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
 
-        <div class="col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Seguridad de acceso</h5>
-                </div>
-                <div class="card-body">
-                    <EditForm Model="tokenSettings" OnValidSubmit="UpdateTokenSettingsAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
+                                @if (!string.IsNullOrEmpty(tokenMessage))
+                                {
+                                    <div class="alert @(tokenSuccess ? "alert-success" : "alert-danger")">@tokenMessage</div>
+                                }
 
-                        @if (!string.IsNullOrEmpty(tokenMessage))
-                        {
-                            <div class="alert @(tokenSuccess ? "alert-success" : "alert-danger")">@tokenMessage</div>
-                        }
+                                <div class="mb-3">
+                                    <label class="form-label">Duración del token (horas)</label>
+                                    <InputNumber @bind-Value="tokenSettings.TokenLifetimeHours" class="form-control" min="1" />
+                                    <div class="form-text">Tiempo máximo antes de requerir un nuevo inicio de sesión.</div>
+                                </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Duración del token (horas)</label>
-                            <InputNumber @bind-Value="tokenSettings.TokenLifetimeHours" class="form-control" />
-                            <div class="form-text">Tiempo máximo antes de requerir un nuevo inicio de sesión.</div>
+                                <button class="btn btn-primary" disabled="@tokenSaving">
+                                    @if (tokenSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>Guardando…
+                                    }
+                                    else
+                                    {
+                                        <span>Guardar duración de sesión</span>
+                                    }
+                                </button>
+                            </EditForm>
                         </div>
+                        <div class="col-lg-6">
+                            <div class="card border-0 h-100 bg-light">
+                                <div class="card-body">
+                                    @if (!string.IsNullOrEmpty(registrationMessage))
+                                    {
+                                        <div class="alert @(registrationSuccess ? "alert-success" : "alert-danger")">@registrationMessage</div>
+                                    }
 
-                        <button class="btn btn-primary w-100" disabled="@tokenSaving">
-                            @if (tokenSaving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                                <span>Guardando...</span>
-                            }
-                            else
-                            {
-                                <span>Guardar duración de sesión</span>
-                            }
-                        </button>
-                    </EditForm>
+                                    <div class="form-check form-switch mb-3">
+                                        <InputCheckbox @bind-Value="registrationSettings.IsRegistrationEnabled" class="form-check-input" id="registrationToggle" />
+                                        <label class="form-check-label" for="registrationToggle">
+                                            Permitir registro público de usuarios
+                                        </label>
+                                    </div>
 
-                    <hr class="my-4" />
+                                    <p class="text-muted small">
+                                        Cuando esta opción está desactivada, solo un administrador puede dar de alta nuevas cuentas desde este panel.
+                                    </p>
 
-                    @if (!string.IsNullOrEmpty(registrationMessage))
-                    {
-                        <div class="alert @(registrationSuccess ? "alert-success" : "alert-danger")">@registrationMessage</div>
-                    }
-
-                    <div class="form-check form-switch mb-3">
-                        <InputCheckbox @bind-Value="registrationSettings.IsRegistrationEnabled" class="form-check-input" id="registrationToggle" />
-                        <label class="form-check-label" for="registrationToggle">
-                            Permitir registro público de usuarios
-                        </label>
+                                    <button class="btn btn-outline-primary" @onclick="UpdateRegistrationSettingsAsync" disabled="@registrationSaving">
+                                        @if (registrationSaving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>Guardando…
+                                        }
+                                        else
+                                        {
+                                            <span>Guardar preferencia</span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-
-                    <p class="text-muted small">
-                        Cuando esta opción está desactivada, solo un administrador puede dar de alta nuevas cuentas desde este panel.
-                    </p>
-
-                    <button class="btn btn-outline-primary w-100" @onclick="UpdateRegistrationSettingsAsync" disabled="@registrationSaving">
-                        @if (registrationSaving)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2">Guardando cambios...</span>
-                            
-                        }
-                        else
-                        {
-                            <span>Guardar preferencia</span>
-                        }
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mt-1">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Motor de IA y puntajes</h5>
-                </div>
-                <div class="card-body">
-                    <EditForm Model="aiSettings" OnValidSubmit="UpdateAIScoringSettingsAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-
-                        @if (!string.IsNullOrEmpty(aiMessage))
-                        {
-                            <div class="alert @(aiSuccess ? "alert-success" : "alert-danger")">@aiMessage</div>
-                        }
-
-                        <div class="row g-3">
-                            <div class="col-lg-4">
-                                <h6 class="text-muted">Umbrales generales</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Umbral riesgo alto</label>
-                                    <InputNumber @bind-Value="aiSettings.HighRiskThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Umbral sospechoso</label>
-                                    <InputNumber @bind-Value="aiSettings.SuspiciousThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Recomendación: Bloquear</label>
-                                    <InputNumber @bind-Value="aiSettings.RecommendationBlockThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Recomendación: Revisar</label>
-                                    <InputNumber @bind-Value="aiSettings.RecommendationReviewThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Recomendación: Monitorear</label>
-                                    <InputNumber @bind-Value="aiSettings.RecommendationMonitorThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Riesgo Alto (usuarios)</label>
-                                    <InputNumber @bind-Value="aiSettings.RiskLevelHighThreshold" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Riesgo Medio (usuarios)</label>
-                                    <InputNumber @bind-Value="aiSettings.RiskLevelMediumThreshold" class="form-control" />
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <h6 class="text-muted">Puntajes de archivo</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos extensión sospechosa</label>
-                                    <InputNumber @bind-Value="aiSettings.SuspiciousExtensionScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos archivo grande</label>
-                                    <InputNumber @bind-Value="aiSettings.LargeFileScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos fuera de horario</label>
-                                    <InputNumber @bind-Value="aiSettings.OutsideBusinessHoursScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos carga inusual</label>
-                                    <InputNumber @bind-Value="aiSettings.UnusualUploadsScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos tamaño inusual</label>
-                                    <InputNumber @bind-Value="aiSettings.UnusualFileSizeScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Puntos acceso fuera de horario</label>
-                                    <InputNumber @bind-Value="aiSettings.OutsideHoursBehaviorScore" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Incremento por actividad inusual</label>
-                                    <InputNumber @bind-Value="aiSettings.UnusualActivityIncrement" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso prob. malware</label>
-                                    <InputNumber @bind-Value="aiSettings.MalwareProbabilityWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso prob. exfiltración</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationWeight" class="form-control" />
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <h6 class="text-muted">Comportamiento y límites</h6>
-                                <div class="row g-3">
-                                    <div class="col-6">
-                                        <label class="form-label">Hora inicio</label>
-                                        <InputNumber @bind-Value="aiSettings.BusinessHoursStart" class="form-control" />
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label">Hora fin</label>
-                                        <InputNumber @bind-Value="aiSettings.BusinessHoursEnd" class="form-control" />
-                                    </div>
-                                </div>
-                                <div class="mb-3 mt-3">
-                                    <label class="form-label">Multiplicador carga inusual</label>
-                                    <InputNumber @bind-Value="aiSettings.UploadAnomalyMultiplier" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Multiplicador tamaño inusual</label>
-                                    <InputNumber @bind-Value="aiSettings.FileSizeAnomalyMultiplier" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Tamaño máximo evaluado (MB)</label>
-                                    <InputNumber @bind-Value="aiSettings.MaxFileSizeMB" class="form-control" />
-                                </div>
-                                <h6 class="text-muted mt-4">Pesos avanzados</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso extensión peligrosa</label>
-                                    <InputNumber @bind-Value="aiSettings.MalwareSuspiciousExtensionWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso palabra "crack"</label>
-                                    <InputNumber @bind-Value="aiSettings.MalwareCrackKeywordWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso palabra "keygen"</label>
-                                    <InputNumber @bind-Value="aiSettings.MalwareKeygenKeywordWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso ejecutables</label>
-                                    <InputNumber @bind-Value="aiSettings.MalwareExecutableWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Umbral archivo grande (MB)</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileMB" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Umbral archivo muy grande (MB)</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileMB" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso archivo grande</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso archivo muy grande</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso archivos comprimidos</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationArchiveWeight" class="form-control" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Peso actividad fuera de horario</label>
-                                    <InputNumber @bind-Value="aiSettings.DataExfiltrationOffHoursWeight" class="form-control" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Extensiones sospechosas (separar por coma)</label>
-                            <InputTextArea @bind-Value="aiSettings.SuspiciousExtensions" class="form-control" rows="3" />
-                        </div>
-
-                        <button class="btn btn-primary" disabled="@aiSaving">
-                            @if (aiSaving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando IA...</span>
-                                
-                            }
-                            else
-                            {
-                                <span>Guardar configuración avanzada</span>
-                            }
-                        </button>
-                    </EditForm>
-                </div>
-            </div>
+                    break;
+            }
         </div>
     </div>
 }
@@ -444,7 +306,6 @@ else
     private EmailNotificationSettingsDto notifications = new();
     private RegistrationSettingsDto registrationSettings = new();
     private TokenSettingsDto tokenSettings = new();
-    private AIScoringSettingsDto aiSettings = new();
 
     private bool isLoading = true;
     private bool storageSaving;
@@ -452,7 +313,6 @@ else
     private bool notificationsSaving;
     private bool registrationSaving;
     private bool tokenSaving;
-    private bool aiSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -464,12 +324,17 @@ else
     private bool registrationSuccess;
     private string? tokenMessage;
     private bool tokenSuccess;
-    private string? aiMessage;
-    private bool aiSuccess;
+
+    private string activeTab = "storage";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSettingsAsync();
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
     }
 
     private async Task LoadSettingsAsync()
@@ -481,7 +346,6 @@ else
             notifications = await SettingsService.GetEmailNotificationSettingsAsync() ?? new EmailNotificationSettingsDto();
             registrationSettings = await SettingsService.GetRegistrationSettingsAsync() ?? new RegistrationSettingsDto();
             tokenSettings = await SettingsService.GetTokenSettingsAsync() ?? new TokenSettingsDto();
-            aiSettings = await SettingsService.GetAIScoringSettingsAsync() ?? new AIScoringSettingsDto();
         }
         finally
         {
@@ -519,7 +383,7 @@ else
         try
         {
             emailSuccess = await SettingsService.UpdateEmailServerSettingsAsync(emailServer);
-            emailMessage = emailSuccess ? "Servidor SMTP actualizado." : "No fue posible guardar el servidor SMTP.";
+            emailMessage = emailSuccess ? "Servidor actualizado." : "No fue posible actualizar el servidor.";
             if (emailSuccess)
             {
                 emailServer.NewPassword = string.Empty;
@@ -583,33 +447,6 @@ else
         finally
         {
             tokenSaving = false;
-        }
-    }
-
-    private async Task UpdateAIScoringSettingsAsync()
-    {
-        aiMessage = null;
-        aiSaving = true;
-
-        try
-        {
-            aiSuccess = await SettingsService.UpdateAIScoringSettingsAsync(aiSettings);
-            aiMessage = aiSuccess
-                ? "Configuración de IA actualizada."
-                : "No fue posible guardar los parámetros de IA.";
-
-            if (aiSuccess)
-            {
-                var refreshed = await SettingsService.GetAIScoringSettingsAsync();
-                if (refreshed is not null)
-                {
-                    aiSettings = refreshed;
-                }
-            }
-        }
-        finally
-        {
-            aiSaving = false;
         }
     }
 

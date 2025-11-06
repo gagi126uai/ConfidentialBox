@@ -191,4 +191,11 @@ public class FileRepository : IFileRepository
             .Where(f => !f.IsDeleted)
             .SumAsync(f => f.FileSizeBytes);
     }
+
+    public async Task<long> GetTotalStorageBytesByUserAsync(string userId)
+    {
+        return await _context.SharedFiles
+            .Where(f => !f.IsDeleted && f.UploadedByUserId == userId)
+            .SumAsync(f => f.FileSizeBytes);
+    }
 }

@@ -1,264 +1,372 @@
-﻿@page "/ai-security"
+@page "/ai-security"
+@using System.Globalization
+@using ConfidentialBox.Core.DTOs
+@using ConfidentialBox.Web.Services
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Rendering
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
+@inject ISettingsService SettingsService
 
 <PageTitle>AI Security Dashboard - ConfidentialBox</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-brain"></i> AI Security Dashboard</h1>
-    <button class="btn btn-primary" @onclick="RunFullScan">
-        <i class="fas fa-search"></i> Escanear Sistema
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="mb-0"><i class="fas fa-brain"></i> AI Security Dashboard</h1>
+        <p class="text-muted small mb-0">Monitoreo en tiempo real y ajustes del motor de IA.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="RunFullScan" disabled="@scanRunning">
+        @if (scanRunning)
+        {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Escaneando…
+        }
+        else
+        {
+            <span><i class="fas fa-search"></i> Escanear sistema</span>
+        }
     </button>
 </div>
 
-@if (isLoading)
+@if (!string.IsNullOrEmpty(scanMessage))
 {
-    <div class="text-center my-5">
-        <div class="spinner-border" role="status"></div>
-        <p class="mt-2">Analizando sistema con IA...</p>
+    <div class="alert @(scanSuccess ? "alert-success" : "alert-danger")">@scanMessage</div>
+}
+
+@if (lastScan is not null)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <div>
+            <strong>Último escaneo:</strong> @lastScan.ExecutedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+            <span class="ms-2">Alertas nuevas: @lastScan.AlertsGenerated</span>
+            <span class="ms-2">Perfiles de alto riesgo: @lastScan.HighRiskProfilesReviewed</span>
+        </div>
+        <span class="text-muted">@lastScan.Message</span>
     </div>
 }
-else if (dashboard != null)
-{
-    <!-- Threat Level Indicator -->
-    <div class="card mb-4 border-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5>Nivel de Amenaza del Sistema</h5>
-                    <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
-                        @GetThreatLevelText(dashboard.SystemThreatLevel)
-                    </h2>
-                </div>
-                <div>
-                    <div class="progress" style="width: 200px; height: 30px;">
-                        <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)"
-                             style="width: @($"{dashboard.SystemThreatLevel * 100:F0}%")">
-                            <td>@($"{dashboard.SystemThreatLevel * 100:F0}%")</td>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-bottom">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <button type="button" class="nav-link @(activeTab == "overview" ? "active" : string.Empty)" @onclick="() => SetActiveTab("overview")">
+                    <i class="fas fa-chart-line"></i> Resumen
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link @(activeTab == "settings" ? "active" : string.Empty)" @onclick="() => SetActiveTab("settings")">
+                    <i class="fas fa-sliders-h"></i> Configuración de IA
+                </button>
+            </li>
+        </ul>
     </div>
-
-    <!-- Stats Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-white bg-danger">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6>Alertas Críticas</h6>
-                            <h2>@dashboard.CriticalAlertsUnreviewed</h2>
-                            <small>Sin revisar</small>
-                        </div>
-                        <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6>Usuarios Alto Riesgo</h6>
-                            <h2>@dashboard.HighRiskUsers</h2>
-                            <small>Requieren atención</small>
-                        </div>
-                        <i class="fas fa-user-shield fa-3x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card text-white bg-info">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6>Archivos Sospechosos</h6>
-                            <h2>@dashboard.SuspiciousFilesDetected</h2>
-                            <small>Detectados hoy</small>
-                        </div>
-                        <i class="fas fa-file-medical-alt fa-3x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card text-white bg-primary">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6>Alertas Hoy</h6>
-                            <h2>@dashboard.TotalAlertsToday</h2>
-                            <small>Total del día</small>
-                        </div>
-                        <i class="fas fa-bell fa-3x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div class="row mb-4">
-        <!-- Alerts by Type -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-chart-pie"></i> Alertas por Tipo</h5>
-                </div>
-                <div class="card-body">
-                    @if (dashboard.AlertsByType?.Any() == true)
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <tbody>
-                                    @foreach (var alert in dashboard.AlertsByType.OrderByDescending(a => a.Value))
-                                    {
-                                        <tr>
-                                            <td>@alert.Key</td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar"
-                                                         style="width: @($"{GetPercentage(alert.Value, dashboard.AlertsByType.Values.Max()):F0}%")">
-                                                        @alert.Value
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-muted text-center">No hay alertas para mostrar</p>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <!-- Threat Trends -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-chart-line"></i> Tendencia de Amenazas (7 días)</h5>
-                </div>
-                <div class="card-body">
-                    @if (dashboard.ThreatTrends?.Any() == true)
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <tbody>
-                                    @foreach (var trend in dashboard.ThreatTrends)
-                                    {
-                                        <tr>
-                                            <td><strong>@trend.Key</strong></td>
-                                            <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar bg-info"
-                                                         style="width: @($"{GetPercentage(trend.Value, dashboard.ThreatTrends.Values.Max()):F0}%")">
-                                                        @trend.Value
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-muted text-center">No hay datos de tendencias</p>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Alerts -->
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5><i class="fas fa-bell"></i> Alertas Recientes</h5>
-            <a href="/security-alerts" class="btn btn-sm btn-outline-primary">Ver Todas</a>
-        </div>
-        <div class="card-body">
-            @if (dashboard.RecentAlerts?.Any() == true)
+    <div class="card-body">
+        @if (activeTab == "overview")
+        {
+            if (isLoading)
             {
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Tipo</th>
-                                <th>Severidad</th>
-                                <th>Usuario</th>
-                                <th>Archivo</th>
-                                <th>Descripción</th>
-                                <th>Confianza</th>
-                                <th>Fecha</th>
-                                <th>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var alert in dashboard.RecentAlerts)
-                            {
-                                <tr>
-                                    <td><span class="badge bg-secondary">@alert.AlertType</span></td>
-                                    <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
-                                    <td>@alert.UserName</td>
-                                    <td>@(alert.FileName ?? "-")</td>
-                                    <td><small>@alert.Description</small></td>
-                                    <td>
-                                        <div class="progress" style="width: 80px; height: 20px;">
-                                            <div class="progress-bar"
-                                                 style="width: @($"{alert.ConfidenceScore * 100:F0}%")">
-                                                <td>@($"{alert.ConfidenceScore * 100:F0}%")</td>
-                                            </div>
+                <div class="text-center my-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3 text-muted">Analizando sistema con IA…</p>
+                </div>
+            }
+            else if (dashboard is null)
+            {
+                <div class="alert alert-danger mb-0">No fue posible cargar los datos del tablero de IA.</div>
+            }
+            else
+            {
+                var threatPercent = dashboard.SystemThreatLevel * 100;
+                <div class="card mb-4 border-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                            <div>
+                                <h5 class="text-muted">Nivel de Amenaza del Sistema</h5>
+                                <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel) mb-0">@GetThreatLevelText(dashboard.SystemThreatLevel)</h2>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="progress" style="height: 30px;">
+                                    <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)" style="@($"width: {threatPercent:F0}%")">
+                                        @($"{threatPercent:F0}%")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @{ var statCards = new[]
+                    {
+                        new { Color = "danger", Title = "Alertas Críticas", Value = dashboard.CriticalAlertsUnreviewed.ToString(), Subtitle = "Sin revisar", Icon = "fas fa-exclamation-triangle" },
+                        new { Color = "warning", Title = "Usuarios Alto Riesgo", Value = dashboard.HighRiskUsers.ToString(), Subtitle = "Requieren atención", Icon = "fas fa-user-shield" },
+                        new { Color = "info", Title = "Archivos Sospechosos", Value = dashboard.SuspiciousFilesDetected.ToString(), Subtitle = "Detectados hoy", Icon = "fas fa-file-medical-alt" },
+                        new { Color = "primary", Title = "Alertas Hoy", Value = dashboard.TotalAlertsToday.ToString(), Subtitle = "Total del día", Icon = "fas fa-bell" }
+                    }; }
+
+                <div class="row g-3 mb-4">
+                    @foreach (var card in statCards)
+                    {
+                        <div class="col-sm-6 col-lg-3">
+                            <div class="card text-white bg-@card.Color h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="text-uppercase small fw-bold">@card.Title</h6>
+                                            <h2 class="fw-bold">@card.Value</h2>
+                                            <small>@card.Subtitle</small>
                                         </div>
-                                    </td>
-                                    <td><small>@alert.DetectedAt.ToString("dd/MM HH:mm")</small></td>
-                                    <td>
-                                        @if (alert.IsReviewed)
+                                        <i class="@card.Icon fa-2x opacity-50"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5 class="mb-0">Alertas por Tipo</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (dashboard.AlertsByType is null || !dashboard.AlertsByType.Any())
+                                {
+                                    <p class="text-muted text-center mb-0">No hay datos disponibles</p>
+                                }
+                                else
+                                {
+                                    var max = dashboard.AlertsByType.Values.Max();
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <tbody>
+                                                @foreach (var item in dashboard.AlertsByType.OrderByDescending(a => a.Value))
+                                                {
+                                                    var percentage = GetPercentage(item.Value, max);
+                                                    <tr>
+                                                        <td class="fw-semibold">@item.Key</td>
+                                                        <td>
+                                                            <div class="progress" style="height: 20px;">
+                                                                <div class="progress-bar" style="@($"width: {percentage:F0}%")">@item.Value</div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5 class="mb-0">Tendencia de Amenazas (7 días)</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (dashboard.ThreatTrends is null || !dashboard.ThreatTrends.Any())
+                                {
+                                    <p class="text-muted text-center mb-0">No hay datos disponibles</p>
+                                }
+                                else
+                                {
+                                    var max = dashboard.ThreatTrends.Values.Any() ? dashboard.ThreatTrends.Values.Max() : 0;
+                                    var safeMax = max == 0 ? 1 : max;
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <tbody>
+                                                @foreach (var item in dashboard.ThreatTrends.OrderBy(t => t.Key))
+                                                {
+                                                    var percentage = GetPercentage(item.Value, safeMax);
+                                                    <tr>
+                                                        <td class="fw-semibold">@item.Key</td>
+                                                        <td>
+                                                            <div class="progress" style="height: 20px;">
+                                                                <div class="progress-bar bg-info" style="@($"width: {percentage:F0}%")">@item.Value</div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-bell"></i> Alertas Recientes</h5>
+                        <a href="/security-alerts" class="btn btn-sm btn-outline-primary">Ver todas</a>
+                    </div>
+                    <div class="card-body">
+                        @if (dashboard.RecentAlerts is null || !dashboard.RecentAlerts.Any())
+                        {
+                            <div class="alert alert-success mb-0"><i class="fas fa-check-circle"></i> No hay alertas recientes. El sistema está seguro.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Tipo</th>
+                                            <th>Severidad</th>
+                                            <th>Usuario</th>
+                                            <th>Archivo</th>
+                                            <th>Descripción</th>
+                                            <th>Confianza</th>
+                                            <th>Fecha</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var alert in dashboard.RecentAlerts)
                                         {
-                                            <span class="badge bg-success">Revisada</span>
+                                            var confidencePercent = alert.ConfidenceScore * 100;
+                                            <tr>
+                                                <td><span class="badge bg-secondary">@alert.AlertType</span></td>
+                                                <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
+                                                <td>@alert.UserName</td>
+                                                <td>@(alert.FileName ?? "-")</td>
+                                                <td><small>@alert.Description</small></td>
+                                                <td>
+                                                    <div class="progress" style="width: 100px; height: 20px;">
+                                                        <div class="progress-bar" style="@($"width: {confidencePercent:F0}%")">@($"{confidencePercent:F0}%")</div>
+                                                    </div>
+                                                </td>
+                                                <td><small>@alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</small></td>
+                                                <td>
+                                                    @if (alert.IsReviewed)
+                                                    {
+                                                        <span class="badge bg-success">Revisada</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-warning text-dark">Pendiente</span>
+                                                    }
+                                                </td>
+                                            </tr>
                                         }
-                                        else
-                                        {
-                                            <span class="badge bg-warning">Pendiente</span>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            if (aiSettingsLoading)
+            {
+                <div class="text-center my-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-3 text-muted">Cargando parámetros de IA…</p>
                 </div>
             }
             else
             {
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle"></i> No hay alertas recientes. El sistema está seguro.
-                </div>
+                <EditForm Model="aiSettings" OnValidSubmit="SaveAIScoringAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    @if (!string.IsNullOrEmpty(aiMessage))
+                    {
+                        <div class="alert @(aiSuccess ? "alert-success" : "alert-danger")">@aiMessage</div>
+                    }
+
+                    <div class="row g-4">
+                        <div class="col-lg-4">
+                            <h6 class="text-muted text-uppercase">Umbrales generales</h6>
+                            <InputNumberField Label="Umbral riesgo alto" @bind-Value="aiSettings.HighRiskThreshold" />
+                            <InputNumberField Label="Umbral sospechoso" @bind-Value="aiSettings.SuspiciousThreshold" />
+                            <InputNumberField Label="Recomendación: Bloquear" @bind-Value="aiSettings.RecommendationBlockThreshold" />
+                            <InputNumberField Label="Recomendación: Revisar" @bind-Value="aiSettings.RecommendationReviewThreshold" />
+                            <InputNumberField Label="Recomendación: Monitorear" @bind-Value="aiSettings.RecommendationMonitorThreshold" />
+                            <InputNumberField Label="Riesgo Alto (usuarios)" @bind-Value="aiSettings.RiskLevelHighThreshold" />
+                            <InputNumberField Label="Riesgo Medio (usuarios)" @bind-Value="aiSettings.RiskLevelMediumThreshold" />
+                        </div>
+                        <div class="col-lg-4">
+                            <h6 class="text-muted text-uppercase">Puntajes de archivo</h6>
+                            <InputNumberField Label="Puntos extensión sospechosa" @bind-Value="aiSettings.SuspiciousExtensionScore" />
+                            <InputNumberField Label="Puntos archivo grande" @bind-Value="aiSettings.LargeFileScore" />
+                            <InputNumberField Label="Puntos fuera de horario" @bind-Value="aiSettings.OutsideBusinessHoursScore" />
+                            <InputNumberField Label="Puntos carga inusual" @bind-Value="aiSettings.UnusualUploadsScore" />
+                            <InputNumberField Label="Puntos tamaño inusual" @bind-Value="aiSettings.UnusualFileSizeScore" />
+                            <InputNumberField Label="Puntos acceso fuera de horario" @bind-Value="aiSettings.OutsideHoursBehaviorScore" />
+                            <InputNumberField Label="Incremento por actividad inusual" @bind-Value="aiSettings.UnusualActivityIncrement" />
+                            <InputNumberField Label="Peso prob. malware" @bind-Value="aiSettings.MalwareProbabilityWeight" />
+                            <InputNumberField Label="Peso prob. exfiltración" @bind-Value="aiSettings.DataExfiltrationWeight" />
+                        </div>
+                        <div class="col-lg-4">
+                            <h6 class="text-muted text-uppercase">Comportamiento y límites</h6>
+                            <InputNumberField Label="Hora inicio" @bind-Value="aiSettings.BusinessHoursStart" />
+                            <InputNumberField Label="Hora fin" @bind-Value="aiSettings.BusinessHoursEnd" />
+                            <InputNumberField Label="Multiplicador carga inusual" @bind-Value="aiSettings.UploadAnomalyMultiplier" />
+                            <InputNumberField Label="Multiplicador tamaño inusual" @bind-Value="aiSettings.FileSizeAnomalyMultiplier" />
+                            <InputNumberField Label="Tamaño máximo evaluado (MB)" @bind-Value="aiSettings.MaxFileSizeMB" />
+
+                            <h6 class="text-muted text-uppercase mt-4">Pesos avanzados</h6>
+                            <InputNumberField Label="Peso extensión peligrosa" @bind-Value="aiSettings.MalwareSuspiciousExtensionWeight" />
+                            <InputNumberField Label="Peso palabra 'crack'" @bind-Value="aiSettings.MalwareCrackKeywordWeight" />
+                            <InputNumberField Label="Peso palabra 'keygen'" @bind-Value="aiSettings.MalwareKeygenKeywordWeight" />
+                            <InputNumberField Label="Peso ejecutables" @bind-Value="aiSettings.MalwareExecutableWeight" />
+                            <InputNumberField Label="Umbral archivo grande (MB)" @bind-Value="aiSettings.DataExfiltrationLargeFileMB" />
+                            <InputNumberField Label="Umbral archivo muy grande (MB)" @bind-Value="aiSettings.DataExfiltrationHugeFileMB" />
+                            <InputNumberField Label="Peso archivo grande" @bind-Value="aiSettings.DataExfiltrationLargeFileWeight" />
+                            <InputNumberField Label="Peso archivo muy grande" @bind-Value="aiSettings.DataExfiltrationHugeFileWeight" />
+                            <InputNumberField Label="Peso archivos comprimidos" @bind-Value="aiSettings.DataExfiltrationArchiveWeight" />
+                            <InputNumberField Label="Peso actividad fuera de horario" @bind-Value="aiSettings.DataExfiltrationOffHoursWeight" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Extensiones sospechosas (separar por coma)</label>
+                        <InputTextArea class="form-control" @bind-Value="aiSettings.SuspiciousExtensions" Rows="3" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" disabled="@aiSaving">
+                        @if (aiSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>Guardando IA…
+                        }
+                        else
+                        {
+                            Guardar configuración avanzada
+                        }
+                    </button>
+                </EditForm>
             }
-        </div>
+        }
     </div>
-}
+</div>
 
 @code {
     private AISecurityDashboardDto? dashboard;
     private bool isLoading = true;
 
+    private AIScoringSettingsDto aiSettings = new();
+    private bool aiSettingsLoading = true;
+    private bool aiSaving;
+    private string? aiMessage;
+    private bool aiSuccess;
+
+    private bool scanRunning;
+    private string? scanMessage;
+    private bool scanSuccess;
+    private AIScanSummaryDto? lastScan;
+
+    private string activeTab = "overview";
+
     protected override async Task OnInitializedAsync()
     {
-        await LoadDashboard();
+        await Task.WhenAll(LoadDashboard(), LoadAIScoringSettings());
     }
 
     private async Task LoadDashboard()
@@ -278,21 +386,75 @@ else if (dashboard != null)
         }
     }
 
-    private async Task RunFullScan()
+    private async Task LoadAIScoringSettings()
     {
-        isLoading = true;
+        aiSettingsLoading = true;
         try
         {
-            await Http.PostAsync("api/aisecurity/scan-all", null);
-            await LoadDashboard();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error running scan: {ex.Message}");
+            aiSettings = await SettingsService.GetAIScoringSettingsAsync() ?? new AIScoringSettingsDto();
         }
         finally
         {
-            isLoading = false;
+            aiSettingsLoading = false;
+        }
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    private async Task RunFullScan()
+    {
+        scanRunning = true;
+        scanMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/aisecurity/scan-all", (object?)null);
+            if (response.IsSuccessStatusCode)
+            {
+                lastScan = await response.Content.ReadFromJsonAsync<AIScanSummaryDto>();
+                scanSuccess = true;
+                scanMessage = lastScan?.Message ?? "Escaneo completado";
+                await LoadDashboard();
+            }
+            else
+            {
+                scanSuccess = false;
+                scanMessage = "No se pudo ejecutar el escaneo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            scanSuccess = false;
+            scanMessage = $"Error al ejecutar el escaneo: {ex.Message}";
+        }
+        finally
+        {
+            scanRunning = false;
+        }
+    }
+
+    private async Task SaveAIScoringAsync()
+    {
+        aiMessage = null;
+        aiSaving = true;
+        try
+        {
+            aiSuccess = await SettingsService.UpdateAIScoringSettingsAsync(aiSettings);
+            aiMessage = aiSuccess ? "Configuración de IA actualizada." : "No fue posible guardar los parámetros de IA.";
+            if (aiSuccess)
+            {
+                var refreshed = await SettingsService.GetAIScoringSettingsAsync();
+                if (refreshed is not null)
+                {
+                    aiSettings = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            aiSaving = false;
         }
     }
 
@@ -321,4 +483,54 @@ else if (dashboard != null)
 
     private double GetPercentage(int value, int max)
         => max == 0 ? 0 : (value / (double)max) * 100;
+
+    private sealed class InputNumberField : InputNumber<double>
+    {
+        [Parameter]
+        public string Label { get; set; } = string.Empty;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "mb-3");
+
+            if (!string.IsNullOrWhiteSpace(Label))
+            {
+                builder.OpenElement(2, "label");
+                builder.AddAttribute(3, "class", "form-label");
+                builder.AddContent(4, Label);
+                builder.CloseElement();
+            }
+
+            builder.OpenElement(5, "input");
+            builder.AddMultipleAttributes(6, AdditionalAttributes);
+            var cssClass = string.IsNullOrWhiteSpace(CssClass)
+                ? "form-control"
+                : $"form-control {CssClass}".Trim();
+            builder.AddAttribute(7, "class", cssClass);
+            builder.AddAttribute(8, "type", "number");
+            builder.AddAttribute(9, "step", "any");
+            builder.AddAttribute(10, "value", BindConverter.FormatValue(CurrentValueAsString));
+            builder.AddAttribute(11, "onchange", EventCallback.Factory.CreateBinder<string?>(this, __value => CurrentValueAsString = __value, CurrentValueAsString));
+            builder.CloseElement();
+
+            builder.CloseElement();
+        }
+
+        protected override bool TryParseValueFromString(string? value, out double result, out string? validationErrorMessage)
+        {
+            if (BindConverter.TryConvertTo<double>(value, CultureInfo.InvariantCulture, out result))
+            {
+                validationErrorMessage = null;
+                return true;
+            }
+
+            validationErrorMessage = "El valor debe ser numérico";
+            return false;
+        }
+
+        protected override string FormatValueAsString(double value)
+            => BindConverter.FormatValue(value, CultureInfo.InvariantCulture);
+
+    }
 }

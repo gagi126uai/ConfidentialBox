@@ -1,6 +1,7 @@
 using ConfidentialBox.Core.Configuration;
 using ConfidentialBox.Core.Entities;
 using Microsoft.Extensions.Options;
+using System.Linq;
 
 namespace ConfidentialBox.Infrastructure.Services;
 
@@ -47,9 +48,15 @@ public class FileStorageService : IFileStorageService
                 safeFileName = Guid.NewGuid().ToString("N");
             }
 
-            var targetPath = Path.Combine(_baseDirectory, safeFileName);
+            var (targetPath, storagePath) = ResolveTargetPath(file, safeFileName);
+            var directory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
             await File.WriteAllBytesAsync(targetPath, encryptedBytes, cancellationToken);
-            file.StoragePath = safeFileName;
+            file.StoragePath = storagePath;
         }
     }
 
@@ -67,8 +74,7 @@ public class FileStorageService : IFileStorageService
                 throw new InvalidOperationException("El archivo no tiene una ruta de almacenamiento válida.");
             }
 
-            var safePath = Path.GetFileName(file.StoragePath);
-            var fullPath = Path.Combine(_baseDirectory, safePath);
+            var fullPath = ResolveFullPath(file.StoragePath);
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException("No se encontró el archivo cifrado en el sistema de archivos.");
@@ -84,8 +90,7 @@ public class FileStorageService : IFileStorageService
     {
         if (file.StoreOnFileSystem && !string.IsNullOrWhiteSpace(file.StoragePath))
         {
-            var safePath = Path.GetFileName(file.StoragePath);
-            var fullPath = Path.Combine(_baseDirectory, safePath);
+            var fullPath = ResolveFullPath(file.StoragePath);
             if (File.Exists(fullPath))
             {
                 File.Delete(fullPath);
@@ -101,5 +106,55 @@ public class FileStorageService : IFileStorageService
         }
 
         return Task.CompletedTask;
+    }
+
+    private (string fullPath, string storagePath) ResolveTargetPath(SharedFile file, string safeFileName)
+    {
+        if (!_settings.UseUserScopedDirectories || string.IsNullOrWhiteSpace(file.UploadedByUserId))
+        {
+            return (Path.Combine(_baseDirectory, safeFileName), safeFileName);
+        }
+
+        var userSegment = SanitizeSegment(file.UploadedByUserId);
+        var storagePath = Path.Combine(userSegment, safeFileName);
+        var fullPath = Path.Combine(_baseDirectory, storagePath);
+        return (fullPath, storagePath.Replace('\\', '/'));
+    }
+
+    private string ResolveFullPath(string storagePath)
+    {
+        var safePath = storagePath.Replace('/', Path.DirectorySeparatorChar);
+        safePath = safePath.Replace('\', Path.DirectorySeparatorChar);
+        var combined = Path.Combine(_baseDirectory, safePath);
+        var fullPath = Path.GetFullPath(combined);
+
+        if (!fullPath.StartsWith(_baseDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Ruta de almacenamiento inválida detectada.");
+        }
+
+        return fullPath;
+    }
+
+    private static string SanitizeSegment(string segment)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var builder = new char[segment.Length];
+        var index = 0;
+        foreach (var ch in segment)
+        {
+            if (invalidChars.Contains(ch) || ch == Path.DirectorySeparatorChar || ch == Path.AltDirectorySeparatorChar)
+            {
+                continue;
+            }
+            builder[index++] = ch;
+        }
+
+        if (index == 0)
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        return new string(builder, 0, index);
     }
 }

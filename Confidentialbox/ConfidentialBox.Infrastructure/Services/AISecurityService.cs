@@ -212,9 +212,9 @@ public class AISecurityService : IAISecurityService
         };
     }
 
-    public async Task<List<SecurityAlert>> DetectAnomaliesAsync()
+    public async Task<AIScanSummaryDto> DetectAnomaliesAsync()
     {
-        var alerts = new List<SecurityAlert>();
+        var scanStarted = DateTime.UtcNow;
         var users = await _context.Users.Where(u => u.IsActive).ToListAsync();
 
         foreach (var user in users)
@@ -229,10 +229,24 @@ public class AISecurityService : IAISecurityService
             }
         }
 
-        return await _context.SecurityAlerts
-            .Where(a => a.DetectedAt >= DateTime.UtcNow.AddHours(-24))
-            .OrderByDescending(a => a.DetectedAt)
-            .ToListAsync();
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
+        var newAlerts = await _context.SecurityAlerts
+            .Where(a => a.DetectedAt >= scanStarted)
+            .CountAsync();
+
+        var highRiskProfiles = await _context.UserBehaviorProfiles
+            .Where(p => p.RiskScore >= scoring.HighRiskThreshold)
+            .CountAsync();
+
+        return new AIScanSummaryDto
+        {
+            ExecutedAtUtc = DateTime.UtcNow,
+            AlertsGenerated = newAlerts,
+            HighRiskProfilesReviewed = highRiskProfiles,
+            Message = newAlerts > 0
+                ? $"Se generaron {newAlerts} alertas nuevas durante el escaneo."
+                : "Escaneo completado sin nuevas alertas."
+        };
     }
 
     public async Task<AISecurityDashboardDto> GetSecurityDashboardAsync()

@@ -71,6 +71,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                   .HasForeignKey(e => e.AccessedByUserId)
                   .OnDelete(DeleteBehavior.SetNull);
 
+            entity.Property(e => e.DeviceName).HasMaxLength(256);
+            entity.Property(e => e.DeviceType).HasMaxLength(64);
+            entity.Property(e => e.OperatingSystem).HasMaxLength(128);
+            entity.Property(e => e.Browser).HasMaxLength(128);
+            entity.Property(e => e.Location).HasMaxLength(256);
+
             // Si existe AccessedAt:
             // entity.HasIndex(e => new { e.SharedFileId, e.AccessedAt });
         });
@@ -87,6 +93,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.Action);
+
+            entity.Property(e => e.DeviceName).HasMaxLength(256);
+            entity.Property(e => e.DeviceType).HasMaxLength(64);
+            entity.Property(e => e.OperatingSystem).HasMaxLength(128);
+            entity.Property(e => e.Browser).HasMaxLength(128);
+            entity.Property(e => e.Location).HasMaxLength(256);
         });
 
         // FilePermission

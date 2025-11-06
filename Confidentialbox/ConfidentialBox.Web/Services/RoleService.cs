@@ -30,6 +30,28 @@ public class RoleService : IRoleService
         return null;
     }
 
+    public async Task<List<RolePolicyDefinitionDto>> GetPolicyDefinitionsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<RolePolicyDefinitionDto>>("api/roles/policy-definitions")
+            ?? new List<RolePolicyDefinitionDto>();
+    }
+
+    public async Task<RoleDto?> UpdatePoliciesAsync(string roleId, Dictionary<string, string> policies)
+    {
+        var request = new UpdateRolePoliciesRequest
+        {
+            Policies = policies
+        };
+
+        var response = await _httpClient.PutAsJsonAsync($"api/roles/{roleId}/policies", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<RoleDto>();
+    }
+
     public async Task<bool> DeleteRoleAsync(string id)
     {
         var response = await _httpClient.DeleteAsync($"api/roles/{id}");

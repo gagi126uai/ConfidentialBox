@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Linq;
 using FileAccessEntity = ConfidentialBox.Core.Entities.FileAccess;
 
 namespace ConfidentialBox.API.Controllers;
@@ -22,6 +23,8 @@ public class FilesController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAISecurityService _aiSecurityService;
     private readonly IFileStorageService _fileStorageService;
+    private readonly ISystemSettingsService _systemSettingsService;
+    private readonly IClientContextResolver _clientContextResolver;
 
     public FilesController(
         IFileRepository fileRepository,
@@ -30,7 +33,9 @@ public class FilesController : ControllerBase
         IShareLinkGenerator linkGenerator,
         UserManager<ApplicationUser> userManager,
         IAISecurityService aiSecurityService,
-        IFileStorageService fileStorageService)
+        IFileStorageService fileStorageService,
+        ISystemSettingsService systemSettingsService,
+        IClientContextResolver clientContextResolver)
     {
         _fileRepository = fileRepository;
         _fileAccessRepository = fileAccessRepository;
@@ -39,6 +44,8 @@ public class FilesController : ControllerBase
         _userManager = userManager;
         _aiSecurityService = aiSecurityService;
         _fileStorageService = fileStorageService;
+        _systemSettingsService = systemSettingsService;
+        _clientContextResolver = clientContextResolver;
     }
 
     [HttpGet]
@@ -117,6 +124,35 @@ public class FilesController : ControllerBase
 
         try
         {
+            var storageSettings = await _systemSettingsService.GetFileStorageSettingsAsync(HttpContext.RequestAborted);
+            var totalLimit = storageSettings.GetTotalStorageLimitBytes();
+            if (totalLimit > 0)
+            {
+                var currentTotal = await _fileRepository.GetTotalStorageBytesAsync();
+                if (currentTotal + request.FileSizeBytes > totalLimit)
+                {
+                    return Ok(new FileUploadResponse
+                    {
+                        Success = false,
+                        ErrorMessage = "Se alcanzó el límite global de almacenamiento configurado."
+                    });
+                }
+            }
+
+            var perUserLimit = storageSettings.GetPerUserStorageLimitBytes();
+            if (perUserLimit > 0)
+            {
+                var currentUserUsage = await _fileRepository.GetTotalStorageBytesByUserAsync(userId);
+                if (currentUserUsage + request.FileSizeBytes > perUserLimit)
+                {
+                    return Ok(new FileUploadResponse
+                    {
+                        Success = false,
+                        ErrorMessage = "Has superado tu cuota de almacenamiento disponible."
+                    });
+                }
+            }
+
             var shareLink = _linkGenerator.GenerateUniqueLink();
 
             // Detectar si es PDF
@@ -183,6 +219,8 @@ public class FilesController : ControllerBase
             }
 
             // Registrar auditoría
+            var clientContext = _clientContextResolver.Resolve(HttpContext);
+
             await _auditLogRepository.AddAsync(new AuditLog
             {
                 UserId = userId,
@@ -191,7 +229,15 @@ public class FilesController : ControllerBase
                 EntityId = savedFile.Id.ToString(),
                 NewValues = $"File: {request.OriginalFileName}",
                 Timestamp = DateTime.UtcNow,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown"
+                IpAddress = clientContext.IpAddress,
+                UserAgent = clientContext.UserAgent,
+                DeviceName = clientContext.DeviceName,
+                DeviceType = clientContext.DeviceType,
+                OperatingSystem = clientContext.OperatingSystem,
+                Browser = clientContext.Browser,
+                Location = clientContext.Location,
+                Latitude = clientContext.Latitude,
+                Longitude = clientContext.Longitude
             });
 
             return Ok(new FileUploadResponse
@@ -360,25 +406,52 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("{id}/accesses")]
-    public async Task<ActionResult<List<FileAccessEntity>>> GetFileAccesses(int id)
+    public async Task<ActionResult<List<FileAccessLogDto>>> GetFileAccesses(int id)
     {
         var accesses = await _fileAccessRepository.GetByFileIdAsync(id);
-        return Ok(accesses);
+        var dtos = accesses.Select(a => new FileAccessLogDto
+        {
+            Id = a.Id,
+            AccessedAt = a.AccessedAt,
+            WasAuthorized = a.WasAuthorized,
+            Action = a.Action,
+            AccessedByUserName = a.AccessedByUser != null ? $"{a.AccessedByUser.FirstName} {a.AccessedByUser.LastName}" : null,
+            AccessedByIp = a.AccessedByIP,
+            UserAgent = a.UserAgent,
+            DeviceName = a.DeviceName,
+            DeviceType = a.DeviceType,
+            OperatingSystem = a.OperatingSystem,
+            Browser = a.Browser,
+            Location = a.Location,
+            Latitude = a.Latitude,
+            Longitude = a.Longitude
+        }).ToList();
+
+        return Ok(dtos);
     }
 
     private async Task LogFileAccess(int fileId, string action, bool wasAuthorized)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // requiere using System.Security.Claims
 
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
         await _fileAccessRepository.AddAsync(new FileAccessEntity
         {
             SharedFileId = fileId,
             AccessedByUserId = userId,
-            AccessedByIP = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown",
+            AccessedByIP = clientContext.IpAddress,
             AccessedAt = DateTime.UtcNow,
             Action = action,
             WasAuthorized = wasAuthorized,
-            UserAgent = HttpContext.Request.Headers["User-Agent"].ToString()
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
         });
     }
 

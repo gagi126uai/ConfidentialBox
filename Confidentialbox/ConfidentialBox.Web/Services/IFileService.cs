@@ -16,4 +16,5 @@ public interface IFileService
     Task<bool> BlockFileAsync(int id, string reason);
     Task<bool> UnblockFileAsync(int id);
     Task<bool> DeleteFileAsync(int id);
+    Task<List<FileAccessLogDto>> GetAccessLogsAsync(int fileId);
 }

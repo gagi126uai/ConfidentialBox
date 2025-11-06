@@ -24,4 +24,5 @@ public interface IFileRepository
     Task<int> GetExpiredFilesCountAsync();
     Task<int> GetBlockedFilesCountAsync();
     Task<long> GetTotalStorageBytesAsync();
+    Task<long> GetTotalStorageBytesByUserAsync(string userId);
 }

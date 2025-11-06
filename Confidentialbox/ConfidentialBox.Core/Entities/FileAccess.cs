@@ -19,4 +19,18 @@ public class FileAccess
     public bool WasAuthorized { get; set; }
 
     public string? UserAgent { get; set; }
+
+    public string? DeviceName { get; set; }
+
+    public string? DeviceType { get; set; }
+
+    public string? OperatingSystem { get; set; }
+
+    public string? Browser { get; set; }
+
+    public string? Location { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
 }
