@@ -32,6 +32,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQUlTZWN1cml0eURhc2hib2FyZC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/AllFiles.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWxsRmlsZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Audit.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQXVkaXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -54,6 +58,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/ForgotPassword.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRm9yZ290UGFzc3dvcmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Home.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSG9tZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Documentos/GitHub/ConfidentialBox/Confidentialbox/ConfidentialBox.Web/Pages/Index.razor]

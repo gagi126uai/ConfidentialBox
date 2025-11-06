@@ -304,6 +304,26 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.AuthController",
+    "Method": "GetRegistrationStatus",
+    "RelativePath": "api/Auth/registration-status",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.RegistrationSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.AuthController",
     "Method": "ResetPassword",
     "RelativePath": "api/Auth/reset-password",
     "HttpMethod": "POST",
@@ -820,6 +840,144 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetAIScoringSettings",
+    "RelativePath": "api/Settings/ai/scoring",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.AIScoringSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateAIScoringSettings",
+    "RelativePath": "api/Settings/ai/scoring",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.AIScoringSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetRegistrationSettings",
+    "RelativePath": "api/Settings/auth/registration",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.RegistrationSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateRegistrationSettings",
+    "RelativePath": "api/Settings/auth/registration",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.RegistrationSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetTokenSettings",
+    "RelativePath": "api/Settings/auth/token",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.TokenSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdateTokenSettings",
+    "RelativePath": "api/Settings/auth/token",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.TokenSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
