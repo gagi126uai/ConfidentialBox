@@ -29,6 +29,34 @@
    Esto aplica todas las migraciones y deja la base de datos lista con los datos iniciales.
    > Incluye la migración `AddMissingFileStorageColumns`, que agrega las columnas de almacenamiento seguro (`EncryptedFileContent`, `StoragePath`, `StoreInDatabase`, `StoreOnFileSystem`) cuando aún no existen.
 
+### Recuperar la tabla `SystemSettings` en bases existentes
+
+Si tu base fue creada antes de la migración `EnsureSystemSettingsTable` y ves el error `El nombre de objeto 'SystemSettings' no es válido`, ejecuta estos pasos:
+
+1. **Aplicar la nueva migración correctiva**
+   ```bash
+   dotnet ef database update 20251024090000_EnsureSystemSettingsTable \
+     --project ConfidentialBox.Infrastructure \
+     --startup-project ConfidentialBox.API
+   ```
+   - Crea la tabla `SystemSettings` si falta.
+   - Reconstruye los índices requeridos.
+   - Inserta los valores por defecto (seguridad, almacenamiento, notificaciones y reglas de IA).
+
+2. **(Opcional) Validar manualmente en SQL Server**
+   ```sql
+   SELECT TOP 10 [Category], [Key], [Value]
+   FROM dbo.SystemSettings
+   ORDER BY [Category], [Key];
+   ```
+   - Verifica que existan entradas para `Security`, `Storage`, `EmailNotifications` y `AI`.
+
+3. **Reiniciar la API**
+   ```bash
+   dotnet run --project ConfidentialBox.API --launch-profile https
+   ```
+   - Repite el inicio de sesión; el token JWT se generará correctamente ahora que la configuración persiste en la base.
+
 ## Ejecución de los servicios
 Para levantar backend (API + Swagger) y frontend (Blazor Server) en paralelo puedes usar dos terminales:
 
