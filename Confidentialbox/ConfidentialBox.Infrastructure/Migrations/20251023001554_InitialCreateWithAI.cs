@@ -843,8 +843,22 @@ namespace ConfidentialBox.Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "UserBehaviorProfiles");
 
-            migrationBuilder.DropTable(
-                name: "SystemSettings");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'[SystemSettings]', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM sys.foreign_keys
+        WHERE name = N'FK_SystemSettings_AspNetUsers_UpdatedByUserId'
+          AND parent_object_id = OBJECT_ID(N'[SystemSettings]')
+    )
+    BEGIN
+        ALTER TABLE [SystemSettings] DROP CONSTRAINT [FK_SystemSettings_AspNetUsers_UpdatedByUserId];
+    END;
+
+    DROP TABLE [SystemSettings];
+END
+");
 
             migrationBuilder.DropTable(
                 name: "PDFViewerSessions");
