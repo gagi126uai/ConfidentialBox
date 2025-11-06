@@ -15,5 +15,6 @@ namespace ConfidentialBox.Core.DTOs
         public string FullName { get; set; } = string.Empty;
         public List<string> Roles { get; set; } = new();
         public string? ErrorMessage { get; set; }
+        public DateTime? ExpiresAt { get; set; }
     }
 }

@@ -27,6 +27,7 @@
      --startup-project ConfidentialBox.API
    ```
    Esto aplica todas las migraciones y deja la base de datos lista con los datos iniciales.
+   > Incluye la migración `AddMissingFileStorageColumns`, que agrega las columnas de almacenamiento seguro (`EncryptedFileContent`, `StoragePath`, `StoreInDatabase`, `StoreOnFileSystem`) cuando aún no existen.
 
 ## Ejecución de los servicios
 Para levantar backend (API + Swagger) y frontend (Blazor Server) en paralelo puedes usar dos terminales:
@@ -62,9 +63,11 @@ Para levantar backend (API + Swagger) y frontend (Blazor Server) en paralelo pue
    - Estrategia de almacenamiento de archivos.
    - Servidor de correo y destinatarios.
    - Disponibilidad del registro público de usuarios.
+   - Duración del token JWT y todos los puntajes del motor de IA desde las tarjetas **Seguridad de acceso** y **Motor de IA y puntajes**.
 4. Si necesitas invitar usuarios manualmente mientras el registro público está desactivado, utiliza el módulo **Usuarios** dentro del panel de administración.
 
 ## Notas adicionales
 - El token JWT se almacena en `localStorage` y se adjunta automáticamente en cada llamada HTTP desde la UI.
+- La sesión expira por defecto a las 12 horas (configurable desde el panel). Cuando el token vence, la UI solicita iniciar sesión nuevamente.
 - Swagger requiere HTTPS; si ves errores de certificado ejecuta `dotnet dev-certs https --trust` y reinicia los proyectos.
 - Ajusta los puertos si tu entorno ya los ocupa; recuerda mantener sincronizados `ApiBaseUrl` (UI) y `ClientApp:BaseUrl` (API).

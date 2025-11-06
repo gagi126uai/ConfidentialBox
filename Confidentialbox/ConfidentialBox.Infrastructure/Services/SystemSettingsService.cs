@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -19,6 +20,9 @@ public class SystemSettingsService : ISystemSettingsService
     private const string EmailNotificationCategory = "EmailNotifications";
     private const string SecurityCategory = "Security";
     private const string RegistrationEnabledKey = "UserRegistrationEnabled";
+    private const string TokenLifetimeKey = "TokenLifetimeHours";
+    private const string AIScoringCategory = "AI";
+    private const string AIScoringSettingsKey = "ScoringSettings";
 
     private readonly ApplicationDbContext _context;
     private readonly IEncryptionService _encryptionService;
@@ -171,24 +175,145 @@ public class SystemSettingsService : ISystemSettingsService
         await UpsertSettingAsync(EmailNotificationCategory, "Channels", serialized, false, updatedByUserId, cancellationToken);
     }
 
-    public async Task<bool> IsUserRegistrationEnabledAsync(CancellationToken cancellationToken = default)
+    public async Task<SecuritySettings> GetSecuritySettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new SecuritySettings();
+
+        var settings = await _context.SystemSettings
+            .AsNoTracking()
+            .Where(s => s.Category == SecurityCategory && (s.Key == RegistrationEnabledKey || s.Key == TokenLifetimeKey))
+            .ToListAsync(cancellationToken);
+
+        foreach (var setting in settings)
+        {
+            switch (setting.Key)
+            {
+                case RegistrationEnabledKey when bool.TryParse(setting.Value, out var isEnabled):
+                    result.UserRegistrationEnabled = isEnabled;
+                    break;
+                case TokenLifetimeKey when int.TryParse(setting.Value, out var hours) && hours > 0:
+                    result.TokenLifetimeHours = hours;
+                    break;
+            }
+        }
+
+        return NormalizeSecuritySettings(result);
+    }
+
+    public async Task UpdateSecuritySettingsAsync(SecuritySettings settings, string? updatedByUserId, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeSecuritySettings(settings);
+
+        await UpsertSettingAsync(SecurityCategory, RegistrationEnabledKey, normalized.UserRegistrationEnabled.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(SecurityCategory, TokenLifetimeKey, normalized.TokenLifetimeHours.ToString(), false, updatedByUserId, cancellationToken);
+    }
+
+    public async Task<AIScoringSettings> GetAIScoringSettingsAsync(CancellationToken cancellationToken = default)
     {
         var setting = await _context.SystemSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Category == SecurityCategory && s.Key == RegistrationEnabledKey, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Category == AIScoringCategory && s.Key == AIScoringSettingsKey, cancellationToken);
 
         if (setting == null || string.IsNullOrWhiteSpace(setting.Value))
         {
-            return true;
+            return NormalizeAIScoringSettings(new AIScoringSettings());
         }
 
-        return bool.TryParse(setting.Value, out var value) ? value : true;
+        try
+        {
+            var deserialized = JsonSerializer.Deserialize<AIScoringSettings>(setting.Value);
+            return NormalizeAIScoringSettings(deserialized ?? new AIScoringSettings());
+        }
+        catch
+        {
+            return NormalizeAIScoringSettings(new AIScoringSettings());
+        }
+    }
+
+    public async Task UpdateAIScoringSettingsAsync(AIScoringSettings settings, string? updatedByUserId, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeAIScoringSettings(settings);
+        var serialized = JsonSerializer.Serialize(normalized);
+        await UpsertSettingAsync(AIScoringCategory, AIScoringSettingsKey, serialized, false, updatedByUserId, cancellationToken);
+    }
+
+    public async Task<bool> IsUserRegistrationEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await GetSecuritySettingsAsync(cancellationToken);
+        return settings.UserRegistrationEnabled;
     }
 
     public async Task UpdateUserRegistrationEnabledAsync(bool isEnabled, string? updatedByUserId, CancellationToken cancellationToken = default)
     {
-        await UpsertSettingAsync(SecurityCategory, RegistrationEnabledKey, isEnabled.ToString(), false, updatedByUserId, cancellationToken);
+        var settings = await GetSecuritySettingsAsync(cancellationToken);
+        settings.UserRegistrationEnabled = isEnabled;
+        await UpdateSecuritySettingsAsync(settings, updatedByUserId, cancellationToken);
     }
+
+    private static SecuritySettings NormalizeSecuritySettings(SecuritySettings settings)
+    {
+        settings.TokenLifetimeHours = Math.Clamp(settings.TokenLifetimeHours, 1, 168);
+        return settings;
+    }
+
+    private static AIScoringSettings NormalizeAIScoringSettings(AIScoringSettings settings)
+    {
+        settings.HighRiskThreshold = Clamp01(settings.HighRiskThreshold);
+        settings.SuspiciousThreshold = Clamp01(settings.SuspiciousThreshold);
+        settings.SuspiciousExtensionScore = Clamp01(settings.SuspiciousExtensionScore);
+        settings.LargeFileScore = Clamp01(settings.LargeFileScore);
+        settings.OutsideBusinessHoursScore = Clamp01(settings.OutsideBusinessHoursScore);
+        settings.UnusualUploadsScore = Clamp01(settings.UnusualUploadsScore);
+        settings.UnusualFileSizeScore = Clamp01(settings.UnusualFileSizeScore);
+        settings.OutsideHoursBehaviorScore = Clamp01(settings.OutsideHoursBehaviorScore);
+        settings.UnusualActivityIncrement = Clamp01(settings.UnusualActivityIncrement);
+        settings.MalwareProbabilityWeight = Clamp01(settings.MalwareProbabilityWeight);
+        settings.DataExfiltrationWeight = Clamp01(settings.DataExfiltrationWeight);
+        settings.MalwareSuspiciousExtensionWeight = Clamp01(settings.MalwareSuspiciousExtensionWeight);
+        settings.MalwareCrackKeywordWeight = Clamp01(settings.MalwareCrackKeywordWeight);
+        settings.MalwareKeygenKeywordWeight = Clamp01(settings.MalwareKeygenKeywordWeight);
+        settings.MalwareExecutableWeight = Clamp01(settings.MalwareExecutableWeight);
+        settings.DataExfiltrationLargeFileWeight = Clamp01(settings.DataExfiltrationLargeFileWeight);
+        settings.DataExfiltrationHugeFileWeight = Clamp01(settings.DataExfiltrationHugeFileWeight);
+        settings.DataExfiltrationArchiveWeight = Clamp01(settings.DataExfiltrationArchiveWeight);
+        settings.DataExfiltrationOffHoursWeight = Clamp01(settings.DataExfiltrationOffHoursWeight);
+        settings.RecommendationMonitorThreshold = Clamp01(settings.RecommendationMonitorThreshold);
+        settings.RecommendationReviewThreshold = Math.Clamp(settings.RecommendationReviewThreshold, settings.RecommendationMonitorThreshold, 1.0);
+        settings.RecommendationBlockThreshold = Math.Clamp(settings.RecommendationBlockThreshold, settings.RecommendationReviewThreshold, 1.0);
+        settings.RiskLevelMediumThreshold = Clamp01(settings.RiskLevelMediumThreshold);
+        settings.RiskLevelHighThreshold = Math.Clamp(settings.RiskLevelHighThreshold, settings.RiskLevelMediumThreshold, 1.0);
+
+        settings.BusinessHoursStart = Math.Clamp(settings.BusinessHoursStart, 0, 23);
+        settings.BusinessHoursEnd = Math.Clamp(settings.BusinessHoursEnd, settings.BusinessHoursStart, 23);
+        settings.UploadAnomalyMultiplier = Math.Max(1.0, settings.UploadAnomalyMultiplier);
+        settings.FileSizeAnomalyMultiplier = Math.Max(1.0, settings.FileSizeAnomalyMultiplier);
+        settings.MaxFileSizeMB = Math.Max(1, settings.MaxFileSizeMB);
+        settings.DataExfiltrationLargeFileMB = Math.Max(1, settings.DataExfiltrationLargeFileMB);
+        settings.DataExfiltrationHugeFileMB = Math.Max(settings.DataExfiltrationLargeFileMB, settings.DataExfiltrationHugeFileMB);
+
+        settings.SuspiciousExtensions = NormalizeExtensions(settings.SuspiciousExtensions);
+
+        return settings;
+    }
+
+    private static List<string> NormalizeExtensions(IEnumerable<string> extensions)
+    {
+        return extensions
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e =>
+            {
+                var trimmed = e.Trim();
+                if (!trimmed.StartsWith('.'))
+                {
+                    trimmed = "." + trimmed;
+                }
+                return trimmed.ToLowerInvariant();
+            })
+            .Distinct()
+            .ToList();
+    }
+
+    private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
 
     private async Task UpsertSettingAsync(string category, string key, string value, bool isSensitive, string? updatedByUserId, CancellationToken cancellationToken)
     {

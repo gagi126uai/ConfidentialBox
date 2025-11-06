@@ -1,8 +1,12 @@
-﻿using ConfidentialBox.Core.Entities;
+﻿using ConfidentialBox.Core.Configuration;
+using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Core.DTOs;
 using ConfidentialBox.Infrastructure.Data;
 using ConfidentialBox.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 
 namespace ConfidentialBox.Infrastructure.Services;
@@ -12,55 +16,50 @@ public class AISecurityService : IAISecurityService
     private readonly ApplicationDbContext _context;
     private readonly IFileRepository _fileRepository;
     private readonly IAuditLogRepository _auditLogRepository;
-
-    // Umbrales de detección
-    private const double HIGH_RISK_THRESHOLD = 0.7;
-    private const double SUSPICIOUS_THRESHOLD = 0.5;
-    private const int MAX_FILES_PER_DAY_THRESHOLD = 50;
-    private const long MAX_FILE_SIZE_MB = 100;
-    private static readonly string[] SUSPICIOUS_EXTENSIONS = { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".js" };
+    private readonly ISystemSettingsService _systemSettingsService;
 
     public AISecurityService(
         ApplicationDbContext context,
         IFileRepository fileRepository,
-        IAuditLogRepository auditLogRepository)
+        IAuditLogRepository auditLogRepository,
+        ISystemSettingsService systemSettingsService)
     {
         _context = context;
         _fileRepository = fileRepository;
         _auditLogRepository = auditLogRepository;
+        _systemSettingsService = systemSettingsService;
     }
 
     public async Task<FileThreatAnalysisDto> AnalyzeFileAsync(SharedFile file, string userId)
     {
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
         var threatScore = 0.0;
         var threats = new List<string>();
 
-        // 1. Análisis de extensión sospechosa
-        var hasSuspiciousExtension = SUSPICIOUS_EXTENSIONS.Contains(file.FileExtension.ToLower());
+        var normalizedExtension = NormalizeExtension(file.FileExtension);
+        var suspiciousExtensions = new HashSet<string>(scoring.SuspiciousExtensions ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        var hasSuspiciousExtension = !string.IsNullOrEmpty(normalizedExtension) && suspiciousExtensions.Contains(normalizedExtension);
         if (hasSuspiciousExtension)
         {
-            threatScore += 0.3;
+            threatScore += scoring.SuspiciousExtensionScore;
             threats.Add("Extensión de archivo potencialmente peligrosa");
         }
 
-        // 2. Análisis de tamaño
         var fileSizeMB = file.FileSizeBytes / (1024.0 * 1024.0);
-        if (fileSizeMB > MAX_FILE_SIZE_MB)
+        if (fileSizeMB > scoring.MaxFileSizeMB)
         {
-            threatScore += 0.2;
+            threatScore += scoring.LargeFileScore;
             threats.Add($"Tamaño de archivo inusualmente grande: {fileSizeMB:F2} MB");
         }
 
-        // 3. Análisis de hora de subida
         var uploadHour = file.UploadedAt.Hour;
-        var isOutsideBusinessHours = uploadHour < 7 || uploadHour > 20;
+        var isOutsideBusinessHours = uploadHour < scoring.BusinessHoursStart || uploadHour > scoring.BusinessHoursEnd;
         if (isOutsideBusinessHours)
         {
-            threatScore += 0.15;
+            threatScore += scoring.OutsideBusinessHoursScore;
             threats.Add("Archivo subido fuera del horario laboral");
         }
 
-        // 4. Análisis de comportamiento del usuario
         var userProfile = await _context.UserBehaviorProfiles
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
@@ -69,28 +68,26 @@ public class AISecurityService : IAISecurityService
             var userFilesToday = await _fileRepository.GetByUserIdAsync(userId);
             var filesToday = userFilesToday.Count(f => f.UploadedAt.Date == DateTime.UtcNow.Date);
 
-            if (filesToday > userProfile.AverageFilesPerDay * 3)
+            if (filesToday > userProfile.AverageFilesPerDay * scoring.UploadAnomalyMultiplier)
             {
-                threatScore += 0.25;
+                threatScore += scoring.UnusualUploadsScore;
                 threats.Add("Número inusual de archivos subidos hoy");
             }
         }
 
-        // 5. Simulación de ML - Detección de patrones (en producción usarías ML.NET)
-        var malwareProbability = CalculateMalwareProbability(file, hasSuspiciousExtension);
-        var dataExfiltrationProbability = CalculateDataExfiltrationProbability(file, fileSizeMB);
+        var malwareProbability = CalculateMalwareProbability(file, hasSuspiciousExtension, scoring);
+        var dataExfiltrationProbability = CalculateDataExfiltrationProbability(file, fileSizeMB, scoring);
 
-        threatScore = Math.Min(1.0, threatScore + (malwareProbability * 0.4) + (dataExfiltrationProbability * 0.3));
+        threatScore = Math.Min(1.0, threatScore + (malwareProbability * scoring.MalwareProbabilityWeight) + (dataExfiltrationProbability * scoring.DataExfiltrationWeight));
 
-        // Guardar resultado del escaneo
         var scanResult = new FileScanResult
         {
             SharedFileId = file.Id,
             ScannedAt = DateTime.UtcNow,
-            IsSuspicious = threatScore >= SUSPICIOUS_THRESHOLD,
+            IsSuspicious = threatScore >= scoring.SuspiciousThreshold,
             ThreatScore = threatScore,
             HasSuspiciousExtension = hasSuspiciousExtension,
-            ExceedsSizeThreshold = fileSizeMB > MAX_FILE_SIZE_MB,
+            ExceedsSizeThreshold = fileSizeMB > scoring.MaxFileSizeMB,
             UploadedOutsideBusinessHours = isOutsideBusinessHours,
             FileHash = GenerateFileHash(file),
             DetectedFileType = file.FileExtension,
@@ -101,10 +98,9 @@ public class AISecurityService : IAISecurityService
 
         _context.FileScanResults.Add(scanResult);
 
-        // Crear alerta de seguridad si es necesario
-        if (threatScore >= SUSPICIOUS_THRESHOLD)
+        if (threatScore >= scoring.SuspiciousThreshold)
         {
-            var severity = threatScore >= HIGH_RISK_THRESHOLD ? "High" : "Medium";
+            var severity = threatScore >= scoring.HighRiskThreshold ? "High" : "Medium";
             await CreateSecurityAlert(
                 "SuspiciousFile",
                 severity,
@@ -122,12 +118,12 @@ public class AISecurityService : IAISecurityService
         {
             FileId = file.Id,
             FileName = file.OriginalFileName,
-            IsThreat = threatScore >= SUSPICIOUS_THRESHOLD,
+            IsThreat = threatScore >= scoring.SuspiciousThreshold,
             ThreatScore = threatScore,
             Threats = threats,
             MalwareProbability = malwareProbability,
             DataExfiltrationProbability = dataExfiltrationProbability,
-            Recommendation = GetRecommendation(threatScore)
+            Recommendation = GetRecommendation(threatScore, scoring)
         };
     }
 
@@ -136,6 +132,8 @@ public class AISecurityService : IAISecurityService
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
             throw new Exception("Usuario no encontrado");
+
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
 
         var profile = await _context.UserBehaviorProfiles
             .FirstOrDefaultAsync(p => p.UserId == userId);
@@ -151,14 +149,13 @@ public class AISecurityService : IAISecurityService
         var filesToday = files.Count(f => f.UploadedAt.Date == DateTime.UtcNow.Date);
         var currentAvgFileSize = files.Any() ? files.Average(f => f.FileSizeBytes) / (1024.0 * 1024.0) : 0;
 
-        // Detectar anomalías
-        var hasUnusualUploadPattern = filesToday > profile!.AverageFilesPerDay * 3;
+        var hasUnusualUploadPattern = filesToday > profile!.AverageFilesPerDay * scoring.UploadAnomalyMultiplier;
         if (hasUnusualUploadPattern)
         {
             anomalies.Add($"Patrón de subida inusual: {filesToday} archivos hoy (promedio: {profile.AverageFilesPerDay:F1})");
         }
 
-        var hasUnusualFileSize = currentAvgFileSize > profile.AverageFileSizeMB * 2;
+        var hasUnusualFileSize = currentAvgFileSize > profile.AverageFileSizeMB * scoring.FileSizeAnomalyMultiplier;
         if (hasUnusualFileSize)
         {
             anomalies.Add($"Tamaño de archivo inusual: {currentAvgFileSize:F2} MB (promedio: {profile.AverageFileSizeMB:F2} MB)");
@@ -171,15 +168,13 @@ public class AISecurityService : IAISecurityService
             anomalies.Add("Acceso fuera del horario habitual");
         }
 
-        // Calcular risk score
         var riskScore = 0.0;
-        if (hasUnusualUploadPattern) riskScore += 0.3;
-        if (hasUnusualFileSize) riskScore += 0.2;
-        if (accessingOutsideHours) riskScore += 0.2;
-        riskScore += profile.UnusualActivityCount * 0.1;
+        if (hasUnusualUploadPattern) riskScore += scoring.UnusualUploadsScore;
+        if (hasUnusualFileSize) riskScore += scoring.UnusualFileSizeScore;
+        if (accessingOutsideHours) riskScore += scoring.OutsideHoursBehaviorScore;
+        riskScore += profile.UnusualActivityCount * scoring.UnusualActivityIncrement;
         riskScore = Math.Min(1.0, riskScore);
 
-        // Actualizar perfil con nuevo risk score
         profile.RiskScore = riskScore;
         if (anomalies.Any())
         {
@@ -188,8 +183,7 @@ public class AISecurityService : IAISecurityService
         }
         await _context.SaveChangesAsync();
 
-        // Crear alerta si el riesgo es alto
-        if (riskScore >= HIGH_RISK_THRESHOLD)
+        if (riskScore >= scoring.HighRiskThreshold)
         {
             await CreateSecurityAlert(
                 "BehavioralAnomaly",
@@ -207,7 +201,7 @@ public class AISecurityService : IAISecurityService
             UserId = userId,
             UserName = $"{user.FirstName} {user.LastName}",
             RiskScore = riskScore,
-            RiskLevel = GetRiskLevel(riskScore),
+            RiskLevel = GetRiskLevel(riskScore, scoring),
             AnomaliesDetected = anomalies,
             LastAnalyzed = DateTime.UtcNow,
             AverageFilesPerDay = profile.AverageFilesPerDay,
@@ -243,6 +237,7 @@ public class AISecurityService : IAISecurityService
 
     public async Task<AISecurityDashboardDto> GetSecurityDashboardAsync()
     {
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
         var today = DateTime.UtcNow.Date;
         var alerts = await _context.SecurityAlerts
             .Include(a => a.User)
@@ -254,7 +249,7 @@ public class AISecurityService : IAISecurityService
         var criticalUnreviewed = alerts.Count(a => a.Severity == "Critical" && !a.IsReviewed);
 
         var highRiskUsers = await _context.UserBehaviorProfiles
-            .Where(p => p.RiskScore >= HIGH_RISK_THRESHOLD)
+            .Where(p => p.RiskScore >= scoring.HighRiskThreshold)
             .CountAsync();
 
         var suspiciousFiles = await _context.FileScanResults
@@ -380,44 +375,97 @@ public class AISecurityService : IAISecurityService
         await _context.SaveChangesAsync();
     }
 
-    private double CalculateMalwareProbability(SharedFile file, bool hasSuspiciousExtension)
+    private double CalculateMalwareProbability(SharedFile file, bool hasSuspiciousExtension, AIScoringSettings scoring)
     {
         var probability = 0.0;
 
-        if (hasSuspiciousExtension) probability += 0.5;
-        if (file.OriginalFileName.Contains("crack", StringComparison.OrdinalIgnoreCase)) probability += 0.3;
-        if (file.OriginalFileName.Contains("keygen", StringComparison.OrdinalIgnoreCase)) probability += 0.3;
-        if (file.FileExtension.Equals(".exe", StringComparison.OrdinalIgnoreCase)) probability += 0.2;
+        if (hasSuspiciousExtension)
+        {
+            probability += scoring.MalwareSuspiciousExtensionWeight;
+        }
+
+        if (!string.IsNullOrEmpty(file.OriginalFileName) &&
+            file.OriginalFileName.Contains("crack", StringComparison.OrdinalIgnoreCase))
+        {
+            probability += scoring.MalwareCrackKeywordWeight;
+        }
+
+        if (!string.IsNullOrEmpty(file.OriginalFileName) &&
+            file.OriginalFileName.Contains("keygen", StringComparison.OrdinalIgnoreCase))
+        {
+            probability += scoring.MalwareKeygenKeywordWeight;
+        }
+
+        var normalizedExtension = NormalizeExtension(file.FileExtension);
+        if (!string.IsNullOrEmpty(normalizedExtension) &&
+            normalizedExtension.Equals(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            probability += scoring.MalwareExecutableWeight;
+        }
 
         return Math.Min(1.0, probability);
     }
 
-    private double CalculateDataExfiltrationProbability(SharedFile file, double fileSizeMB)
+    private double CalculateDataExfiltrationProbability(SharedFile file, double fileSizeMB, AIScoringSettings scoring)
     {
         var probability = 0.0;
 
-        if (fileSizeMB > 50) probability += 0.3;
-        if (fileSizeMB > 100) probability += 0.3;
-        if (file.FileExtension.Equals(".zip", StringComparison.OrdinalIgnoreCase) ||
-            file.FileExtension.Equals(".rar", StringComparison.OrdinalIgnoreCase)) probability += 0.2;
-        if (file.UploadedAt.Hour < 6 || file.UploadedAt.Hour > 22) probability += 0.2;
+        if (fileSizeMB > scoring.DataExfiltrationLargeFileMB)
+        {
+            probability += scoring.DataExfiltrationLargeFileWeight;
+        }
+
+        if (fileSizeMB > scoring.DataExfiltrationHugeFileMB)
+        {
+            probability += scoring.DataExfiltrationHugeFileWeight;
+        }
+
+        var normalizedExtension = NormalizeExtension(file.FileExtension);
+        if (!string.IsNullOrEmpty(normalizedExtension) &&
+            (normalizedExtension.Equals(".zip", StringComparison.OrdinalIgnoreCase) ||
+             normalizedExtension.Equals(".rar", StringComparison.OrdinalIgnoreCase)))
+        {
+            probability += scoring.DataExfiltrationArchiveWeight;
+        }
+
+        var uploadHour = file.UploadedAt.Hour;
+        if (uploadHour < scoring.BusinessHoursStart || uploadHour > scoring.BusinessHoursEnd)
+        {
+            probability += scoring.DataExfiltrationOffHoursWeight;
+        }
 
         return Math.Min(1.0, probability);
     }
 
-    private string GetRecommendation(double threatScore)
+    private string GetRecommendation(double threatScore, AIScoringSettings scoring)
     {
-        if (threatScore >= 0.8) return "BLOQUEAR INMEDIATAMENTE - Amenaza crítica detectada";
-        if (threatScore >= 0.6) return "REVISAR MANUALMENTE - Alto riesgo detectado";
-        if (threatScore >= 0.4) return "MONITOREAR - Actividad sospechosa";
+        if (threatScore >= scoring.RecommendationBlockThreshold) return "BLOQUEAR INMEDIATAMENTE - Amenaza crítica detectada";
+        if (threatScore >= scoring.RecommendationReviewThreshold) return "REVISAR MANUALMENTE - Alto riesgo detectado";
+        if (threatScore >= scoring.RecommendationMonitorThreshold) return "MONITOREAR - Actividad sospechosa";
         return "PERMITIR - Sin amenazas detectadas";
     }
 
-    private string GetRiskLevel(double riskScore)
+    private string GetRiskLevel(double riskScore, AIScoringSettings scoring)
     {
-        if (riskScore >= 0.7) return "High";
-        if (riskScore >= 0.4) return "Medium";
+        if (riskScore >= scoring.RiskLevelHighThreshold) return "High";
+        if (riskScore >= scoring.RiskLevelMediumThreshold) return "Medium";
         return "Low";
+    }
+
+    private static string? NormalizeExtension(string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return null;
+        }
+
+        var trimmed = extension.Trim();
+        if (!trimmed.StartsWith("."))
+        {
+            trimmed = "." + trimmed;
+        }
+
+        return trimmed.ToLowerInvariant();
     }
 
     private string GenerateFileHash(SharedFile file)
