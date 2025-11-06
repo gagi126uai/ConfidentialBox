@@ -47,7 +47,10 @@ public class SystemSettingsService : ISystemSettingsService
         {
             StoreInDatabase = _defaultStorageSettings.StoreInDatabase,
             StoreOnFileSystem = _defaultStorageSettings.StoreOnFileSystem,
-            FileSystemDirectory = _defaultStorageSettings.FileSystemDirectory
+            FileSystemDirectory = _defaultStorageSettings.FileSystemDirectory,
+            UseUserScopedDirectories = _defaultStorageSettings.UseUserScopedDirectories,
+            TotalStorageLimitGb = _defaultStorageSettings.TotalStorageLimitGb,
+            PerUserStorageLimitGb = _defaultStorageSettings.PerUserStorageLimitGb
         };
 
         var settings = await _context.SystemSettings
@@ -67,6 +70,15 @@ public class SystemSettingsService : ISystemSettingsService
                 case "FileSystemDirectory" when !string.IsNullOrWhiteSpace(setting.Value):
                     result.FileSystemDirectory = setting.Value;
                     break;
+                case "UseUserScopedDirectories" when bool.TryParse(setting.Value, out var useScoped):
+                    result.UseUserScopedDirectories = useScoped;
+                    break;
+                case "TotalStorageLimitGb" when int.TryParse(setting.Value, out var totalGb):
+                    result.TotalStorageLimitGb = Math.Max(0, totalGb);
+                    break;
+                case "PerUserStorageLimitGb" when int.TryParse(setting.Value, out var perUserGb):
+                    result.PerUserStorageLimitGb = Math.Max(0, perUserGb);
+                    break;
             }
         }
 
@@ -79,6 +91,9 @@ public class SystemSettingsService : ISystemSettingsService
         await UpsertSettingAsync(StorageCategory, "StoreInDatabase", settings.StoreInDatabase.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(StorageCategory, "StoreOnFileSystem", settings.StoreOnFileSystem.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(StorageCategory, "FileSystemDirectory", directory, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(StorageCategory, "UseUserScopedDirectories", settings.UseUserScopedDirectories.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(StorageCategory, "TotalStorageLimitGb", Math.Max(0, settings.TotalStorageLimitGb).ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(StorageCategory, "PerUserStorageLimitGb", Math.Max(0, settings.PerUserStorageLimitGb).ToString(), false, updatedByUserId, cancellationToken);
     }
 
     public async Task<EmailServerSettings> GetEmailServerSettingsAsync(CancellationToken cancellationToken = default)

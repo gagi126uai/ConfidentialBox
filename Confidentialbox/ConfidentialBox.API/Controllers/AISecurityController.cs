@@ -196,12 +196,12 @@ public class AISecurityController : ControllerBase
 
     [HttpPost("scan-all")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult> ScanAllUsers()
+    public async Task<ActionResult<AIScanSummaryDto>> ScanAllUsers()
     {
         try
         {
-            await _aiSecurityService.DetectAnomaliesAsync();
-            return Ok(new { message = "Escaneo de anomalías completado" });
+            var summary = await _aiSecurityService.DetectAnomaliesAsync();
+            return Ok(summary);
         }
         catch (Exception ex)
         {

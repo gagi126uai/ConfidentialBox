@@ -26,6 +26,10 @@
                             <th>Tipo de Entidad</th>
                             <th>ID Entidad</th>
                             <th>IP</th>
+                            <th>Dispositivo</th>
+                            <th>SO</th>
+                            <th>Navegador</th>
+                            <th>Ubicación</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -40,6 +44,10 @@
                                 <td>@log.EntityType</td>
                                 <td>@log.EntityId</td>
                                 <td><small class="text-muted">@log.IpAddress</small></td>
+                                <td>@(string.IsNullOrWhiteSpace(log.DeviceName) ? log.DeviceType ?? "-" : log.DeviceName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.OperatingSystem) ? "-" : log.OperatingSystem)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Browser) ? "-" : log.Browser)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Location) ? "Sin datos" : log.Location)</td>
                             </tr>
                         }
                     </tbody>

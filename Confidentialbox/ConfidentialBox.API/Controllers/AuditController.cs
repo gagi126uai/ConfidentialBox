@@ -31,7 +31,15 @@ public class AuditController : ControllerBase
             EntityType = l.EntityType,
             EntityId = l.EntityId,
             Timestamp = l.Timestamp,
-            IpAddress = l.IpAddress
+            IpAddress = l.IpAddress,
+            UserAgent = l.UserAgent,
+            DeviceName = l.DeviceName,
+            DeviceType = l.DeviceType,
+            OperatingSystem = l.OperatingSystem,
+            Browser = l.Browser,
+            Location = l.Location,
+            Latitude = l.Latitude,
+            Longitude = l.Longitude
         }).ToList();
 
         return Ok(new PagedResult<AuditLogDto>

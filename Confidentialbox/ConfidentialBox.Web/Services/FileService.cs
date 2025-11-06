@@ -97,4 +97,10 @@ public class FileService : IFileService
         var response = await _httpClient.DeleteAsync($"api/files/{id}");
         return response.IsSuccessStatusCode;
     }
+
+    public async Task<List<FileAccessLogDto>> GetAccessLogsAsync(int fileId)
+    {
+        return await _httpClient.GetFromJsonAsync<List<FileAccessLogDto>>($"api/files/{fileId}/accesses")
+            ?? new List<FileAccessLogDto>();
+    }
 }

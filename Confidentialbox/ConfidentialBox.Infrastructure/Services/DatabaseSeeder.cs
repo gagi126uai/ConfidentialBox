@@ -1,7 +1,9 @@
-﻿using ConfidentialBox.Core.Entities;
+﻿using ConfidentialBox.Core.Configuration;
+using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
 namespace ConfidentialBox.Infrastructure.Services;
@@ -14,9 +16,13 @@ public class DatabaseSeeder
         var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         // Crear roles
-        await CreateRoleIfNotExists(roleManager, "Admin", "Administrador del sistema", true);
-        await CreateRoleIfNotExists(roleManager, "User", "Usuario estándar", true);
-        await CreateRoleIfNotExists(roleManager, "Guest", "Usuario invitado", true);
+        var adminRole = await CreateRoleIfNotExists(roleManager, "Admin", "Administrador del sistema", true);
+        var userRole = await CreateRoleIfNotExists(roleManager, "User", "Usuario estándar", true);
+        var guestRole = await CreateRoleIfNotExists(roleManager, "Guest", "Usuario invitado", true);
+
+        await EnsureRolePoliciesAsync(roleManager, adminRole);
+        await EnsureRolePoliciesAsync(roleManager, userRole);
+        await EnsureRolePoliciesAsync(roleManager, guestRole);
 
         // Crear usuario administrador predeterminado
         await CreateUserIfNotExists(
@@ -39,11 +45,12 @@ public class DatabaseSeeder
             new[] { "User" });
     }
 
-    private static async Task CreateRoleIfNotExists(RoleManager<ApplicationRole> roleManager, string roleName, string description, bool isSystemRole)
+    private static async Task<ApplicationRole> CreateRoleIfNotExists(RoleManager<ApplicationRole> roleManager, string roleName, string description, bool isSystemRole)
     {
-        if (!await roleManager.RoleExistsAsync(roleName))
+        var role = await roleManager.FindByNameAsync(roleName);
+        if (role == null)
         {
-            var role = new ApplicationRole
+            role = new ApplicationRole
             {
                 Name = roleName,
                 Description = description,
@@ -52,6 +59,47 @@ public class DatabaseSeeder
             };
             await roleManager.CreateAsync(role);
         }
+        return role;
+    }
+
+    private static async Task EnsureRolePoliciesAsync(RoleManager<ApplicationRole> roleManager, ApplicationRole role)
+    {
+        var existingRole = await roleManager.Roles
+            .Where(r => r.Id == role.Id)
+            .Select(r => new
+            {
+                Role = r,
+                Policies = r.RolePolicies
+            })
+            .FirstOrDefaultAsync();
+
+        if (existingRole == null)
+        {
+            return;
+        }
+
+        var currentPolicies = existingRole.Policies.ToDictionary(p => p.PolicyName, p => p, StringComparer.OrdinalIgnoreCase);
+        var defaults = RolePolicyCatalog.GetDefaultValuesForRole(role.Name ?? string.Empty);
+
+        foreach (var definition in RolePolicyCatalog.Definitions)
+        {
+            if (currentPolicies.ContainsKey(definition.Key))
+            {
+                continue;
+            }
+
+            var value = defaults.TryGetValue(definition.Key, out var defaultValue)
+                ? defaultValue
+                : definition.DefaultValue ?? string.Empty;
+
+            role.RolePolicies.Add(new RolePolicy
+            {
+                PolicyName = definition.Key,
+                PolicyValue = value
+            });
+        }
+
+        await roleManager.UpdateAsync(role);
     }
 
     private static async Task CreateUserIfNotExists(

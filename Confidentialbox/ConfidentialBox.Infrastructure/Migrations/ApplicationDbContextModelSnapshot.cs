@@ -218,6 +218,15 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Browser")
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("DeviceName")
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("DeviceType")
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("EntityId")
                         .HasColumnType("nvarchar(max)");
 
@@ -229,11 +238,23 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
+
                     b.Property<string>("NewValues")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("OldValues")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
@@ -278,11 +299,32 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Browser")
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("DeviceName")
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("DeviceType")
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<int>("SharedFileId")
                         .HasColumnType("int");
 
                     b.Property<string>("UserAgent")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<bool>("WasAuthorized")
                         .HasColumnType("bit");

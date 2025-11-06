@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.IO;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,9 +45,20 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Configurar DbContext con SQL Server
+// Configurar DbContext con SQL Server o SQLite (fallback para entornos sin SQL Server)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        var dbPath = Path.Combine(AppContext.BaseDirectory, "confidentialbox.db");
+        options.UseSqlite($"Data Source={dbPath}");
+    }
+});
 
 // Configurar Identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -100,6 +112,7 @@ builder.Services.AddScoped<IPDFViewerAIService, PDFViewerAIService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+builder.Services.AddSingleton<IClientContextResolver, ClientContextResolver>();
 
 // Configurar CORS
 builder.Services.AddCors(options =>
