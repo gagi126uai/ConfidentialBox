@@ -102,6 +102,54 @@
         }
     }
 
+    function disposePdfFrame(frameId) {
+        const frame = document.getElementById(frameId);
+        if (!frame) {
+            return;
+        }
+
+        const objectUrl = frame.dataset?.objectUrl;
+        if (objectUrl) {
+            try {
+                URL.revokeObjectURL(objectUrl);
+            } catch (err) {
+                console.warn('No se pudo revocar la URL del PDF', err);
+            }
+            delete frame.dataset.objectUrl;
+        }
+
+        frame.removeAttribute('src');
+    }
+
+    function renderPdf(frameId, base64Data) {
+        const frame = document.getElementById(frameId);
+        if (!frame) {
+            throw new Error('No se encontró el iframe del PDF seguro');
+        }
+
+        disposePdfFrame(frameId);
+
+        const binary = atob(base64Data);
+        const sliceSize = 1024;
+        const byteArrays = [];
+
+        for (let offset = 0; offset < binary.length; offset += sliceSize) {
+            const slice = binary.slice(offset, offset + sliceSize);
+            const byteNumbers = new Array(slice.length);
+
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+
+            byteArrays.push(new Uint8Array(byteNumbers));
+        }
+
+        const blob = new Blob(byteArrays, { type: 'application/pdf' });
+        const objectUrl = URL.createObjectURL(blob);
+        frame.src = objectUrl;
+        frame.dataset.objectUrl = objectUrl;
+    }
+
     function disposeSecurePdfViewer(sessionId) {
         const state = sessions.get(sessionId);
         if (!state) {
@@ -148,4 +196,6 @@
     window.confidentialBox.initSecurePdfViewer = initSecurePdfViewer;
     window.confidentialBox.disposeSecurePdfViewer = disposeSecurePdfViewer;
     window.confidentialBox.notifyPdfPage = notifyPdfPage;
+    window.confidentialBox.renderPdf = renderPdf;
+    window.confidentialBox.disposePdfFrame = disposePdfFrame;
 })();
