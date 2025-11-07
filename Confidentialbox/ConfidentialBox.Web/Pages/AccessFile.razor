@@ -3,6 +3,7 @@
 @inject IFileService FileService
 @inject IJSRuntime JS
 @using System.Security.Cryptography
+@implements IAsyncDisposable
 
 <PageTitle>Acceso Seguro - ConfidentialBox</PageTitle>
 
@@ -105,6 +106,17 @@
     private bool isLoading = true;
     private bool isProcessing;
     private bool hasValidatedPassword;
+    private IJSObjectReference? confidentialBoxModule;
+
+    private async Task<IJSObjectReference> GetConfidentialBoxModuleAsync()
+    {
+        if (confidentialBoxModule is null)
+        {
+            confidentialBoxModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/confidentialbox.js");
+        }
+
+        return confidentialBoxModule;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -209,7 +221,8 @@
 
             var decryptedBytes = DecryptContent(contentResponse.EncryptedContent, contentResponse.EncryptionKey);
             var base64 = Convert.ToBase64String(decryptedBytes);
-            await JS.InvokeVoidAsync("confidentialBox.downloadFile", fileMetadata.OriginalFileName, base64);
+            var module = await GetConfidentialBoxModuleAsync();
+            await module.InvokeVoidAsync("downloadFile", fileMetadata.OriginalFileName, base64);
             successMessage = "Descarga iniciada.";
         }
         catch (Exception ex)
@@ -253,5 +266,12 @@
             len /= 1024;
         }
         return $"{len:0.##} {sizes[order]}";
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (confidentialBoxModule is not null)
+        {
+            await confidentialBoxModule.DisposeAsync();
+        }
     }
 }
