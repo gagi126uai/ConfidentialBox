@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Linq;
+using System.IO;
 using FileAccessEntity = ConfidentialBox.Core.Entities.FileAccess;
 
 namespace ConfidentialBox.API.Controllers;
@@ -303,7 +304,45 @@ public class FilesController : ControllerBase
             return Ok(validation);
         }
 
-        var encryptedBytes = await _fileStorageService.GetFileAsync(file, HttpContext.RequestAborted);
+        byte[] encryptedBytes;
+        try
+        {
+            encryptedBytes = await _fileStorageService.GetFileAsync(file, HttpContext.RequestAborted);
+        }
+        catch (FileNotFoundException)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "El archivo cifrado no está disponible en el almacenamiento"
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = $"Error al recuperar el archivo: {ex.Message}"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(file.EncryptionKey))
+        {
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = "El archivo no tiene una clave de cifrado registrada"
+            });
+        }
+
         await LogFileAccess(file.Id, file.IsPDF ? "ContentRetrievedForViewer" : "ContentDownloaded", true);
 
         return Ok(new FileContentResponse
