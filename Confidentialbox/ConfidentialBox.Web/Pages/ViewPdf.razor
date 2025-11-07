@@ -60,7 +60,7 @@
 
                         if (sessionId == null)
                         {
-                            <EditForm Model="formModel" OnValidSubmit="StartSecureViewer">
+                            <EditForm Model="@formModel" OnValidSubmit="StartSecureViewer">
                                 <div class="row g-3 align-items-end">
                                     <div class="col-md-6">
                                         <label class="form-label">Contraseña maestra (si corresponde)</label>
@@ -102,7 +102,7 @@
     private FileDto? fileMetadata;
     private PDFViewerConfigDto? viewerConfig;
     private string? sessionId;
-    private readonly SecureViewerForm formModel = new();
+    private SecureViewerForm formModel = new();
     private bool pdfLoaded;
     private string? errorMessage;
     private string? infoMessage;
@@ -142,6 +142,8 @@
 
     private async Task StartSecureViewer()
     {
+        formModel ??= new SecureViewerForm();
+
         if (fileMetadata == null)
         {
             errorMessage = "Archivo no disponible.";
