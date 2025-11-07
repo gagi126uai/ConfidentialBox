@@ -157,12 +157,12 @@ else
                                     {
                                         case "Boolean":
                                             <div class="form-check form-switch">
-                                                <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="policy-@policy.PolicyName" />
+                                                <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="@($"policy-{policy.PolicyName}")" />
                                                 <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
                                             </div>
                                             break;
                                         case "Number":
-                                            <InputNumber<decimal> @bind-Value="policy.NumericValue" class="form-control" />
+                                            <InputNumber @bind-Value="policy.NumericValue" class="form-control" />
                                             break;
                                         default:
                                             <InputText @bind-Value="policy.Value" class="form-control" />

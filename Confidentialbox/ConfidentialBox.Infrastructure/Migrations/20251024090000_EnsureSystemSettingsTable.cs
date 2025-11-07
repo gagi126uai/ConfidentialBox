@@ -1,3 +1,4 @@
+
 using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ConfidentialBox.Infrastructure.Migrations
@@ -107,7 +108,7 @@ BEGIN
     VALUES (
         N'EmailNotifications',
         N'Channels',
-        N'{""SecurityAlertRecipients"": """, ""PasswordRecoveryRecipients"": """, ""UserInvitationRecipients"": """}',
+        N'{""SecurityAlertRecipients"":"""",""PasswordRecoveryRecipients"":"""",""UserInvitationRecipients"":""""}',
         0,
         @utcNow,
         NULL
@@ -123,7 +124,7 @@ BEGIN
     VALUES (
         N'AI',
         N'ScoringSettings',
-        N'{""HighRiskThreshold"":0.7,""SuspiciousThreshold"":0.5,""SuspiciousExtensionScore"":0.3,""LargeFileScore"":0.2,""OutsideBusinessHoursScore"":0.15,""UnusualUploadsScore"":0.25,""UnusualFileSizeScore"":0.2,""OutsideHoursBehaviorScore"":0.2,""UnusualActivityIncrement"":0.1,""MalwareProbabilityWeight"":0.4,""DataExfiltrationWeight"":0.3,""BusinessHoursStart"":7,""BusinessHoursEnd"":20,""UploadAnomalyMultiplier"":3.0,""FileSizeAnomalyMultiplier"":2.0,""MaxFileSizeMB"":100,""MalwareSuspiciousExtensionWeight"":0.5,""MalwareCrackKeywordWeight"":0.3,""MalwareKeygenKeywordWeight"":0.3,""MalwareExecutableWeight"":0.2,""DataExfiltrationLargeFileMB"":50,""DataExfiltrationHugeFileMB"":100,""DataExfiltrationLargeFileWeight"":0.3,""DataExfiltrationHugeFileWeight"":0.3,""DataExfiltrationArchiveWeight"":0.2,""DataExfiltrationOffHoursWeight"":0.2,""RecommendationBlockThreshold"":0.8,""RecommendationReviewThreshold"":0.6,""RecommendationMonitorThreshold"":0.4,""RiskLevelHighThreshold"":0.7,""RiskLevelMediumThreshold"":0.4,""SuspiciousExtensions"": ["".exe"","".bat"","".cmd"","".ps1"","".vbs"","".js""]}',
+        N'{""HighRiskThreshold"":0.7,""SuspiciousThreshold"":0.5,""SuspiciousExtensionScore"":0.3,""LargeFileScore"":0.2,""OutsideBusinessHoursScore"":0.15,""UnusualUploadsScore"":0.25,""UnusualFileSizeScore"":0.2,""OutsideHoursBehaviorScore"":0.2,""UnusualActivityIncrement"":0.1,""MalwareProbabilityWeight"":0.4,""DataExfiltrationWeight"":0.3,""BusinessHoursStart"":7,""BusinessHoursEnd"":20,""UploadAnomalyMultiplier"":3.0,""FileSizeAnomalyMultiplier"":2.0,""MaxFileSizeMB"":100,""MalwareSuspiciousExtensionWeight"":0.5,""MalwareCrackKeywordWeight"":0.3,""MalwareKeygenKeywordWeight"":0.3,""MalwareExecutableWeight"":0.2,""DataExfiltrationLargeFileMB"":50,""DataExfiltrationHugeFileMB"":100,""DataExfiltrationLargeFileWeight"":0.3,""DataExfiltrationHugeFileWeight"":0.3,""DataExfiltrationArchiveWeight"":0.2,""DataExfiltrationOffHoursWeight"":0.2,""RecommendationBlockThreshold"":0.8,""RecommendationReviewThreshold"":0.6,""RecommendationMonitorThreshold"":0.4,""RiskLevelHighThreshold"":0.7,""RiskLevelMediumThreshold"":0.4,""SuspiciousExtensions"":["".exe"","".bat"","".cmd"","".ps1"","".vbs"","".js""]}',
         0,
         @utcNow,
         NULL

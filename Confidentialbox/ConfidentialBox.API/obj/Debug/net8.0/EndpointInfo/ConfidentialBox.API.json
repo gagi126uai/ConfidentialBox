@@ -252,7 +252,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIScanSummaryDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIScanSummaryDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIScanSummaryDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1000,7 +1017,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FileAccess"
+                    "$ref": "#/components/schemas/FileAccessLogDto"
                   }
                 }
               },
@@ -1008,7 +1025,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FileAccess"
+                    "$ref": "#/components/schemas/FileAccessLogDto"
                   }
                 }
               },
@@ -1016,7 +1033,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FileAccess"
+                    "$ref": "#/components/schemas/FileAccessLogDto"
                   }
                 }
               }
@@ -1398,6 +1415,44 @@
         }
       }
     },
+    "/api/Roles/policy-definitions": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RolePolicyDefinitionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RolePolicyDefinitionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RolePolicyDefinitionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Roles/{id}": {
       "delete": {
         "tags": [
@@ -1416,6 +1471,64 @@
         "responses": {
           "200": {
             "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Roles/{id}/policies": {
+      "put": {
+        "tags": [
+          "Roles"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRolePoliciesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRolePoliciesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRolePoliciesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2088,6 +2201,28 @@
   },
   "components": {
     "schemas": {
+      "AIScanSummaryDto": {
+        "type": "object",
+        "properties": {
+          "executedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "alertsGenerated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "highRiskProfilesReviewed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AIScoringSettingsDto": {
         "required": [
           "suspiciousExtensions"
@@ -2548,6 +2683,36 @@
           "userAgent": {
             "type": "string",
             "nullable": true
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2580,6 +2745,40 @@
             "format": "date-time"
           },
           "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "userAgent": {
             "type": "string",
             "nullable": true
           }
@@ -2861,6 +3060,99 @@
           },
           "wasAuthorized": {
             "type": "boolean"
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileAccessLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accessedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wasAuthorized": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessedByIp": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "operatingSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "browser": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "userAgent": {
             "type": "string",
@@ -3189,6 +3481,17 @@
           "fileSystemDirectory": {
             "type": "string",
             "nullable": true
+          },
+          "useUserScopedDirectories": {
+            "type": "boolean"
+          },
+          "totalStorageLimitGb": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "perUserStorageLimitGb": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -3436,6 +3739,25 @@
           "policyValue": {
             "type": "string",
             "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "valueType": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3604,6 +3926,39 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RolePolicyDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "policyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "valueType": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3984,6 +4339,19 @@
           },
           "aiMonitoringEnabled": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateRolePoliciesRequest": {
+        "type": "object",
+        "properties": {
+          "policies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

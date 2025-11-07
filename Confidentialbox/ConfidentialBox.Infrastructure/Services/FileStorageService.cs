@@ -124,7 +124,8 @@ public class FileStorageService : IFileStorageService
     private string ResolveFullPath(string storagePath)
     {
         var safePath = storagePath.Replace('/', Path.DirectorySeparatorChar);
-        safePath = safePath.Replace('\', Path.DirectorySeparatorChar);
+        safePath = safePath.Replace('\\', Path.DirectorySeparatorChar);
+
         var combined = Path.Combine(_baseDirectory, safePath);
         var fullPath = Path.GetFullPath(combined);
 

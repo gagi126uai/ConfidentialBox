@@ -1,0 +1,30 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@typeparam TValue
+
+<div class="mb-2">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="form-label">@Label</label>
+    }
+
+    <InputNumber @bind-Value="CurrentValue"
+                 class="form-control" />
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+
+    // Soporta @bind-Value en el padre
+    [Parameter] public TValue Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+
+    private TValue CurrentValue
+    {
+        get => Value;
+        set
+        {
+            Value = value;
+            ValueChanged.InvokeAsync(value);
+        }
+    }
+}

@@ -219,12 +219,15 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Browser")
+                        .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("DeviceName")
+                        .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("DeviceType")
+                        .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("EntityId")
@@ -242,6 +245,7 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasColumnType("float");
 
                     b.Property<string>("Location")
+                        .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<double?>("Longitude")
@@ -254,6 +258,7 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("OperatingSystem")
+                        .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
                     b.Property<DateTime>("Timestamp")
@@ -300,31 +305,36 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Browser")
+                        .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("DeviceName")
+                        .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("DeviceType")
+                        .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<int>("SharedFileId")
                         .HasColumnType("int");
 
                     b.Property<string>("UserAgent")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Location")
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("float");
-
-                    b.Property<string>("OperatingSystem")
-                        .HasColumnType("nvarchar(128)");
 
                     b.Property<bool>("WasAuthorized")
                         .HasColumnType("bit");
@@ -745,6 +755,9 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<byte[]>("EncryptedFileContent")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<string>("EncryptedFileName")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -753,9 +766,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<string>("EncryptionKey")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<byte[]>("EncryptedFileContent")
-                        .HasColumnType("varbinary(max)");
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("datetime2");
@@ -799,12 +809,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<bool>("ScreenshotProtectionEnabled")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("StoreInDatabase")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("StoreOnFileSystem")
-                        .HasColumnType("bit");
-
                     b.Property<string>("ShareLink")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -813,6 +817,12 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<string>("StoragePath")
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
+
+                    b.Property<bool>("StoreInDatabase")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("StoreOnFileSystem")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
@@ -860,7 +870,7 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("UpdatedByUserId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Value")
                         .IsRequired()
@@ -868,17 +878,10 @@ namespace ConfidentialBox.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UpdatedByUserId");
-
                     b.HasIndex("Category", "Key")
                         .IsUnique();
 
                     b.ToTable("SystemSettings");
-
-                    b.HasOne("ConfidentialBox.Core.Entities.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("ConfidentialBox.Core.Entities.UserBehaviorProfile", b =>

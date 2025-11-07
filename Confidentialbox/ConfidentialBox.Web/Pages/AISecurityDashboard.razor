@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Rendering
+@using ConfidentialBox.Core.Entities
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
 @inject ISettingsService SettingsService
@@ -20,8 +21,8 @@
     <button class="btn btn-primary" @onclick="RunFullScan" disabled="@scanRunning">
         @if (scanRunning)
         {
-            <span class="spinner-border spinner-border-sm me-2"></span>
-            Escaneando…
+            <span class="spinner-border spinner-border-sm me-2">Escaneando…</span>
+            
         }
         else
         {
@@ -51,12 +52,16 @@
     <div class="card-header bg-white border-bottom">
         <ul class="nav nav-tabs card-header-tabs">
             <li class="nav-item">
-                <button type="button" class="nav-link @(activeTab == "overview" ? "active" : string.Empty)" @onclick="() => SetActiveTab("overview")">
+                <button type="button"
+                        class="nav-link @(activeTab == "overview" ? "active" : string.Empty)"
+                        @onclick='() => SetActiveTab("overview")'>
                     <i class="fas fa-chart-line"></i> Resumen
                 </button>
             </li>
             <li class="nav-item">
-                <button type="button" class="nav-link @(activeTab == "settings" ? "active" : string.Empty)" @onclick="() => SetActiveTab("settings")">
+                <button type="button"
+                        class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
+                        @onclick='() => SetActiveTab("settings")'>
                     <i class="fas fa-sliders-h"></i> Configuración de IA
                 </button>
             </li>
@@ -79,16 +84,20 @@
             else
             {
                 var threatPercent = dashboard.SystemThreatLevel * 100;
+
                 <div class="card mb-4 border-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
                     <div class="card-body">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                             <div>
                                 <h5 class="text-muted">Nivel de Amenaza del Sistema</h5>
-                                <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel) mb-0">@GetThreatLevelText(dashboard.SystemThreatLevel)</h2>
+                                <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel) mb-0">
+                                    @GetThreatLevelText(dashboard.SystemThreatLevel)
+                                </h2>
                             </div>
                             <div class="flex-grow-1">
                                 <div class="progress" style="height: 30px;">
-                                    <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)" style="@($"width: {threatPercent:F0}%")">
+                                    <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)"
+                                         style="@($"width: {threatPercent:F0}%")">
                                         @($"{threatPercent:F0}%")
                                     </div>
                                 </div>
@@ -97,13 +106,13 @@
                     </div>
                 </div>
 
-                @{ var statCards = new[]
-                    {
-                        new { Color = "danger", Title = "Alertas Críticas", Value = dashboard.CriticalAlertsUnreviewed.ToString(), Subtitle = "Sin revisar", Icon = "fas fa-exclamation-triangle" },
-                        new { Color = "warning", Title = "Usuarios Alto Riesgo", Value = dashboard.HighRiskUsers.ToString(), Subtitle = "Requieren atención", Icon = "fas fa-user-shield" },
-                        new { Color = "info", Title = "Archivos Sospechosos", Value = dashboard.SuspiciousFilesDetected.ToString(), Subtitle = "Detectados hoy", Icon = "fas fa-file-medical-alt" },
-                        new { Color = "primary", Title = "Alertas Hoy", Value = dashboard.TotalAlertsToday.ToString(), Subtitle = "Total del día", Icon = "fas fa-bell" }
-                    }; }
+                var statCards = new[]
+                {
+                new { Color = "danger",  Title = "Alertas Críticas",     Value = dashboard.CriticalAlertsUnreviewed.ToString(),  Subtitle = "Sin revisar",        Icon = "fas fa-exclamation-triangle" },
+                new { Color = "warning", Title = "Usuarios Alto Riesgo", Value = dashboard.HighRiskUsers.ToString(),           Subtitle = "Requieren atención", Icon = "fas fa-user-shield" },
+                new { Color = "info",    Title = "Archivos Sospechosos", Value = dashboard.SuspiciousFilesDetected.ToString(), Subtitle = "Detectados hoy",    Icon = "fas fa-file-medical-alt" },
+                new { Color = "primary", Title = "Alertas Hoy",          Value = dashboard.TotalAlertsToday.ToString(),       Subtitle = "Total del día",     Icon = "fas fa-bell" }
+                };
 
                 <div class="row g-3 mb-4">
                     @foreach (var card in statCards)
@@ -149,7 +158,9 @@
                                                         <td class="fw-semibold">@item.Key</td>
                                                         <td>
                                                             <div class="progress" style="height: 20px;">
-                                                                <div class="progress-bar" style="@($"width: {percentage:F0}%")">@item.Value</div>
+                                                                <div class="progress-bar" style="@($"width: {percentage:F0}%")">
+                                                                    @item.Value
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -161,6 +172,7 @@
                             </div>
                         </div>
                     </div>
+
                     <div class="col-md-6">
                         <div class="card h-100">
                             <div class="card-header">
@@ -173,8 +185,12 @@
                                 }
                                 else
                                 {
-                                    var max = dashboard.ThreatTrends.Values.Any() ? dashboard.ThreatTrends.Values.Max() : 0;
+                                    var max = dashboard.ThreatTrends.Values.Any()
+                                    ? dashboard.ThreatTrends.Values.Max()
+                                    : 0;
+
                                     var safeMax = max == 0 ? 1 : max;
+
                                     <div class="table-responsive">
                                         <table class="table table-sm align-middle mb-0">
                                             <tbody>
@@ -185,7 +201,9 @@
                                                         <td class="fw-semibold">@item.Key</td>
                                                         <td>
                                                             <div class="progress" style="height: 20px;">
-                                                                <div class="progress-bar bg-info" style="@($"width: {percentage:F0}%")">@item.Value</div>
+                                                                <div class="progress-bar bg-info" style="@($"width: {percentage:F0}%")">
+                                                                    @item.Value
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -207,7 +225,10 @@
                     <div class="card-body">
                         @if (dashboard.RecentAlerts is null || !dashboard.RecentAlerts.Any())
                         {
-                            <div class="alert alert-success mb-0"><i class="fas fa-check-circle"></i> No hay alertas recientes. El sistema está seguro.</div>
+                            <div class="alert alert-success mb-0">
+                                <i class="fas fa-check-circle"></i>
+                                No hay alertas recientes. El sistema está seguro.
+                            </div>
                         }
                         else
                         {
@@ -237,7 +258,9 @@
                                                 <td><small>@alert.Description</small></td>
                                                 <td>
                                                     <div class="progress" style="width: 100px; height: 20px;">
-                                                        <div class="progress-bar" style="@($"width: {confidencePercent:F0}%")">@($"{confidencePercent:F0}%")</div>
+                                                        <div class="progress-bar" style="@($"width: {confidencePercent:F0}%")">
+                                                            @($"{confidencePercent:F0}%")
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td><small>@alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</small></td>
@@ -334,11 +357,11 @@
                     <button type="submit" class="btn btn-primary" disabled="@aiSaving">
                         @if (aiSaving)
                         {
-                            <span class="spinner-border spinner-border-sm me-2"></span>Guardando IA…
+                            <span class="spinner-border spinner-border-sm me-2">Guardando IA…</span>
                         }
                         else
                         {
-                            Guardar configuración avanzada
+                            <span>Guardar configuración avanzada</span>
                         }
                     </button>
                 </EditForm>

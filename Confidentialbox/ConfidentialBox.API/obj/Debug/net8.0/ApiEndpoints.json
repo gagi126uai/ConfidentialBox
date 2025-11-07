@@ -135,7 +135,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.AIScanSummaryDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.AISecurityController",
@@ -436,7 +446,7 @@
     ],
     "ReturnTypes": [
       {
-        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.Entities.FileAccess, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.DTOs.FileAccessLogDto, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "MediaTypes": [
           "text/plain",
           "application/json",
@@ -840,6 +850,57 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.RolesController",
+    "Method": "UpdatePolicies",
+    "RelativePath": "api/Roles/{id}/policies",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.UpdateRolePoliciesRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.RoleDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.RolesController",
+    "Method": "GetPolicyDefinitions",
+    "RelativePath": "api/Roles/policy-definitions",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.DTOs.RolePolicyDefinitionDto, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",

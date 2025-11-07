@@ -16,37 +16,37 @@ public static class RolePolicyCatalog
             "Subida de archivos",
             "Permite que el rol cargue archivos en la plataforma.",
             PolicyValueType.Boolean,
-            defaultValue: "true"),
+            DefaultValue: "true"),
         new(
             PolicyMaxFileSizeMb,
             "Tamaño máximo por archivo (MB)",
             "Límite individual para cada archivo que suben los usuarios del rol.",
             PolicyValueType.Number,
-            defaultValue: "500"),
+            DefaultValue: "500"),
         new(
             PolicyMaxStorageGb,
             "Cupo de almacenamiento del rol (GB)",
             "Capacidad total que puede consumir el rol antes de impedir nuevas subidas.",
             PolicyValueType.Number,
-            defaultValue: "5"),
+            DefaultValue: "5"),
         new(
             PolicyRequiresMfa,
             "Requiere MFA",
             "Obliga a los miembros del rol a configurar un segundo factor.",
             PolicyValueType.Boolean,
-            defaultValue: "false"),
+            DefaultValue: "false"),
         new(
             PolicyCanShareExternal,
             "Compartir fuera de la organización",
             "Habilita enlaces públicos y compartidos para usuarios externos.",
             PolicyValueType.Boolean,
-            defaultValue: "false"),
+            DefaultValue: "false"),
         new(
             PolicyCanAccessAi,
             "Acceso al panel de IA",
             "Permite visualizar el AI Security Dashboard y ejecutar escaneos.",
             PolicyValueType.Boolean,
-            defaultValue: "false")
+            DefaultValue: "false")
     };
 
     public static IReadOnlyDictionary<string, string> GetDefaultValuesForRole(string roleName)
