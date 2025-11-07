@@ -267,7 +267,12 @@ public class FilesController : ControllerBase
             return NotFound("Archivo no encontrado");
         }
 
-        var validation = await ValidateFileAccessAsync(file, masterPassword, incrementCounter: false);
+        var requireMasterPassword = string.IsNullOrEmpty(file.MasterPassword) || !string.IsNullOrEmpty(masterPassword);
+        var validation = await ValidateFileAccessAsync(
+            file,
+            masterPassword,
+            incrementCounter: false,
+            requireMasterPassword: requireMasterPassword);
         if (!validation.Success)
         {
             return BadRequest(validation.ErrorMessage);
@@ -288,7 +293,11 @@ public class FilesController : ControllerBase
             return NotFound();
         }
 
-        var validation = await ValidateFileAccessAsync(file, masterPassword, incrementCounter: true);
+        var validation = await ValidateFileAccessAsync(
+            file,
+            masterPassword,
+            incrementCounter: true,
+            requireMasterPassword: true);
         if (!validation.Success)
         {
             return Ok(validation);
@@ -455,7 +464,11 @@ public class FilesController : ControllerBase
         });
     }
 
-    private async Task<FileContentResponse> ValidateFileAccessAsync(SharedFile file, string? masterPassword, bool incrementCounter)
+    private async Task<FileContentResponse> ValidateFileAccessAsync(
+        SharedFile file,
+        string? masterPassword,
+        bool incrementCounter,
+        bool requireMasterPassword = true)
     {
         if (file.IsBlocked)
         {
@@ -496,7 +509,7 @@ public class FilesController : ControllerBase
             };
         }
 
-        if (!string.IsNullOrEmpty(file.MasterPassword))
+        if (requireMasterPassword && !string.IsNullOrEmpty(file.MasterPassword))
         {
             if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
             {
