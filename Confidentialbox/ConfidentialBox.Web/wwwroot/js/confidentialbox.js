@@ -10,9 +10,9 @@ async function loadPdfJs() {
         return pdfJsLibPromise;
     }
 
-    pdfJsLibPromise = import(`${PDF_JS_BASE}pdf.min.mjs`)
+    pdfJsLibPromise = import(`${PDF_JS_BASE}pdf.mjs`)
         .then((module) => {
-            module.GlobalWorkerOptions.workerSrc = `${PDF_JS_BASE}pdf.worker.min.mjs`;
+            module.GlobalWorkerOptions.workerSrc = `${PDF_JS_BASE}pdf.worker.mjs`;
             return module;
         })
         .catch((err) => {
