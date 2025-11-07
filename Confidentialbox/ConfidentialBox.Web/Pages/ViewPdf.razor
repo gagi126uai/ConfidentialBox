@@ -83,7 +83,7 @@
                     @if (pdfLoaded && viewerConfig != null)
                     {
                         <div class="secure-pdf-container mt-4" id="@ViewerContainerElementId">
-                            <iframe class="secure-pdf-frame" id="@PdfFrameElementId"></iframe>
+                            <div class="secure-pdf-frame" id="@PdfFrameElementId"></div>
                         </div>
                         <p class="text-muted small mt-2">
                             <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
@@ -224,6 +224,7 @@
                 {
                     sessionId,
                     dotNetRef = dotNetReference,
+                    frameId = PdfFrameElementId,
                     watermarkText = viewerConfig.HasWatermark ? viewerConfig.WatermarkText : string.Empty,
                     disableContextMenu = viewerConfig.ScreenshotProtectionEnabled,
                     maxViewMinutes = viewerConfig.MaxViewTimeMinutes
