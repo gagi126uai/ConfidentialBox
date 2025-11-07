@@ -1,4 +1,39 @@
 const sessions = new Map();
+const pdfFrames = new Map();
+let pdfJsLibPromise = null;
+
+const PDF_JS_VERSION = '3.10.111';
+const PDF_JS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_VERSION}/build/`;
+
+async function loadPdfJs() {
+    if (pdfJsLibPromise) {
+        return pdfJsLibPromise;
+    }
+
+    pdfJsLibPromise = import(`${PDF_JS_BASE}pdf.min.mjs`)
+        .then((module) => {
+            module.GlobalWorkerOptions.workerSrc = `${PDF_JS_BASE}pdf.worker.min.mjs`;
+            return module;
+        })
+        .catch((err) => {
+            pdfJsLibPromise = null;
+            throw err;
+        });
+
+    return pdfJsLibPromise;
+}
+
+function base64ToUint8Array(base64) {
+    const binary = atob(base64);
+    const length = binary.length;
+    const bytes = new Uint8Array(length);
+
+    for (let i = 0; i < length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    return bytes;
+}
 
 function sendEvent(state, type, pageNumber, data) {
     if (!state || !state.dotNetRef) {
@@ -17,6 +52,34 @@ function registerHandler(state, target, eventName, handler, options) {
     state.handlers.push({ target, eventName, handler, options });
 }
 
+function registerTrackingHandler(state, target, eventName, handler, options) {
+    target.addEventListener(eventName, handler, options);
+    const record = { target, eventName, handler, options };
+    state.handlers.push(record);
+    state.trackingHandlers.push(record);
+}
+
+function cleanupPageTracking(state) {
+    if (!state.trackingHandlers) {
+        return;
+    }
+
+    for (const entry of state.trackingHandlers) {
+        try {
+            if (entry.dispose) {
+                entry.dispose();
+                continue;
+            }
+
+            entry.target.removeEventListener(entry.eventName, entry.handler, entry.options);
+        } catch (err) {
+            console.warn('No se pudo eliminar un listener del visor seguro', err);
+        }
+    }
+
+    state.trackingHandlers.length = 0;
+}
+
 function buildWatermark(container, text) {
     if (!text) {
         return null;
@@ -27,6 +90,92 @@ function buildWatermark(container, text) {
     watermark.textContent = text;
     container.appendChild(watermark);
     return watermark;
+}
+
+function getMostVisiblePage(frameElement, pages) {
+    if (!pages || pages.length === 0) {
+        return null;
+    }
+
+    const frameRect = frameElement.getBoundingClientRect();
+    let bestPage = null;
+    let bestVisibility = 0;
+
+    for (const page of pages) {
+        const rect = page.element.getBoundingClientRect();
+        const intersectionTop = Math.max(rect.top, frameRect.top);
+        const intersectionBottom = Math.min(rect.bottom, frameRect.bottom);
+        const visibleHeight = Math.max(0, intersectionBottom - intersectionTop);
+        const ratio = visibleHeight / rect.height;
+
+        if (ratio > bestVisibility) {
+            bestVisibility = ratio;
+            bestPage = page.pageNumber;
+        }
+    }
+
+    return bestPage;
+}
+
+function ensurePageTracking(state) {
+    if (!state.frameId) {
+        return;
+    }
+
+    const frameState = pdfFrames.get(state.frameId);
+    if (!frameState || !frameState.container) {
+        state.awaitingFrame = true;
+        return;
+    }
+
+    state.awaitingFrame = false;
+
+    cleanupPageTracking(state);
+
+    const frameElement = frameState.container;
+    const scheduleQueue = { scheduled: false };
+
+    const evaluateVisiblePage = () => {
+        scheduleQueue.scheduled = false;
+        const nextPage = getMostVisiblePage(frameElement, frameState.pages);
+
+        if (!nextPage || nextPage === state.lastReportedPage) {
+            return;
+        }
+
+        state.lastReportedPage = nextPage;
+
+        if (state.hasInitialPageReport) {
+            sendEvent(state, 'PageView', nextPage, { pageNumber: nextPage });
+        }
+    };
+
+    const scheduleEvaluation = () => {
+        if (scheduleQueue.scheduled) {
+            return;
+        }
+
+        scheduleQueue.scheduled = true;
+        requestAnimationFrame(evaluateVisiblePage);
+    };
+
+    const cleanupToken = { dispose: () => { scheduleQueue.scheduled = false; } };
+    state.trackingHandlers.push(cleanupToken);
+    state.handlers.push(cleanupToken);
+
+    registerTrackingHandler(state, frameElement, 'scroll', scheduleEvaluation);
+    registerTrackingHandler(state, frameElement, 'touchmove', scheduleEvaluation, { passive: true });
+    registerTrackingHandler(state, window, 'resize', scheduleEvaluation);
+
+    requestAnimationFrame(evaluateVisiblePage);
+}
+
+function ensureTrackingForFrame(frameId) {
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId) {
+            ensurePageTracking(state);
+        }
+    }
 }
 
 export function initSecurePdfViewer(elementId, options) {
@@ -44,14 +193,19 @@ export function initSecurePdfViewer(elementId, options) {
     const state = {
         dotNetRef: options.dotNetRef,
         sessionId,
+        frameId: options.frameId,
         handlers: [],
-        watermarkElement: null
+        trackingHandlers: [],
+        watermarkElement: null,
+        lastReportedPage: null,
+        hasInitialPageReport: false,
+        awaitingFrame: false
     };
 
     sessions.set(sessionId, state);
 
     container.setAttribute('data-secure-viewer', 'true');
-    container.addEventListener('dragstart', (e) => e.preventDefault());
+    registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
 
     state.watermarkElement = buildWatermark(container, options.watermarkText);
 
@@ -99,54 +253,99 @@ export function initSecurePdfViewer(elementId, options) {
             dispose: () => clearTimeout(timeoutId)
         });
     }
+
+    ensurePageTracking(state);
 }
 
-export function disposePdfFrame(frameId) {
-    const frame = document.getElementById(frameId);
-    if (!frame) {
-        return;
-    }
+export async function disposePdfFrame(frameId) {
+    const frameState = pdfFrames.get(frameId);
+    pdfFrames.delete(frameId);
 
-    const objectUrl = frame.dataset?.objectUrl;
-    if (objectUrl) {
+    if (frameState) {
         try {
-            URL.revokeObjectURL(objectUrl);
+            if (frameState.pdfDoc && typeof frameState.pdfDoc.destroy === 'function') {
+                await frameState.pdfDoc.destroy();
+            } else if (frameState.loadingTask && typeof frameState.loadingTask.destroy === 'function') {
+                await frameState.loadingTask.destroy();
+            }
         } catch (err) {
-            console.warn('No se pudo revocar la URL del PDF', err);
+            console.warn('No se pudo liberar recursos del PDF seguro', err);
         }
-        delete frame.dataset.objectUrl;
     }
 
-    frame.removeAttribute('src');
+    const frameElement = document.getElementById(frameId);
+    if (frameElement) {
+        frameElement.innerHTML = '';
+        frameElement.scrollTop = 0;
+    }
+
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId) {
+            cleanupPageTracking(state);
+            state.lastReportedPage = null;
+            state.hasInitialPageReport = false;
+        }
+    }
 }
 
-export function renderPdf(frameId, base64Data) {
+export async function renderPdf(frameId, base64Data) {
     const frame = document.getElementById(frameId);
     if (!frame) {
-        throw new Error('No se encontró el iframe del PDF seguro');
+        throw new Error('No se encontró el contenedor del PDF seguro');
     }
 
-    disposePdfFrame(frameId);
+    await disposePdfFrame(frameId);
 
-    const binary = atob(base64Data);
-    const sliceSize = 1024;
-    const byteArrays = [];
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'secure-pdf-loading';
+    loadingIndicator.textContent = 'Cargando documento seguro…';
+    frame.appendChild(loadingIndicator);
 
-    for (let offset = 0; offset < binary.length; offset += sliceSize) {
-        const slice = binary.slice(offset, offset + sliceSize);
-        const byteNumbers = new Array(slice.length);
+    try {
+        const pdfjsLib = await loadPdfJs();
+        const pdfData = base64ToUint8Array(base64Data);
+        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        const pdfDocument = await loadingTask.promise;
 
-        for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
+        frame.innerHTML = '';
+
+        const pages = [];
+        const scale = 1.45;
+
+        for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
+            const page = await pdfDocument.getPage(pageNumber);
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            canvas.className = 'secure-pdf-page';
+            canvas.setAttribute('data-page-number', pageNumber.toString());
+
+            const context = canvas.getContext('2d', { alpha: false });
+            const renderContext = { canvasContext: context, viewport };
+            await page.render(renderContext).promise;
+
+            frame.appendChild(canvas);
+            pages.push({ element: canvas, pageNumber });
         }
 
-        byteArrays.push(new Uint8Array(byteNumbers));
-    }
+        pdfFrames.set(frameId, {
+            container: frame,
+            pdfDoc: pdfDocument,
+            loadingTask,
+            pages
+        });
 
-    const blob = new Blob(byteArrays, { type: 'application/pdf' });
-    const objectUrl = URL.createObjectURL(blob);
-    frame.src = objectUrl;
-    frame.dataset.objectUrl = objectUrl;
+        ensureTrackingForFrame(frameId);
+    } catch (err) {
+        console.error('Error renderizando el PDF seguro', err);
+        frame.innerHTML = '';
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'secure-pdf-loading';
+        errorMessage.textContent = 'No se pudo renderizar el documento.';
+        frame.appendChild(errorMessage);
+        throw err;
+    }
 }
 
 export function disposeSecurePdfViewer(sessionId) {
@@ -154,6 +353,8 @@ export function disposeSecurePdfViewer(sessionId) {
     if (!state) {
         return;
     }
+
+    cleanupPageTracking(state);
 
     for (const entry of state.handlers) {
         if (entry.dispose) {
@@ -177,6 +378,8 @@ export function notifyPdfPage(sessionId, pageNumber) {
         return;
     }
 
+    state.lastReportedPage = pageNumber;
+    state.hasInitialPageReport = true;
     sendEvent(state, 'PageView', pageNumber, { pageNumber });
 }
 
