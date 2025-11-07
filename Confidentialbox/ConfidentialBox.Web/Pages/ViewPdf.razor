@@ -60,11 +60,11 @@
 
                         if (sessionId == null)
                         {
-                            <EditForm OnValidSubmit="StartSecureViewer">
+                            <EditForm Model="formModel" OnValidSubmit="StartSecureViewer">
                                 <div class="row g-3 align-items-end">
                                     <div class="col-md-6">
                                         <label class="form-label">Contraseña maestra (si corresponde)</label>
-                                        <InputText @bind-Value="masterPassword" type="password" class="form-control" />
+                                        <InputText @bind-Value="formModel.MasterPassword" type="password" class="form-control" />
                                     </div>
                                     <div class="col-md-6 text-md-end">
                                         <button class="btn btn-danger" type="submit" disabled="@isStarting">
@@ -80,10 +80,10 @@
                         }
                     }
 
-                    @if (!string.IsNullOrEmpty(pdfDataUrl) && viewerConfig != null)
+                    @if (pdfLoaded && viewerConfig != null)
                     {
-                        <div class="secure-pdf-container mt-4" id="secureViewerContainer">
-                            <iframe class="secure-pdf-frame" src="@pdfDataUrl"></iframe>
+                        <div class="secure-pdf-container mt-4" id="@ViewerContainerElementId">
+                            <iframe class="secure-pdf-frame" id="@PdfFrameElementId"></iframe>
                         </div>
                         <p class="text-muted small mt-2">
                             <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
@@ -102,8 +102,8 @@
     private FileDto? fileMetadata;
     private PDFViewerConfigDto? viewerConfig;
     private string? sessionId;
-    private string? pdfDataUrl;
-    private string? masterPassword;
+    private readonly SecureViewerForm formModel = new();
+    private bool pdfLoaded;
     private string? errorMessage;
     private string? infoMessage;
     private bool isLoading = true;
@@ -111,6 +111,8 @@
     private bool viewerBlocked;
     private string? blockedReason;
     private DotNetObjectReference<ViewPdf>? dotNetReference;
+    private const string PdfFrameElementId = "securePdfFrame";
+    private const string ViewerContainerElementId = "secureViewerContainer";
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,12 +155,21 @@
             blockedReason = null;
             errorMessage = null;
             infoMessage = null;
-            pdfDataUrl = null;
+            pdfLoaded = false;
+
+            if (sessionId != null)
+            {
+                await PdfViewerService.EndSessionAsync(sessionId);
+                await JS.InvokeVoidAsync("confidentialBox.disposeSecurePdfViewer", sessionId);
+                sessionId = null;
+            }
+
+            await JS.InvokeVoidAsync("confidentialBox.disposePdfFrame", PdfFrameElementId);
 
             var startResponse = await PdfViewerService.StartSessionAsync(new StartViewerSessionRequest
             {
                 ShareLink = ShareLink,
-                MasterPassword = masterPassword
+                MasterPassword = formModel.MasterPassword
             });
 
             if (startResponse == null || !startResponse.Success || startResponse.Config == null || string.IsNullOrEmpty(startResponse.SessionId))
@@ -169,6 +180,7 @@
 
             viewerConfig = startResponse.Config;
             sessionId = startResponse.SessionId;
+            formModel.MasterPassword = null;
 
             var content = await PdfViewerService.GetSessionContentAsync(sessionId);
             if (content == null || !content.Success)
@@ -178,7 +190,7 @@
             }
 
             var decryptedBytes = DecryptContent(content.EncryptedContent, content.EncryptionKey);
-            pdfDataUrl = $"data:application/pdf;base64,{Convert.ToBase64String(decryptedBytes)}";
+            var base64Content = Convert.ToBase64String(decryptedBytes);
 
             fileMetadata ??= new FileDto
             {
@@ -192,9 +204,17 @@
             dotNetReference?.Dispose();
             dotNetReference = DotNetObjectReference.Create(this);
 
+            pdfLoaded = true;
+            await InvokeAsync(StateHasChanged);
+
+            await JS.InvokeVoidAsync(
+                "confidentialBox.renderPdf",
+                PdfFrameElementId,
+                base64Content);
+
             await JS.InvokeVoidAsync(
                 "confidentialBox.initSecurePdfViewer",
-                "secureViewerContainer",
+                ViewerContainerElementId,
                 new
                 {
                     sessionId,
@@ -209,6 +229,7 @@
         }
         catch (Exception ex)
         {
+            pdfLoaded = false;
             errorMessage = ex.Message;
         }
         finally
@@ -238,7 +259,9 @@
             viewerBlocked = true;
             blockedReason = result.Reason ?? "Comportamiento bloqueado.";
             infoMessage = null;
-            pdfDataUrl = null;
+            pdfLoaded = false;
+
+            await JS.InvokeVoidAsync("confidentialBox.disposePdfFrame", PdfFrameElementId);
 
             if (sessionId != null)
             {
@@ -291,6 +314,12 @@
             sessionId = null;
         }
 
+        await JS.InvokeVoidAsync("confidentialBox.disposePdfFrame", PdfFrameElementId);
         dotNetReference?.Dispose();
+    }
+
+    private sealed class SecureViewerForm
+    {
+        public string? MasterPassword { get; set; }
     }
 }
