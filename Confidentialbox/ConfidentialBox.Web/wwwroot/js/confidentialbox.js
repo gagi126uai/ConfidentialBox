@@ -4,23 +4,111 @@ let pdfJsLibPromise = null;
 
 const PDF_JS_VERSION = '3.10.111';
 const PDF_JS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_VERSION}/build/`;
+const PDF_JS_SCRIPT = `${PDF_JS_BASE}pdf.min.js`;
+const PDF_JS_WORKER_SCRIPT = `${PDF_JS_BASE}pdf.worker.min.js`;
+const PDF_JS_MODULE = `${PDF_JS_BASE}pdf.mjs`;
+const PDF_JS_WORKER_MODULE = `${PDF_JS_BASE}pdf.worker.mjs`;
+
+function extractPdfJsLib(candidate) {
+    if (!candidate) {
+        return null;
+    }
+
+    if (candidate.GlobalWorkerOptions) {
+        return candidate;
+    }
+
+    if (candidate.default && candidate.default.GlobalWorkerOptions) {
+        return candidate.default;
+    }
+
+    return null;
+}
+
+function configurePdfJsLib(candidate, workerSrc) {
+    const pdfjsLib = extractPdfJsLib(candidate);
+
+    if (!pdfjsLib) {
+        throw new Error('La librería PDF.js no expuso la API esperada.');
+    }
+
+    if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    }
+
+    return pdfjsLib;
+}
+
+function loadPdfJsModule(moduleUrl, workerUrl) {
+    return import(moduleUrl).then((module) => configurePdfJsLib(module, workerUrl));
+}
+
+function loadPdfJsScript(scriptUrl, workerUrl) {
+    return new Promise((resolve, reject) => {
+        try {
+            const existing = extractPdfJsLib(window.pdfjsLib);
+            if (existing) {
+                resolve(configurePdfJsLib(existing, workerUrl));
+                return;
+            }
+        } catch (err) {
+            reject(err);
+            return;
+        }
+
+        const head = document.head || document.getElementsByTagName('head')[0];
+        if (!head) {
+            reject(new Error('No se pudo encontrar el elemento <head> para cargar PDF.js.'));
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = scriptUrl;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.dataset.pdfjs = 'true';
+
+        script.onload = () => {
+            try {
+                resolve(configurePdfJsLib(window.pdfjsLib, workerUrl));
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        script.onerror = () => {
+            reject(new Error(`No se pudo descargar PDF.js desde ${scriptUrl}.`));
+        };
+
+        head.appendChild(script);
+    });
+}
 
 async function loadPdfJs() {
     if (pdfJsLibPromise) {
         return pdfJsLibPromise;
     }
 
-    pdfJsLibPromise = import(`${PDF_JS_BASE}pdf.mjs`)
-        .then((module) => {
-            module.GlobalWorkerOptions.workerSrc = `${PDF_JS_BASE}pdf.worker.mjs`;
-            return module;
-        })
-        .catch((err) => {
-            pdfJsLibPromise = null;
-            throw err;
-        });
+    const loaders = [
+        () => loadPdfJsModule(PDF_JS_MODULE, PDF_JS_WORKER_MODULE),
+        () => loadPdfJsScript(PDF_JS_SCRIPT, PDF_JS_WORKER_SCRIPT),
+    ];
 
-    return pdfJsLibPromise;
+    let lastError = null;
+
+    for (const loader of loaders) {
+        try {
+            pdfJsLibPromise = loader();
+            const module = await pdfJsLibPromise;
+            return module;
+        } catch (err) {
+            console.warn('No se pudo cargar PDF.js, intentando siguiente opción.', err);
+            pdfJsLibPromise = null;
+            lastError = err;
+        }
+    }
+
+    throw lastError ?? new Error('No se pudo cargar PDF.js desde ninguna fuente disponible.');
 }
 
 function base64ToUint8Array(base64) {
