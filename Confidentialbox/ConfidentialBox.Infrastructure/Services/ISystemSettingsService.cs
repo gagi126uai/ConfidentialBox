@@ -20,4 +20,6 @@ public interface ISystemSettingsService
     Task UpdateSecuritySettingsAsync(SecuritySettings settings, string? updatedByUserId, CancellationToken cancellationToken = default);
     Task<AIScoringSettings> GetAIScoringSettingsAsync(CancellationToken cancellationToken = default);
     Task UpdateAIScoringSettingsAsync(AIScoringSettings settings, string? updatedByUserId, CancellationToken cancellationToken = default);
+    Task<PDFViewerSettings> GetPdfViewerSettingsAsync(CancellationToken cancellationToken = default);
+    Task UpdatePdfViewerSettingsAsync(PDFViewerSettings settings, string? updatedByUserId, CancellationToken cancellationToken = default);
 }

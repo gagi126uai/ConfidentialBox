@@ -246,6 +246,26 @@ public class SettingsController : ControllerBase
         return Ok(new OperationResultDto { Success = true });
     }
 
+    [HttpGet("pdf-viewer")]
+    public async Task<ActionResult<PDFViewerSettingsDto>> GetPdfViewerSettings(CancellationToken cancellationToken)
+    {
+        var settings = await _systemSettingsService.GetPdfViewerSettingsAsync(cancellationToken);
+        return Ok(ToDto(settings));
+    }
+
+    [HttpPost("pdf-viewer")]
+    public async Task<ActionResult<OperationResultDto>> UpdatePdfViewerSettings([FromBody] PDFViewerSettingsDto request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var settings = ToSettings(request);
+        await _systemSettingsService.UpdatePdfViewerSettingsAsync(settings, GetUserId(), cancellationToken);
+        return Ok(new OperationResultDto { Success = true });
+    }
+
     [HttpGet("auth/registration")]
     public async Task<ActionResult<RegistrationSettingsDto>> GetRegistrationSettings(CancellationToken cancellationToken)
     {
@@ -301,6 +321,80 @@ public class SettingsController : ControllerBase
             RiskLevelHighThreshold = settings.RiskLevelHighThreshold,
             RiskLevelMediumThreshold = settings.RiskLevelMediumThreshold,
             SuspiciousExtensions = string.Join(", ", settings.SuspiciousExtensions)
+        };
+    }
+
+    private static PDFViewerSettingsDto ToDto(PDFViewerSettings settings)
+    {
+        return new PDFViewerSettingsDto
+        {
+            Theme = settings.Theme,
+            AccentColor = settings.AccentColor,
+            BackgroundColor = settings.BackgroundColor,
+            ToolbarBackgroundColor = settings.ToolbarBackgroundColor,
+            ToolbarTextColor = settings.ToolbarTextColor,
+            FontFamily = settings.FontFamily,
+            ShowToolbar = settings.ShowToolbar,
+            ToolbarPosition = settings.ToolbarPosition,
+            ShowFileDetails = settings.ShowFileDetails,
+            ShowSearch = settings.ShowSearch,
+            ShowPageControls = settings.ShowPageControls,
+            ShowPageIndicator = settings.ShowPageIndicator,
+            ShowDownloadButton = settings.ShowDownloadButton,
+            ShowPrintButton = settings.ShowPrintButton,
+            ShowFullscreenButton = settings.ShowFullscreenButton,
+            AllowDownload = settings.AllowDownload,
+            AllowPrint = settings.AllowPrint,
+            AllowCopy = settings.AllowCopy,
+            DisableTextSelection = settings.DisableTextSelection,
+            DisableContextMenu = settings.DisableContextMenu,
+            ForceGlobalWatermark = settings.ForceGlobalWatermark,
+            GlobalWatermarkText = settings.GlobalWatermarkText,
+            WatermarkOpacity = settings.WatermarkOpacity,
+            WatermarkFontSize = settings.WatermarkFontSize,
+            WatermarkColor = settings.WatermarkColor,
+            MaxViewTimeMinutes = settings.MaxViewTimeMinutes,
+            DefaultZoomPercent = settings.DefaultZoomPercent,
+            ZoomStepPercent = settings.ZoomStepPercent,
+            ViewerPadding = settings.ViewerPadding,
+            CustomCss = settings.CustomCss
+        };
+    }
+
+    private static PDFViewerSettings ToSettings(PDFViewerSettingsDto dto)
+    {
+        return new PDFViewerSettings
+        {
+            Theme = dto.Theme,
+            AccentColor = dto.AccentColor,
+            BackgroundColor = dto.BackgroundColor,
+            ToolbarBackgroundColor = dto.ToolbarBackgroundColor,
+            ToolbarTextColor = dto.ToolbarTextColor,
+            FontFamily = dto.FontFamily,
+            ShowToolbar = dto.ShowToolbar,
+            ToolbarPosition = dto.ToolbarPosition,
+            ShowFileDetails = dto.ShowFileDetails,
+            ShowSearch = dto.ShowSearch,
+            ShowPageControls = dto.ShowPageControls,
+            ShowPageIndicator = dto.ShowPageIndicator,
+            ShowDownloadButton = dto.ShowDownloadButton,
+            ShowPrintButton = dto.ShowPrintButton,
+            ShowFullscreenButton = dto.ShowFullscreenButton,
+            AllowDownload = dto.AllowDownload,
+            AllowPrint = dto.AllowPrint,
+            AllowCopy = dto.AllowCopy,
+            DisableTextSelection = dto.DisableTextSelection,
+            DisableContextMenu = dto.DisableContextMenu,
+            ForceGlobalWatermark = dto.ForceGlobalWatermark,
+            GlobalWatermarkText = dto.GlobalWatermarkText,
+            WatermarkOpacity = dto.WatermarkOpacity,
+            WatermarkFontSize = dto.WatermarkFontSize,
+            WatermarkColor = dto.WatermarkColor,
+            MaxViewTimeMinutes = dto.MaxViewTimeMinutes,
+            DefaultZoomPercent = dto.DefaultZoomPercent,
+            ZoomStepPercent = dto.ZoomStepPercent,
+            ViewerPadding = dto.ViewerPadding,
+            CustomCss = dto.CustomCss
         };
     }
 

@@ -23,6 +23,8 @@ public class SystemSettingsService : ISystemSettingsService
     private const string TokenLifetimeKey = "TokenLifetimeHours";
     private const string AIScoringCategory = "AI";
     private const string AIScoringSettingsKey = "ScoringSettings";
+    private const string PdfViewerCategory = "PDFViewer";
+    private const string PdfViewerSettingsKey = "ViewerSettings";
 
     private readonly ApplicationDbContext _context;
     private readonly IEncryptionService _encryptionService;
@@ -252,6 +254,35 @@ public class SystemSettingsService : ISystemSettingsService
         await UpsertSettingAsync(AIScoringCategory, AIScoringSettingsKey, serialized, false, updatedByUserId, cancellationToken);
     }
 
+    public async Task<PDFViewerSettings> GetPdfViewerSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var setting = await _context.SystemSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Category == PdfViewerCategory && s.Key == PdfViewerSettingsKey, cancellationToken);
+
+        if (setting == null || string.IsNullOrWhiteSpace(setting.Value))
+        {
+            return NormalizePdfViewerSettings(new PDFViewerSettings());
+        }
+
+        try
+        {
+            var deserialized = JsonSerializer.Deserialize<PDFViewerSettings>(setting.Value);
+            return NormalizePdfViewerSettings(deserialized ?? new PDFViewerSettings());
+        }
+        catch
+        {
+            return NormalizePdfViewerSettings(new PDFViewerSettings());
+        }
+    }
+
+    public async Task UpdatePdfViewerSettingsAsync(PDFViewerSettings settings, string? updatedByUserId, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizePdfViewerSettings(settings);
+        var serialized = JsonSerializer.Serialize(normalized);
+        await UpsertSettingAsync(PdfViewerCategory, PdfViewerSettingsKey, serialized, false, updatedByUserId, cancellationToken);
+    }
+
     public async Task<bool> IsUserRegistrationEnabledAsync(CancellationToken cancellationToken = default)
     {
         var settings = await GetSecuritySettingsAsync(cancellationToken);
@@ -309,6 +340,47 @@ public class SystemSettingsService : ISystemSettingsService
         settings.SuspiciousExtensions = NormalizeExtensions(settings.SuspiciousExtensions);
 
         return settings;
+    }
+
+    private static PDFViewerSettings NormalizePdfViewerSettings(PDFViewerSettings settings)
+    {
+        settings.Theme = string.IsNullOrWhiteSpace(settings.Theme) ? "dark" : settings.Theme.Trim().ToLowerInvariant();
+        settings.AccentColor = NormalizeColor(settings.AccentColor, "#f97316");
+        settings.BackgroundColor = NormalizeColor(settings.BackgroundColor, "#0f172a");
+        settings.ToolbarBackgroundColor = NormalizeColor(settings.ToolbarBackgroundColor, "#111827");
+        settings.ToolbarTextColor = NormalizeColor(settings.ToolbarTextColor, "#f9fafb");
+        settings.WatermarkColor = NormalizeColor(settings.WatermarkColor, "rgba(220,53,69,0.18)");
+        settings.FontFamily = string.IsNullOrWhiteSpace(settings.FontFamily) ? "'Inter', 'Segoe UI', sans-serif" : settings.FontFamily.Trim();
+        settings.ToolbarPosition = NormalizeToolbarPosition(settings.ToolbarPosition);
+        settings.GlobalWatermarkText = string.IsNullOrWhiteSpace(settings.GlobalWatermarkText) ? "CONFIDENTIAL" : settings.GlobalWatermarkText.Trim();
+        settings.ViewerPadding = string.IsNullOrWhiteSpace(settings.ViewerPadding) ? "1.5rem" : settings.ViewerPadding.Trim();
+        settings.DefaultZoomPercent = Math.Clamp(settings.DefaultZoomPercent, 25, 400);
+        settings.ZoomStepPercent = Math.Clamp(settings.ZoomStepPercent, 5, 50);
+        settings.WatermarkOpacity = Clamp01(settings.WatermarkOpacity);
+        settings.WatermarkFontSize = Math.Clamp(settings.WatermarkFontSize, 16, 120);
+        settings.MaxViewTimeMinutes = Math.Max(0, settings.MaxViewTimeMinutes);
+        settings.CustomCss = settings.CustomCss?.Trim() ?? string.Empty;
+
+        return settings;
+    }
+
+    private static string NormalizeColor(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim();
+    }
+
+    private static string NormalizeToolbarPosition(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "bottom" => "bottom",
+            _ => "top"
+        };
     }
 
     private static List<string> NormalizeExtensions(IEnumerable<string> extensions)

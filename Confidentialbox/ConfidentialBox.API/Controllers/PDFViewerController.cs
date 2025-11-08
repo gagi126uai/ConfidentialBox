@@ -1,4 +1,5 @@
 ﻿
+using ConfidentialBox.Core.Configuration;
 using ConfidentialBox.Core.DTOs;
 using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
@@ -22,19 +23,22 @@ public class PDFViewerController : ControllerBase
     private readonly IFileStorageService _fileStorageService;
     private readonly IFileAccessRepository _fileAccessRepository;
     private readonly IPDFViewerAIService _pdfViewerAI;
+    private readonly ISystemSettingsService _systemSettingsService;
 
     public PDFViewerController(
         ApplicationDbContext context,
         IFileRepository fileRepository,
         IFileStorageService fileStorageService,
         IFileAccessRepository fileAccessRepository,
-        IPDFViewerAIService pdfViewerAI)
+        IPDFViewerAIService pdfViewerAI,
+        ISystemSettingsService systemSettingsService)
     {
         _context = context;
         _fileRepository = fileRepository;
         _fileStorageService = fileStorageService;
         _fileAccessRepository = fileAccessRepository;
         _pdfViewerAI = pdfViewerAI;
+        _systemSettingsService = systemSettingsService;
     }
 
     [HttpPost("start-session")]
@@ -142,18 +146,31 @@ public class PDFViewerController : ControllerBase
                 UserAgent = userAgent
             });
 
+            var viewerSettings = await _systemSettingsService.GetPdfViewerSettingsAsync(ct);
+            var combinedMaxViewTime = CombineMaxViewTime(file.MaxViewTimeMinutes, viewerSettings.MaxViewTimeMinutes);
+            var sessionViewerSettings = BuildViewerSettingsDto(viewerSettings, file, combinedMaxViewTime);
+
+            var hasWatermark = viewerSettings.ForceGlobalWatermark || file.HasWatermark;
+            var watermarkText = viewerSettings.ForceGlobalWatermark
+                ? viewerSettings.GlobalWatermarkText
+                : file.WatermarkText;
+
             var config = new PDFViewerConfigDto
             {
                 FileId = file.Id,
                 FileName = file.OriginalFileName,
-                HasWatermark = file.HasWatermark,
-                WatermarkText = file.WatermarkText,
-                ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled,
-                PrintProtectionEnabled = file.PrintProtectionEnabled,
-                CopyProtectionEnabled = file.CopyProtectionEnabled,
-                MaxViewTimeMinutes = file.MaxViewTimeMinutes,
+                HasWatermark = hasWatermark,
+                WatermarkText = string.IsNullOrWhiteSpace(watermarkText) ? viewerSettings.GlobalWatermarkText : watermarkText,
+                WatermarkOpacity = viewerSettings.WatermarkOpacity,
+                WatermarkFontSize = viewerSettings.WatermarkFontSize,
+                WatermarkColor = viewerSettings.WatermarkColor,
+                ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled || sessionViewerSettings.DisableContextMenu,
+                PrintProtectionEnabled = file.PrintProtectionEnabled || !sessionViewerSettings.AllowPrint,
+                CopyProtectionEnabled = file.CopyProtectionEnabled || !sessionViewerSettings.AllowCopy,
+                MaxViewTimeMinutes = combinedMaxViewTime,
                 AIMonitoringEnabled = file.AIMonitoringEnabled,
-                SessionId = session.SessionId
+                SessionId = session.SessionId,
+                ViewerSettings = sessionViewerSettings
             };
 
             return Ok(new StartViewerSessionResponse
@@ -343,6 +360,69 @@ public class PDFViewerController : ControllerBase
         {
             return StatusCode(500, new { error = ex.Message });
         }
+    }
+
+    private static int CombineMaxViewTime(int fileMax, int settingsMax)
+    {
+        if (fileMax > 0 && settingsMax > 0)
+        {
+            return Math.Min(fileMax, settingsMax);
+        }
+
+        if (fileMax > 0)
+        {
+            return fileMax;
+        }
+
+        if (settingsMax > 0)
+        {
+            return settingsMax;
+        }
+
+        return 0;
+    }
+
+    private static PDFViewerSettingsDto BuildViewerSettingsDto(PDFViewerSettings settings, SharedFile file, int combinedMaxViewTime)
+    {
+        var allowDownload = settings.AllowDownload;
+        var allowPrint = settings.AllowPrint && !file.PrintProtectionEnabled;
+        var allowCopy = settings.AllowCopy && !file.CopyProtectionEnabled;
+        var disableContextMenu = settings.DisableContextMenu || file.ScreenshotProtectionEnabled;
+        var disableTextSelection = settings.DisableTextSelection || !allowCopy;
+
+        return new PDFViewerSettingsDto
+        {
+            Theme = settings.Theme,
+            AccentColor = settings.AccentColor,
+            BackgroundColor = settings.BackgroundColor,
+            ToolbarBackgroundColor = settings.ToolbarBackgroundColor,
+            ToolbarTextColor = settings.ToolbarTextColor,
+            FontFamily = settings.FontFamily,
+            ShowToolbar = settings.ShowToolbar,
+            ToolbarPosition = settings.ToolbarPosition,
+            ShowFileDetails = settings.ShowFileDetails,
+            ShowSearch = settings.ShowSearch,
+            ShowPageControls = settings.ShowPageControls,
+            ShowPageIndicator = settings.ShowPageIndicator,
+            ShowDownloadButton = settings.ShowDownloadButton && allowDownload,
+            ShowPrintButton = settings.ShowPrintButton && allowPrint,
+            ShowFullscreenButton = settings.ShowFullscreenButton,
+            AllowDownload = allowDownload,
+            AllowPrint = allowPrint,
+            AllowCopy = allowCopy,
+            DisableTextSelection = disableTextSelection,
+            DisableContextMenu = disableContextMenu,
+            ForceGlobalWatermark = settings.ForceGlobalWatermark,
+            GlobalWatermarkText = settings.GlobalWatermarkText,
+            WatermarkOpacity = settings.WatermarkOpacity,
+            WatermarkFontSize = settings.WatermarkFontSize,
+            WatermarkColor = settings.WatermarkColor,
+            MaxViewTimeMinutes = combinedMaxViewTime,
+            DefaultZoomPercent = settings.DefaultZoomPercent,
+            ZoomStepPercent = settings.ZoomStepPercent,
+            ViewerPadding = settings.ViewerPadding,
+            CustomCss = settings.CustomCss
+        };
     }
 
     private string GetClientIp()
