@@ -1,115 +1,5 @@
 const sessions = new Map();
 const pdfFrames = new Map();
-let pdfJsLibPromise = null;
-
-const PDF_JS_VERSION = '3.10.111';
-const PDF_JS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_VERSION}/build/`;
-const PDF_JS_SCRIPT = `${PDF_JS_BASE}pdf.min.js`;
-const PDF_JS_WORKER_SCRIPT = `${PDF_JS_BASE}pdf.worker.min.js`;
-const PDF_JS_MODULE = `${PDF_JS_BASE}pdf.mjs`;
-const PDF_JS_WORKER_MODULE = `${PDF_JS_BASE}pdf.worker.mjs`;
-
-function extractPdfJsLib(candidate) {
-    if (!candidate) {
-        return null;
-    }
-
-    if (candidate.GlobalWorkerOptions) {
-        return candidate;
-    }
-
-    if (candidate.default && candidate.default.GlobalWorkerOptions) {
-        return candidate.default;
-    }
-
-    return null;
-}
-
-function configurePdfJsLib(candidate, workerSrc) {
-    const pdfjsLib = extractPdfJsLib(candidate);
-
-    if (!pdfjsLib) {
-        throw new Error('La librería PDF.js no expuso la API esperada.');
-    }
-
-    if (pdfjsLib.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-    }
-
-    return pdfjsLib;
-}
-
-function loadPdfJsModule(moduleUrl, workerUrl) {
-    return import(moduleUrl).then((module) => configurePdfJsLib(module, workerUrl));
-}
-
-function loadPdfJsScript(scriptUrl, workerUrl) {
-    return new Promise((resolve, reject) => {
-        try {
-            const existing = extractPdfJsLib(window.pdfjsLib);
-            if (existing) {
-                resolve(configurePdfJsLib(existing, workerUrl));
-                return;
-            }
-        } catch (err) {
-            reject(err);
-            return;
-        }
-
-        const head = document.head || document.getElementsByTagName('head')[0];
-        if (!head) {
-            reject(new Error('No se pudo encontrar el elemento <head> para cargar PDF.js.'));
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = scriptUrl;
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.dataset.pdfjs = 'true';
-
-        script.onload = () => {
-            try {
-                resolve(configurePdfJsLib(window.pdfjsLib, workerUrl));
-            } catch (err) {
-                reject(err);
-            }
-        };
-
-        script.onerror = () => {
-            reject(new Error(`No se pudo descargar PDF.js desde ${scriptUrl}.`));
-        };
-
-        head.appendChild(script);
-    });
-}
-
-async function loadPdfJs() {
-    if (pdfJsLibPromise) {
-        return pdfJsLibPromise;
-    }
-
-    const loaders = [
-        () => loadPdfJsModule(PDF_JS_MODULE, PDF_JS_WORKER_MODULE),
-        () => loadPdfJsScript(PDF_JS_SCRIPT, PDF_JS_WORKER_SCRIPT),
-    ];
-
-    let lastError = null;
-
-    for (const loader of loaders) {
-        try {
-            pdfJsLibPromise = loader();
-            const module = await pdfJsLibPromise;
-            return module;
-        } catch (err) {
-            console.warn('No se pudo cargar PDF.js, intentando siguiente opción.', err);
-            pdfJsLibPromise = null;
-            lastError = err;
-        }
-    }
-
-    throw lastError ?? new Error('No se pudo cargar PDF.js desde ninguna fuente disponible.');
-}
 
 function base64ToUint8Array(base64) {
     const binary = atob(base64);
@@ -121,6 +11,12 @@ function base64ToUint8Array(base64) {
     }
 
     return bytes;
+}
+
+function createPdfObjectUrl(base64) {
+    const pdfBytes = base64ToUint8Array(base64);
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
 }
 
 function sendEvent(state, type, pageNumber, data) {
@@ -356,6 +252,9 @@ export async function disposePdfFrame(frameId) {
             } else if (frameState.loadingTask && typeof frameState.loadingTask.destroy === 'function') {
                 await frameState.loadingTask.destroy();
             }
+            if (frameState.objectUrl) {
+                URL.revokeObjectURL(frameState.objectUrl);
+            }
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
         }
@@ -389,39 +288,28 @@ export async function renderPdf(frameId, base64Data) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
+    let objectUrl = null;
     try {
-        const pdfjsLib = await loadPdfJs();
-        const pdfData = base64ToUint8Array(base64Data);
-        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-        const pdfDocument = await loadingTask.promise;
-
+        objectUrl = createPdfObjectUrl(base64Data);
         frame.innerHTML = '';
 
-        const pages = [];
-        const scale = 1.45;
+        const iframe = document.createElement('iframe');
+        iframe.className = 'secure-pdf-iframe';
+        iframe.title = 'Documento PDF seguro';
+        iframe.src = objectUrl;
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('allowfullscreen', 'true');
 
-        for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
-            const page = await pdfDocument.getPage(pageNumber);
-            const viewport = page.getViewport({ scale });
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            canvas.className = 'secure-pdf-page';
-            canvas.setAttribute('data-page-number', pageNumber.toString());
+        iframe.addEventListener('load', () => {
+            frame.dispatchEvent(new Event('scroll'));
+        });
 
-            const context = canvas.getContext('2d', { alpha: false });
-            const renderContext = { canvasContext: context, viewport };
-            await page.render(renderContext).promise;
-
-            frame.appendChild(canvas);
-            pages.push({ element: canvas, pageNumber });
-        }
+        frame.appendChild(iframe);
 
         pdfFrames.set(frameId, {
             container: frame,
-            pdfDoc: pdfDocument,
-            loadingTask,
-            pages
+            pages: [],
+            objectUrl
         });
 
         ensureTrackingForFrame(frameId);
@@ -432,6 +320,9 @@ export async function renderPdf(frameId, base64Data) {
         errorMessage.className = 'secure-pdf-loading';
         errorMessage.textContent = 'No se pudo renderizar el documento.';
         frame.appendChild(errorMessage);
+        if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+        }
         throw err;
     }
 }
