@@ -42,7 +42,7 @@
                     }
                     else
                     {
-                        if (fileMetadata != null)
+                        if (fileMetadata != null && (viewerConfig?.ViewerSettings?.ShowFileDetails ?? true))
                         {
                             <div class="mb-3">
                                 <h5 class="fw-bold">@fileMetadata.OriginalFileName</h5>
@@ -51,7 +51,7 @@
                                 <p class="text-muted"><i class="fas fa-calendar"></i> Subido: @fileMetadata.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
                             </div>
                         }
-                        else
+                        else if (fileMetadata == null)
                         {
                             <div class="alert alert-info">
                                 Ingresa la contraseña maestra para abrir el documento en el visor seguro.
@@ -83,6 +83,7 @@
                     @if (pdfLoaded && viewerConfig != null)
                     {
                         <div class="secure-pdf-container mt-4" id="@ViewerContainerElementId">
+                            <div class="secure-pdf-toolbar" id="@ToolbarElementId"></div>
                             <div class="secure-pdf-frame" id="@PdfFrameElementId"></div>
                         </div>
                         <p class="text-muted small mt-2">
@@ -114,6 +115,7 @@
     private IJSObjectReference? confidentialBoxModule;
     private const string PdfFrameElementId = "securePdfFrame";
     private const string ViewerContainerElementId = "secureViewerContainer";
+    private const string ToolbarElementId = "securePdfToolbar";
 
     protected override async Task OnInitializedAsync()
     {
@@ -215,7 +217,8 @@
             await module.InvokeVoidAsync(
                 "renderPdf",
                 PdfFrameElementId,
-                base64Content);
+                base64Content,
+                viewerConfig.FileName);
 
             await module.InvokeVoidAsync(
                 "initSecurePdfViewer",
@@ -225,9 +228,18 @@
                     sessionId,
                     dotNetRef = dotNetReference,
                     frameId = PdfFrameElementId,
+                    toolbarId = ToolbarElementId,
                     watermarkText = viewerConfig.HasWatermark ? viewerConfig.WatermarkText : string.Empty,
+                    watermarkStyle = new
+                    {
+                        color = viewerConfig.WatermarkColor,
+                        opacity = viewerConfig.WatermarkOpacity,
+                        fontSize = viewerConfig.WatermarkFontSize
+                    },
                     disableContextMenu = viewerConfig.ScreenshotProtectionEnabled,
-                    maxViewMinutes = viewerConfig.MaxViewTimeMinutes
+                    maxViewMinutes = viewerConfig.MaxViewTimeMinutes,
+                    settings = viewerConfig.ViewerSettings,
+                    fileName = viewerConfig.FileName
                 });
 
             await module.InvokeVoidAsync("notifyPdfPage", sessionId, 1);

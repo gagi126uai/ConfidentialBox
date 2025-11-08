@@ -44,6 +44,13 @@ else
                 </li>
                 <li class="nav-item">
                     <button type="button"
+                            class="nav-link @(activeTab == "viewer" ? "active" : string.Empty)"
+                            @onclick='() => SetActiveTab("viewer")'>
+                        <i class="fas fa-file-pdf"></i> Visor PDF
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button"
                             class="nav-link @(activeTab == "security" ? "active" : string.Empty)"
                             @onclick='() => SetActiveTab("security")'>
                         <i class="fas fa-user-shield"></i> Seguridad de acceso
@@ -240,6 +247,250 @@ else
                         </button>
                     </EditForm>
                     break;
+                case "viewer":
+                    <EditForm Model="pdfViewerSettings" OnValidSubmit="UpdatePdfViewerSettingsAsync">
+                        <DataAnnotationsValidator />
+
+                        @if (!string.IsNullOrEmpty(pdfViewerMessage))
+                        {
+                            <div class="alert @(pdfViewerSuccess ? "alert-success" : "alert-danger")">@pdfViewerMessage</div>
+                        }
+
+                        <div class="row g-4">
+                            <div class="col-xl-8">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-palette me-2"></i> Experiencia visual</h5>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Tema base</label>
+                                                <InputSelect @bind-Value="pdfViewerSettings.Theme" class="form-select">
+                                                    <option value="dark">Oscuro</option>
+                                                    <option value="light">Claro</option>
+                                                    <option value="custom">Personalizado</option>
+                                                </InputSelect>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Posición de la barra</label>
+                                                <InputSelect @bind-Value="pdfViewerSettings.ToolbarPosition" class="form-select">
+                                                    <option value="top">Superior</option>
+                                                    <option value="bottom">Inferior</option>
+                                                </InputSelect>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Familia tipográfica</label>
+                                                <InputText @bind-Value="pdfViewerSettings.FontFamily" class="form-control" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Espaciado interno</label>
+                                                <InputText @bind-Value="pdfViewerSettings.ViewerPadding" class="form-control" />
+                                                <div class="form-text">Acepta valores CSS (ej: <code>1.5rem</code>).</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-3">
+                                                <label class="form-label">Color acento</label>
+                                                <InputText @bind-Value="pdfViewerSettings.AccentColor" type="color" class="form-control form-control-color" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Fondo visor</label>
+                                                <InputText @bind-Value="pdfViewerSettings.BackgroundColor" type="color" class="form-control form-control-color" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Fondo barra</label>
+                                                <InputText @bind-Value="pdfViewerSettings.ToolbarBackgroundColor" type="color" class="form-control form-control-color" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Texto barra</label>
+                                                <InputText @bind-Value="pdfViewerSettings.ToolbarTextColor" type="color" class="form-control form-control-color" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-3">
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowToolbar" class="form-check-input" id="viewerToolbar" />
+                                                    <label class="form-check-label" for="viewerToolbar">Mostrar barra personalizada</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowFileDetails" class="form-check-input" id="viewerDetails" />
+                                                    <label class="form-check-label" for="viewerDetails">Mostrar datos del archivo</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowSearch" class="form-check-input" id="viewerSearch" />
+                                                    <label class="form-check-label" for="viewerSearch">Habilitar búsqueda rápida</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6 col-lg-3">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowPageControls" class="form-check-input" id="viewerControls" />
+                                                    <label class="form-check-label" for="viewerControls">Controles de zoom</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 col-lg-3">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowPageIndicator" class="form-check-input" id="viewerPageIndicator" />
+                                                    <label class="form-check-label" for="viewerPageIndicator">Indicador de página</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 col-lg-3">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowDownloadButton" class="form-check-input" id="viewerDownloadBtn" />
+                                                    <label class="form-check-label" for="viewerDownloadBtn">Botón de descarga</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 col-lg-3">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.ShowPrintButton" class="form-check-input" id="viewerPrintBtn" />
+                                                    <label class="form-check-label" for="viewerPrintBtn">Botón de impresión</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-check form-switch mt-1">
+                                            <InputCheckbox @bind-Value="pdfViewerSettings.ShowFullscreenButton" class="form-check-input" id="viewerFullscreen" />
+                                            <label class="form-check-label" for="viewerFullscreen">Botón de pantalla completa</label>
+                                        </div>
+
+                                        <div class="mt-3">
+                                            <label class="form-label">CSS adicional (opcional)</label>
+                                            <InputTextArea @bind-Value="pdfViewerSettings.CustomCss" class="form-control" rows="4" />
+                                            <div class="form-text">Se inyectará dentro del visor, ideal para ajustes finos corporativos.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-user-lock me-2"></i> Restricciones y controles</h5>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.AllowDownload" class="form-check-input" id="viewerAllowDownload" />
+                                                    <label class="form-check-label" for="viewerAllowDownload">Permitir descarga</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.AllowPrint" class="form-check-input" id="viewerAllowPrint" />
+                                                    <label class="form-check-label" for="viewerAllowPrint">Permitir impresión</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.AllowCopy" class="form-check-input" id="viewerAllowCopy" />
+                                                    <label class="form-check-label" for="viewerAllowCopy">Permitir copiado de texto</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.DisableContextMenu" class="form-check-input" id="viewerDisableMenu" />
+                                                    <label class="form-check-label" for="viewerDisableMenu">Bloquear menú contextual</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox @bind-Value="pdfViewerSettings.DisableTextSelection" class="form-check-input" id="viewerDisableSelection" />
+                                                    <label class="form-check-label" for="viewerDisableSelection">Deshabilitar selección de texto</label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Zoom por defecto (%)</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.DefaultZoomPercent" class="form-control" min="50" max="300" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Incremento zoom (%)</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.ZoomStepPercent" class="form-control" min="5" max="50" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-tint me-2"></i> Marca de agua y sesión</h5>
+
+                                        <div class="form-check form-switch mb-3">
+                                            <InputCheckbox @bind-Value="pdfViewerSettings.ForceGlobalWatermark" class="form-check-input" id="viewerWatermark" />
+                                            <label class="form-check-label" for="viewerWatermark">Forzar marca de agua global</label>
+                                        </div>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Texto de la marca</label>
+                                                <InputText @bind-Value="pdfViewerSettings.GlobalWatermarkText" class="form-control" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Color marca</label>
+                                                <InputText @bind-Value="pdfViewerSettings.WatermarkColor" class="form-control" />
+                                                <div class="form-text">Admite valores HEX o RGBA.</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-4">
+                                                <label class="form-label">Opacidad</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.WatermarkOpacity" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Tamaño fuente</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.WatermarkFontSize" class="form-control" min="16" max="120" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Tiempo máximo (min)</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.MaxViewTimeMinutes" class="form-control" min="0" />
+                                                <div class="form-text">0 = sin límite global. Se combinará con el límite del archivo.</div>
+                                            </div>
+                                        </div>
+
+                                        <button class="btn btn-danger mt-4" disabled="@pdfViewerSaving">
+                                            @if (pdfViewerSaving)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                                <span>Guardando…</span>
+                                            }
+                                            else
+                                            {
+                                                <span><i class="fas fa-save me-2"></i>Guardar personalización</span>
+                                            }
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-4">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body">
+                                        <h6 class="fw-semibold"><i class="fas fa-shield-alt text-danger me-1"></i> Consejos de seguridad</h6>
+                                        <ul class="small mb-0">
+                                            <li>Las restricciones globales se aplican junto con las políticas específicas del archivo compartido.</li>
+                                            <li>El sistema bloquea el menú contextual y la selección cuando la protección está activa.</li>
+                                            <li>La IA del visor sigue evaluando descargas, impresiones y cambios de zoom sospechosos.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                    break;
                 case "security":
                     <div class="row g-4">
                         <div class="col-lg-6">
@@ -315,6 +566,7 @@ else
     private EmailNotificationSettingsDto notifications = new();
     private RegistrationSettingsDto registrationSettings = new();
     private TokenSettingsDto tokenSettings = new();
+    private PDFViewerSettingsDto pdfViewerSettings = new();
 
     private bool isLoading = true;
     private bool storageSaving;
@@ -322,6 +574,7 @@ else
     private bool notificationsSaving;
     private bool registrationSaving;
     private bool tokenSaving;
+    private bool pdfViewerSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -333,6 +586,8 @@ else
     private bool registrationSuccess;
     private string? tokenMessage;
     private bool tokenSuccess;
+    private string? pdfViewerMessage;
+    private bool pdfViewerSuccess;
 
     private string activeTab = "storage";
 
@@ -355,6 +610,7 @@ else
             notifications = await SettingsService.GetEmailNotificationSettingsAsync() ?? new EmailNotificationSettingsDto();
             registrationSettings = await SettingsService.GetRegistrationSettingsAsync() ?? new RegistrationSettingsDto();
             tokenSettings = await SettingsService.GetTokenSettingsAsync() ?? new TokenSettingsDto();
+            pdfViewerSettings = await SettingsService.GetPdfViewerSettingsAsync() ?? new PDFViewerSettingsDto();
         }
         finally
         {
@@ -456,6 +712,29 @@ else
         finally
         {
             tokenSaving = false;
+        }
+    }
+
+    private async Task UpdatePdfViewerSettingsAsync()
+    {
+        pdfViewerMessage = null;
+        pdfViewerSaving = true;
+        try
+        {
+            pdfViewerSuccess = await SettingsService.UpdatePdfViewerSettingsAsync(pdfViewerSettings);
+            pdfViewerMessage = pdfViewerSuccess ? "Visor personalizado actualizado." : "No fue posible guardar la configuración del visor.";
+            if (pdfViewerSuccess)
+            {
+                var refreshed = await SettingsService.GetPdfViewerSettingsAsync();
+                if (refreshed is not null)
+                {
+                    pdfViewerSettings = refreshed;
+                }
+            }
+        }
+        finally
+        {
+            pdfViewerSaving = false;
         }
     }
 

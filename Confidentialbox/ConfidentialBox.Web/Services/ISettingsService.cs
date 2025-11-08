@@ -18,4 +18,6 @@ public interface ISettingsService
     Task<bool> UpdateTokenSettingsAsync(TokenSettingsDto request);
     Task<AIScoringSettingsDto?> GetAIScoringSettingsAsync();
     Task<bool> UpdateAIScoringSettingsAsync(AIScoringSettingsDto request);
+    Task<PDFViewerSettingsDto?> GetPdfViewerSettingsAsync();
+    Task<bool> UpdatePdfViewerSettingsAsync(PDFViewerSettingsDto request);
 }

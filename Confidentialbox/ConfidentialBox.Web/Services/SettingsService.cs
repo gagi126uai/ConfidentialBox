@@ -84,6 +84,17 @@ public class SettingsService : ISettingsService
         return await ParseOperationResultAsync(response);
     }
 
+    public async Task<PDFViewerSettingsDto?> GetPdfViewerSettingsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<PDFViewerSettingsDto>("api/settings/pdf-viewer");
+    }
+
+    public async Task<bool> UpdatePdfViewerSettingsAsync(PDFViewerSettingsDto request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/settings/pdf-viewer", request);
+        return await ParseOperationResultAsync(response);
+    }
+
     private static async Task<bool> ParseOperationResultAsync(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
