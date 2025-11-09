@@ -54,6 +54,15 @@ public class FileRepository : IFileRepository
             .ToListAsync();
     }
 
+    public async Task<List<SharedFile>> GetDeletedAsync()
+    {
+        return await _context.SharedFiles
+            .Include(f => f.UploadedByUser)
+            .Where(f => f.IsDeleted)
+            .OrderByDescending(f => f.DeletedAt ?? f.UploadedAt)
+            .ToListAsync();
+    }
+
     public async Task<List<SharedFile>> SearchAsync(string? searchTerm, DateTime? uploadedAfter, DateTime? uploadedBefore, string? userId, bool? isBlocked, bool? isDeleted, int pageNumber, int pageSize)
     {
         var query = _context.SharedFiles
@@ -154,6 +163,27 @@ public class FileRepository : IFileRepository
         {
             file.IsDeleted = true;
             file.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task RestoreAsync(int id)
+    {
+        var file = await _context.SharedFiles.FindAsync(id);
+        if (file != null && file.IsDeleted)
+        {
+            file.IsDeleted = false;
+            file.DeletedAt = null;
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task PurgeAsync(int id)
+    {
+        var file = await _context.SharedFiles.FindAsync(id);
+        if (file != null)
+        {
+            _context.SharedFiles.Remove(file);
             await _context.SaveChangesAsync();
         }
     }

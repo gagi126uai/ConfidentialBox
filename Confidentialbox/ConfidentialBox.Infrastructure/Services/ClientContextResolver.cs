@@ -1,11 +1,14 @@
+using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
+using UAParser;
 
 namespace ConfidentialBox.Infrastructure.Services;
 
 public class ClientContextResolver : IClientContextResolver
 {
+    private static readonly Parser UserAgentParser = Parser.GetDefault();
     private static readonly Regex WindowsRegex = new("Windows NT (?<version>[0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex MacRegex = new("Mac OS X (?<version>[0-9_]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex AndroidRegex = new("Android (?<version>[0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -21,8 +24,10 @@ public class ClientContextResolver : IClientContextResolver
         var userAgent = headers["User-Agent"].ToString();
         var deviceName = headers["X-Device-Name"].ToString();
 
-        var (deviceType, os) = ParseOperatingSystem(userAgent);
-        var browser = ParseBrowser(userAgent);
+        var parsedUa = ParseUserAgent(userAgent);
+        var (regexDeviceType, regexOs) = ParseOperatingSystem(userAgent);
+        var operatingSystem = parsedUa.OperatingSystem ?? regexOs;
+        var browser = parsedUa.Browser ?? ParseBrowser(userAgent);
 
         var locationHeader = headers["X-Geo-Location"].ToString();
         string? location = null;
@@ -48,14 +53,14 @@ public class ClientContextResolver : IClientContextResolver
             location = "Red local";
         }
 
-        var deviceTypeName = DetermineDeviceType(userAgent, deviceType);
+        var deviceTypeName = DetermineDeviceType(userAgent, parsedUa.DeviceType ?? regexDeviceType);
 
         return new ClientContext(
             ip,
             string.IsNullOrWhiteSpace(userAgent) ? null : userAgent,
             string.IsNullOrWhiteSpace(deviceName) ? null : deviceName,
             deviceTypeName,
-            os,
+            operatingSystem,
             browser,
             location,
             latitude,
@@ -112,6 +117,27 @@ public class ClientContextResolver : IClientContextResolver
         return ("Desconocido", null);
     }
 
+    private static (string? Browser, string? OperatingSystem, string? DeviceType) ParseUserAgent(string userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            return (null, null, null);
+        }
+
+        try
+        {
+            var clientInfo = UserAgentParser.Parse(userAgent);
+            var os = FormatOperatingSystem(clientInfo.OS);
+            var browser = FormatBrowser(clientInfo.UA);
+            var deviceType = NormalizeDeviceType(clientInfo.Device);
+            return (browser, os, deviceType);
+        }
+        catch
+        {
+            return (null, null, null);
+        }
+    }
+
     private static string? ParseBrowser(string userAgent)
     {
         if (string.IsNullOrWhiteSpace(userAgent))
@@ -162,6 +188,66 @@ public class ClientContextResolver : IClientContextResolver
         if (userAgent.Contains("Tablet", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("iPad", StringComparison.OrdinalIgnoreCase))
         {
             return "Tablet";
+        }
+
+        return "Desktop";
+    }
+
+    private static string? FormatOperatingSystem(OS os)
+    {
+        if (os == null)
+        {
+            return null;
+        }
+
+        var family = os.Family;
+        if (string.IsNullOrWhiteSpace(family))
+        {
+            return null;
+        }
+
+        var versions = new[] { os.Major, os.Minor, os.Patch, os.PatchMinor }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+
+        return versions.Length > 0 ? $"{family} {string.Join('.', versions)}" : family;
+    }
+
+    private static string? FormatBrowser(UserAgent ua)
+    {
+        if (ua == null || string.IsNullOrWhiteSpace(ua.Family))
+        {
+            return null;
+        }
+
+        var versions = new[] { ua.Major, ua.Minor, ua.Patch }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+
+        return versions.Length > 0 ? $"{ua.Family} {string.Join('.', versions)}" : ua.Family;
+    }
+
+    private static string? NormalizeDeviceType(Device device)
+    {
+        if (device == null || string.IsNullOrWhiteSpace(device.Family) || device.Family.Equals("Other", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var family = device.Family;
+        if (family.Contains("tablet", StringComparison.OrdinalIgnoreCase) || family.Contains("iPad", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Tablet";
+        }
+
+        if (family.Contains("mobile", StringComparison.OrdinalIgnoreCase) || family.Contains("phone", StringComparison.OrdinalIgnoreCase) || family.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Mobile";
+        }
+
+        if (family.Contains("spider", StringComparison.OrdinalIgnoreCase) || family.Contains("bot", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Robot";
         }
 
         return "Desktop";

@@ -103,4 +103,21 @@ public class FileService : IFileService
         return await _httpClient.GetFromJsonAsync<List<FileAccessLogDto>>($"api/files/{fileId}/accesses")
             ?? new List<FileAccessLogDto>();
     }
+
+    public async Task<List<FileDto>> GetDeletedFilesAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<FileDto>>("api/files/deleted") ?? new List<FileDto>();
+    }
+
+    public async Task<bool> RestoreFileAsync(int id)
+    {
+        var response = await _httpClient.PostAsync($"api/files/{id}/restore", null);
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> PurgeFileAsync(int id)
+    {
+        var response = await _httpClient.DeleteAsync($"api/files/{id}/purge");
+        return response.IsSuccessStatusCode;
+    }
 }

@@ -19,6 +19,9 @@ public interface IFileRepository
     Task<SharedFile> AddAsync(SharedFile file);
     Task UpdateAsync(SharedFile file);
     Task DeleteAsync(int id);
+    Task<List<SharedFile>> GetDeletedAsync();
+    Task RestoreAsync(int id);
+    Task PurgeAsync(int id);
     Task<int> GetTotalFilesCountAsync();
     Task<int> GetActiveFilesCountAsync();
     Task<int> GetExpiredFilesCountAsync();

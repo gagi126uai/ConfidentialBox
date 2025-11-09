@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace ConfidentialBox.API.Controllers;
 
@@ -145,15 +146,39 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult> Delete(string id)
+    public async Task<ActionResult<OperationResultDto>> Delete(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null)
         {
-            return NotFound();
+            return NotFound(new OperationResultDto
+            {
+                Success = false,
+                Error = "Usuario no encontrado"
+            });
         }
 
-        await _userManager.DeleteAsync(user);
-        return Ok();
+        var roles = await _userManager.GetRolesAsync(user);
+        if (roles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Error = "Los usuarios administradores no pueden ser eliminados."
+            });
+        }
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            var error = result.Errors.FirstOrDefault()?.Description ?? "No fue posible eliminar el usuario.";
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Error = error
+            });
+        }
+
+        return Ok(new OperationResultDto { Success = true });
     }
 }

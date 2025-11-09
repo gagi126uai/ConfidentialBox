@@ -11,5 +11,5 @@ public interface IUserService
     Task<UserDto?> CreateUserAsync(CreateUserRequest request);
     Task<bool> ToggleActiveAsync(string id);
     Task<bool> UpdateRolesAsync(string id, List<string> roles);
-    Task<bool> DeleteUserAsync(string id);
+    Task<OperationResultDto> DeleteUserAsync(string id);
 }

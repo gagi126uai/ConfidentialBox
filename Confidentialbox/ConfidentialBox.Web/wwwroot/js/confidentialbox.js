@@ -572,7 +572,8 @@ function createState(sessionId, options, container) {
         pendingZoom: null,
         zoomLabel: null,
         pageIndicator: null,
-        currentPage: null
+        currentPage: null,
+        disableContextMenu: false
     };
 }
 
@@ -616,13 +617,30 @@ export function initSecurePdfViewer(elementId, options) {
         updateZoom(state, frameState, state.currentZoom, { silent: true });
     }
 
-    const blockContextMenu = options.disableContextMenu || settings.disableContextMenu;
-    if (blockContextMenu) {
-        registerHandler(state, container, 'contextmenu', (e) => {
-            e.preventDefault();
+    state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
+
+    const contextMenuHandler = (event) => {
+        if (!container) {
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
+            event.clientY >= rect.top && event.clientY <= rect.bottom;
+
+        if (!inside) {
+            return;
+        }
+
+        if (state.disableContextMenu) {
+            event.preventDefault();
             sendEvent(state, 'ContextMenuBlocked');
-        });
-    }
+        } else {
+            sendEvent(state, 'ContextMenuOpened');
+        }
+    };
+
+    registerHandler(state, document, 'contextmenu', contextMenuHandler, true);
 
     registerHandler(state, document, 'keydown', (e) => {
         const key = e.key.toLowerCase();
@@ -739,6 +757,24 @@ export async function renderPdf(frameId, base64Data, fileName) {
 
         iframe.addEventListener('load', () => {
             viewport.dispatchEvent(new Event('scroll'));
+            try {
+                const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (frameDoc) {
+                    frameDoc.addEventListener('contextmenu', (evt) => {
+                        const relatedStates = Array.from(sessions.values()).filter(s => s.frameId === frameId);
+                        for (const relatedState of relatedStates) {
+                            if (relatedState.disableContextMenu) {
+                                evt.preventDefault();
+                                sendEvent(relatedState, 'ContextMenuBlocked');
+                            } else {
+                                sendEvent(relatedState, 'ContextMenuOpened');
+                            }
+                        }
+                    }, true);
+                }
+            } catch (err) {
+                console.warn('No se pudo interceptar el menú contextual interno del visor seguro', err);
+            }
         });
 
         viewport.appendChild(iframe);
