@@ -28,7 +28,7 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <button class="btn btn-primary w-100" @onclick="SearchAlerts">
+                <button class="btn btn-primary w-100" @onclick="ApplyFilters">
                     <i class="fas fa-search"></i> Buscar
                 </button>
             </div>
@@ -119,7 +119,76 @@
     </div>
 </div>
 
-<!-- Modal igual que el tuyo -->
+@if (showReviewModal && selectedAlert != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(15, 23, 42, 0.65);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-clipboard-check me-2"></i> Revisar alerta de seguridad</h5>
+                    <button type="button" class="btn-close" @onclick="CloseReviewModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descripción</label>
+                        <p class="form-control-plaintext">@selectedAlert.Description</p>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Usuario</label>
+                            <p class="form-control-plaintext">@selectedAlert.UserName</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Archivo</label>
+                            <p class="form-control-plaintext">@(selectedAlert.FileName ?? "-")</p>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Severidad</label>
+                            <span class="badge bg-@GetSeverityColor(selectedAlert.Severity)">@selectedAlert.Severity</span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Confianza</label>
+                            <span class="badge bg-secondary">@($"{selectedAlert.ConfidenceScore * 100:F0}%")</span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Detectada</label>
+                            <p class="form-control-plaintext">@selectedAlert.DetectedAt.ToString("dd/MM/yyyy HH:mm")</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notas de revisión</label>
+                        <textarea class="form-control" rows="3" @bind="reviewNotes" placeholder="Acciones tomadas, hallazgos o recomendaciones"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Acción tomada (opcional)</label>
+                        <input class="form-control" @bind="actionTaken" placeholder="Ej. Bloqueo de usuario, reseteo de credenciales" />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(reviewError))
+                    {
+                        <div class="alert alert-danger">@reviewError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseReviewModal" disabled="@reviewSubmitting">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" type="button" @onclick="SubmitReview" disabled="@reviewSubmitting">
+                        @if (reviewSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Confirmar revisión
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
 @code {
     private PagedResult<SecurityAlertDto>? alerts;
     private bool isLoading = true;
@@ -133,6 +202,8 @@
     private SecurityAlertDto? selectedAlert;
     private string reviewNotes = "";
     private string actionTaken = "";
+    private string? reviewError;
+    private bool reviewSubmitting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -161,6 +232,12 @@
         }
     }
 
+    private async Task ApplyFilters()
+    {
+        currentPage = 1;
+        await SearchAlerts();
+    }
+
     private async Task ChangePage(int page)
     {
         if (page < 1) return;
@@ -175,6 +252,8 @@
         selectedAlert = alert;
         reviewNotes = "";
         actionTaken = "";
+        reviewError = null;
+        reviewSubmitting = false;
         showReviewModal = true;
     }
 
@@ -182,11 +261,16 @@
     {
         showReviewModal = false;
         selectedAlert = null;
+        reviewError = null;
+        reviewSubmitting = false;
     }
 
     private async Task SubmitReview()
     {
         if (selectedAlert == null) return;
+
+        reviewError = null;
+        reviewSubmitting = true;
 
         try
         {
@@ -203,10 +287,19 @@
                 CloseReviewModal();
                 await SearchAlerts();
             }
+            else
+            {
+                var message = await response.Content.ReadAsStringAsync();
+                reviewError = string.IsNullOrWhiteSpace(message) ? "No se pudo registrar la revisión." : message;
+            }
         }
         catch (Exception ex)
         {
-            error = $"Error al revisar la alerta: {ex.Message}";
+            reviewError = $"Error al revisar la alerta: {ex.Message}";
+        }
+        finally
+        {
+            reviewSubmitting = false;
         }
     }
 

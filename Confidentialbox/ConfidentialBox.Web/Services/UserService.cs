@@ -47,9 +47,33 @@ public class UserService : IUserService
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> DeleteUserAsync(string id)
+    public async Task<OperationResultDto> DeleteUserAsync(string id)
     {
         var response = await _httpClient.DeleteAsync($"api/users/{id}");
-        return response.IsSuccessStatusCode;
+        if (response.IsSuccessStatusCode)
+        {
+            return new OperationResultDto { Success = true };
+        }
+
+        try
+        {
+            var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+            if (result != null)
+            {
+                result.Success = false;
+                return result;
+            }
+        }
+        catch
+        {
+            // Ignored - fall back to raw message
+        }
+
+        var message = await response.Content.ReadAsStringAsync();
+        return new OperationResultDto
+        {
+            Success = false,
+            Error = string.IsNullOrWhiteSpace(message) ? "No fue posible eliminar el usuario." : message
+        };
     }
 }

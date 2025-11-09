@@ -21,6 +21,14 @@
     </div>
 }
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
 @if (isLoading)
 {
     <div class="text-center my-5">
@@ -210,6 +218,7 @@ else if (users != null && users.Any())
 
     private bool isLoading = true;
     private string? successMessage;
+    private string? errorMessage;
 
     private bool showCreateModal = false;
     private bool showEditRolesModal = false;
@@ -293,9 +302,18 @@ else if (users != null && users.Any())
 
     private async Task DeleteUser(string userId)
     {
-        await UserService.DeleteUserAsync(userId);
-        successMessage = "Usuario eliminado exitosamente";
-        await LoadData();
+        var result = await UserService.DeleteUserAsync(userId);
+        if (result.Success)
+        {
+            successMessage = "Usuario eliminado exitosamente";
+            errorMessage = null;
+            await LoadData();
+        }
+        else
+        {
+            errorMessage = result.Error ?? "No fue posible eliminar el usuario.";
+            successMessage = null;
+        }
     }
 
     private void ToggleRole(List<string> rolesList, string roleName, bool isChecked)

@@ -270,9 +270,12 @@ public class AISecurityService : IAISecurityService
             .Where(s => s.IsSuspicious && s.ScannedAt >= today)
             .CountAsync();
 
-        var systemThreatLevel = alerts.Any()
-            ? alerts.Where(a => a.DetectedAt >= DateTime.UtcNow.AddHours(-24))
-                    .Average(a => a.ConfidenceScore)
+        var last24Hours = alerts
+            .Where(a => a.DetectedAt >= DateTime.UtcNow.AddHours(-24))
+            .ToList();
+
+        var systemThreatLevel = last24Hours.Any()
+            ? last24Hours.Average(a => a.ConfidenceScore)
             : 0.0;
 
         var recentAlerts = alerts.Take(10).Select(a => new SecurityAlertDto
@@ -280,7 +283,7 @@ public class AISecurityService : IAISecurityService
             Id = a.Id,
             AlertType = a.AlertType,
             Severity = a.Severity,
-            UserName = $"{a.User.FirstName} {a.User.LastName}",
+            UserName = a.User != null ? $"{a.User.FirstName} {a.User.LastName}" : "Usuario desconocido",
             FileName = a.File?.OriginalFileName,
             Description = a.Description,
             ConfidenceScore = a.ConfidenceScore,

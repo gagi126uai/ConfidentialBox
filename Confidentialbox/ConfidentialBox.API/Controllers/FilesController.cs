@@ -58,6 +58,14 @@ public class FilesController : ControllerBase
         return Ok(fileDtos);
     }
 
+    [HttpGet("deleted")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<FileDto>>> GetDeleted()
+    {
+        var files = await _fileRepository.GetDeletedAsync();
+        return Ok(files.Select(MapToDto).ToList());
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<FileDto>> GetById(int id)
     {
@@ -378,6 +386,8 @@ public class FilesController : ControllerBase
         await _fileRepository.UpdateAsync(file);
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
         await _auditLogRepository.AddAsync(new AuditLog
         {
             UserId = userId!,
@@ -386,7 +396,15 @@ public class FilesController : ControllerBase
             EntityId = id.ToString(),
             NewValues = $"Reason: {reason}",
             Timestamp = DateTime.UtcNow,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown"
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
         });
 
         return Ok();
@@ -407,6 +425,8 @@ public class FilesController : ControllerBase
         await _fileRepository.UpdateAsync(file);
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
         await _auditLogRepository.AddAsync(new AuditLog
         {
             UserId = userId!,
@@ -414,7 +434,15 @@ public class FilesController : ControllerBase
             EntityType = "SharedFile",
             EntityId = id.ToString(),
             Timestamp = DateTime.UtcNow,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown"
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
         });
 
         return Ok();
@@ -439,6 +467,8 @@ public class FilesController : ControllerBase
 
         await _fileRepository.DeleteAsync(id);
 
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
         await _auditLogRepository.AddAsync(new AuditLog
         {
             UserId = userId!,
@@ -447,10 +477,110 @@ public class FilesController : ControllerBase
             EntityId = id.ToString(),
             OldValues = $"File: {file.OriginalFileName}",
             Timestamp = DateTime.UtcNow,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown"
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
         });
 
         return Ok();
+    }
+
+    [HttpPost("{id}/restore")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> Restore(int id)
+    {
+        var file = await _fileRepository.GetByIdAsync(id);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (!file.IsDeleted)
+        {
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Error = "El archivo no se encuentra en la papelera."
+            });
+        }
+
+        await _fileRepository.RestoreAsync(id);
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
+        await _auditLogRepository.AddAsync(new AuditLog
+        {
+            UserId = userId,
+            Action = "FileRestored",
+            EntityType = "SharedFile",
+            EntityId = id.ToString(),
+            Timestamp = DateTime.UtcNow,
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
+        });
+
+        return Ok(new OperationResultDto { Success = true });
+    }
+
+    [HttpDelete("{id}/purge")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> Purge(int id)
+    {
+        var file = await _fileRepository.GetByIdAsync(id);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (!file.IsDeleted)
+        {
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Error = "Solo es posible eliminar definitivamente archivos en la papelera."
+            });
+        }
+
+        await _fileStorageService.DeleteFileAsync(file);
+        await _fileRepository.PurgeAsync(id);
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
+        await _auditLogRepository.AddAsync(new AuditLog
+        {
+            UserId = userId,
+            Action = "FilePurged",
+            EntityType = "SharedFile",
+            EntityId = id.ToString(),
+            OldValues = $"File: {file.OriginalFileName}",
+            Timestamp = DateTime.UtcNow,
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
+        });
+
+        return Ok(new OperationResultDto { Success = true });
     }
 
     [HttpGet("{id}/accesses")]
@@ -590,7 +720,9 @@ public class FilesController : ControllerBase
             IsPdf = file.IsPDF,
             HasWatermark = file.HasWatermark,
             ScreenshotProtectionEnabled = file.ScreenshotProtectionEnabled,
-            AimMonitoringEnabled = file.AIMonitoringEnabled
+            AimMonitoringEnabled = file.AIMonitoringEnabled,
+            IsDeleted = file.IsDeleted,
+            DeletedAt = file.DeletedAt
         };
     }
 }

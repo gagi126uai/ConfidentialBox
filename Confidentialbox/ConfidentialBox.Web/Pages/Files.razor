@@ -24,6 +24,14 @@
     </div>
 }
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
 @if (isLoading)
 {
     <div class="text-center my-5">
@@ -54,8 +62,12 @@ else if (files != null && files.Any())
                         {
                             <tr>
                                 <td>
-                                    <i class="fas fa-file me-2"></i>
-                                    @file.OriginalFileName
+                                    <button type="button"
+                                            class="secure-file-link"
+                                            @onclick="() => OpenFile(file)">
+                                        <i class="fas @(file.IsPdf ? "fa-file-pdf text-danger" : "fa-file text-primary") me-2"></i>
+                                        @file.OriginalFileName
+                                    </button>
                                 </td>
                                 <td>@FormatBytes(file.FileSizeBytes)</td>
                                 <td>@file.UploadedAt.ToString("dd/MM/yyyy HH:mm")</td>
@@ -104,7 +116,7 @@ else if (files != null && files.Any())
                                         <button class="btn btn-outline-info" @onclick="async () => await ViewFileDetails(file.Id)">
                                             <i class="fas fa-info-circle"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger" @onclick="() => DeleteFile(file.Id)">
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteFile(file)">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -243,6 +255,7 @@ else
     private List<FileDto> files = new();
     private bool isLoading = true;
     private string? successMessage;
+    private string? errorMessage;
 
     private bool showAccessLogs;
     private FileDto? selectedFile;
@@ -311,7 +324,18 @@ else
         }
     }
 
-    private async Task DeleteFile(int fileId)
+    private void OpenFile(FileDto file)
+    {
+        if (string.IsNullOrWhiteSpace(file.ShareLink))
+        {
+            return;
+        }
+
+        var destination = file.IsPdf ? $"/view-pdf/{file.ShareLink}" : $"/access/{file.ShareLink}";
+        NavigationManager.NavigateTo(destination);
+    }
+
+    private async Task DeleteFile(FileDto file)
     {
         var confirm = await JS.InvokeAsync<bool>("confirm", "¿Estás seguro de que deseas eliminar este archivo?");
         if (!confirm)
@@ -319,10 +343,25 @@ else
             return;
         }
 
-        if (await FileService.DeleteFileAsync(fileId))
+        errorMessage = null;
+        successMessage = null;
+
+        try
         {
-            successMessage = "Archivo eliminado exitosamente";
-            await LoadFiles();
+            var result = await FileService.DeleteFileAsync(file.Id);
+            if (result)
+            {
+                successMessage = $"'{file.OriginalFileName}' fue enviado a la papelera.";
+                await LoadFiles();
+            }
+            else
+            {
+                errorMessage = "No se pudo eliminar el archivo. Intenta nuevamente.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al eliminar el archivo: {ex.Message}";
         }
     }
 
