@@ -22,6 +22,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     // AI Security Module
     public DbSet<SecurityAlert> SecurityAlerts { get; set; }
+    public DbSet<SecurityAlertAction> SecurityAlertActions { get; set; }
     public DbSet<UserBehaviorProfile> UserBehaviorProfiles { get; set; }
     public DbSet<FileScanResult> FileScanResults { get; set; }
     public DbSet<AIModel> AIModels { get; set; }
@@ -161,6 +162,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
             entity.Property(e => e.Severity).HasMaxLength(32);
             entity.Property(e => e.AlertType).HasMaxLength(64);
+            entity.Property(e => e.Status).HasMaxLength(32);
+            entity.Property(e => e.Verdict).HasMaxLength(128);
             // entity.Property(e => e.ConfidenceScore).HasPrecision(5,2); // si es decimal
 
             entity.HasOne(e => e.User)
@@ -184,6 +187,36 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             // entity.HasIndex(e => e.IsReviewed).HasFilter("[IsReviewed] = 0");
         });
 
+        builder.Entity<SecurityAlertAction>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.ActionType).HasMaxLength(64);
+            entity.Property(e => e.StatusAfterAction).HasMaxLength(32);
+
+            entity.HasOne(e => e.Alert)
+                  .WithMany()
+                  .HasForeignKey(e => e.AlertId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.TargetUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.TargetUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.TargetFile)
+                  .WithMany()
+                  .HasForeignKey(e => e.TargetFileId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.AlertId, e.CreatedAt });
+        });
+
         // UserBehaviorProfile
         builder.Entity<UserBehaviorProfile>(entity =>
         {
@@ -196,6 +229,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
             entity.HasIndex(e => e.UserId).IsUnique();
             entity.HasIndex(e => e.RiskScore);
+            entity.Property(e => e.MonitoringNotes).HasMaxLength(1024);
+            entity.Property(e => e.MonitoringLevel).HasDefaultValue(1);
             // entity.Property(e => e.RiskScore).HasPrecision(5,2);
         });
 

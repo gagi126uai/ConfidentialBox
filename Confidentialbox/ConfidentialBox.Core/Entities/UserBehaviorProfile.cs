@@ -1,4 +1,6 @@
-﻿namespace ConfidentialBox.Core.Entities;
+using System;
+
+namespace ConfidentialBox.Core.Entities;
 
 public class UserBehaviorProfile
 {
@@ -22,4 +24,13 @@ public class UserBehaviorProfile
 
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     public DateTime ProfileCreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Monitoring level assigned by analysts (1 = normal, 2 = elevado, 3 = crítico).
+    /// </summary>
+    public int MonitoringLevel { get; set; } = 1;
+
+    public DateTime? MonitoringLevelUpdatedAt { get; set; }
+
+    public string? MonitoringNotes { get; set; }
 }

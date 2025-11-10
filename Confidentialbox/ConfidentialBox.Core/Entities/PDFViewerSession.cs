@@ -1,4 +1,6 @@
-﻿namespace ConfidentialBox.Core.Entities;
+using System;
+
+namespace ConfidentialBox.Core.Entities;
 
 public class PDFViewerSession
 {
@@ -36,6 +38,14 @@ public class PDFViewerSession
     public int PrintAttempts { get; set; } = 0;
 
     public int CopyAttempts { get; set; } = 0;
+
+    public int WindowBlurEvents { get; set; } = 0;
+
+    public int VisibilityLossEvents { get; set; } = 0;
+
+    public int FullscreenExitEvents { get; set; } = 0;
+
+    public int ClipboardEvents { get; set; } = 0;
 
     public bool WasBlocked { get; set; } = false;
 
