@@ -14,13 +14,13 @@
     </div>
     <ul class="nav nav-pills secure-files-tabs">
         <li class="nav-item">
-            <button class="nav-link @GetTabClass("active")" @onclick="() => SwitchTab("active")">
+            <button class='nav-link @GetTabClass("active")' @onclick='() => SwitchTab("active")'>
                 Activos
                 <span class="badge bg-light text-dark ms-1">@((activeFiles?.Count ?? 0))</span>
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link @GetTabClass("deleted")" @onclick="() => SwitchTab("deleted")">
+            <button class='nav-link @GetTabClass("deleted")' @onclick='() => SwitchTab("deleted")'>
                 Papelera
                 <span class="badge bg-light text-dark ms-1">@((deletedFiles?.Count ?? 0))</span>
             </button>

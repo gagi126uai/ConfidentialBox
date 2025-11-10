@@ -59,6 +59,7 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\System.Security.Cryptography.ProtectedData.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\System.Security.Permissions.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\System.Windows.Extensions.dll
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\UAParser.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\cs\Microsoft.CodeAnalysis.resources.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\de\Microsoft.CodeAnalysis.resources.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\bin\Debug\net8.0\es\Microsoft.CodeAnalysis.resources.dll
@@ -164,6 +165,7 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\staticwebassets.build.json.cache
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\staticwebassets.development.json
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\Confiden.7F9EFF5E.Up2Date
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\ConfidentialBox.API.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\refint\ConfidentialBox.API.dll

@@ -641,6 +641,44 @@
         }
       }
     },
+    "/api/Files/deleted": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Files/{id}": {
       "get": {
         "tags": [
@@ -972,6 +1010,52 @@
     },
     "/api/Files/{id}/unblock": {
       "put": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/restore": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/purge": {
+      "delete": {
         "tags": [
           "Files"
         ],
@@ -1908,6 +1992,81 @@
         }
       }
     },
+    "/api/Settings/pdf-viewer": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PDFViewerSettingsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PDFViewerSettingsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PDFViewerSettingsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PDFViewerSettingsDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PDFViewerSettingsDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PDFViewerSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Settings/auth/registration": {
       "get": {
         "tags": [
@@ -2121,7 +2280,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
           }
         }
       }
@@ -3282,6 +3458,14 @@
           },
           "aimMonitoringEnabled": {
             "type": "boolean"
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3702,6 +3886,18 @@
             "type": "string",
             "nullable": true
           },
+          "watermarkOpacity": {
+            "type": "number",
+            "format": "double"
+          },
+          "watermarkFontSize": {
+            "type": "number",
+            "format": "double"
+          },
+          "watermarkColor": {
+            "type": "string",
+            "nullable": true
+          },
           "screenshotProtectionEnabled": {
             "type": "boolean"
           },
@@ -3719,6 +3915,121 @@
             "type": "boolean"
           },
           "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "viewerSettings": {
+            "$ref": "#/components/schemas/PDFViewerSettingsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PDFViewerSettingsDto": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "nullable": true
+          },
+          "accentColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "backgroundColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "toolbarBackgroundColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "toolbarTextColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "fontFamily": {
+            "type": "string",
+            "nullable": true
+          },
+          "showToolbar": {
+            "type": "boolean"
+          },
+          "toolbarPosition": {
+            "type": "string",
+            "nullable": true
+          },
+          "showFileDetails": {
+            "type": "boolean"
+          },
+          "showSearch": {
+            "type": "boolean"
+          },
+          "showPageControls": {
+            "type": "boolean"
+          },
+          "showPageIndicator": {
+            "type": "boolean"
+          },
+          "showDownloadButton": {
+            "type": "boolean"
+          },
+          "showPrintButton": {
+            "type": "boolean"
+          },
+          "showFullscreenButton": {
+            "type": "boolean"
+          },
+          "allowDownload": {
+            "type": "boolean"
+          },
+          "allowPrint": {
+            "type": "boolean"
+          },
+          "allowCopy": {
+            "type": "boolean"
+          },
+          "disableTextSelection": {
+            "type": "boolean"
+          },
+          "disableContextMenu": {
+            "type": "boolean"
+          },
+          "forceGlobalWatermark": {
+            "type": "boolean"
+          },
+          "globalWatermarkText": {
+            "type": "string",
+            "nullable": true
+          },
+          "watermarkOpacity": {
+            "type": "number",
+            "format": "double"
+          },
+          "watermarkFontSize": {
+            "type": "number",
+            "format": "double"
+          },
+          "watermarkColor": {
+            "type": "string",
+            "nullable": true
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultZoomPercent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "zoomStepPercent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "viewerPadding": {
+            "type": "string",
+            "nullable": true
+          },
+          "customCss": {
             "type": "string",
             "nullable": true
           }

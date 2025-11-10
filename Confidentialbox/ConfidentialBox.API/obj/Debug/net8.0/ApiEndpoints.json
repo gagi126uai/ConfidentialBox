@@ -479,6 +479,38 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "Purge",
+    "RelativePath": "api/Files/{id}/purge",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "Restore",
+    "RelativePath": "api/Files/{id}/restore",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
     "Method": "UnblockFile",
     "RelativePath": "api/Files/{id}/unblock",
     "HttpMethod": "PUT",
@@ -546,6 +578,26 @@
     "ReturnTypes": [
       {
         "Type": "ConfidentialBox.Core.DTOs.FileContentResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "GetDeleted",
+    "RelativePath": "api/Files/deleted",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.DTOs.FileDto, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "MediaTypes": [
           "text/plain",
           "application/json",
@@ -1134,6 +1186,52 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "GetPdfViewerSettings",
+    "RelativePath": "api/Settings/pdf-viewer",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.PDFViewerSettingsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
+    "Method": "UpdatePdfViewerSettings",
+    "RelativePath": "api/Settings/pdf-viewer",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.PDFViewerSettingsDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.SettingsController",
     "Method": "GetStorageSettings",
     "RelativePath": "api/Settings/storage",
     "HttpMethod": "GET",
@@ -1264,7 +1362,17 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.UsersController",

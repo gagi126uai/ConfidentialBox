@@ -40,6 +40,7 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\staticwebassets.build.json.cache
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\staticwebassets.development.json
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\Confiden.03F0C4A0.Up2Date
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ConfidentialBox.Web.dll
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\refint\ConfidentialBox.Web.dll
