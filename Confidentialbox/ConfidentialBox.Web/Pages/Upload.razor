@@ -1,6 +1,7 @@
 ﻿@page "/upload"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
 @attribute [Authorize]
 @inject IFileService FileService
 @inject IJSRuntime JS
@@ -221,15 +222,34 @@
 
     private void HandleDragEnter() => isDragging = true;
     private void HandleDragLeave() => isDragging = false;
-    private void HandleDrop() => isDragging = false;
 
-    private void HandleFileSelected(InputFileChangeEventArgs e)
+    private async Task HandleDrop(DragEventArgs e)
     {
-        selectedFile = e.File;
+        isDragging = false;
+
+        if (e.DataTransfer?.Files is { Count: > 0 })
+        {
+            var droppedFile = e.DataTransfer.Files[0];
+            await SelectFileAsync(droppedFile);
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount > 0)
+        {
+            await SelectFileAsync(e.File);
+        }
+    }
+
+    private Task SelectFileAsync(IBrowserFile file)
+    {
+        selectedFile = file;
         errorMessage = null;
         successMessage = null;
         shareLink = null;
-        // No tocar lastUploadedWasPdf acá; se setea tras subir con éxito
+
+        return InvokeAsync(StateHasChanged);
     }
 
     private void ClearFile()
