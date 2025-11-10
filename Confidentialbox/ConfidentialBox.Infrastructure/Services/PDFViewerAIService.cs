@@ -85,6 +85,16 @@ public class PDFViewerAIService : IPDFViewerAIService
                 session.CopyAttempts++;
                 break;
 
+            case "ClipboardCopy":
+                session.CopyAttempts++;
+                session.ClipboardEvents++;
+                if (session.ClipboardEvents >= 5)
+                {
+                    await BlockSessionAsync(session, "Copiado recurrente detectado por IA");
+                    viewerEvent.WasBlocked = true;
+                }
+                break;
+
             case "PageView":
                 session.PageViewCount++;
                 session.CurrentPage = pageNumber ?? 1;
@@ -104,6 +114,28 @@ public class PDFViewerAIService : IPDFViewerAIService
                         await BlockSessionAsync(session, "Patrón de navegación sospechoso: cambios de página muy rápidos");
                         viewerEvent.WasBlocked = true;
                     }
+                }
+                break;
+
+            case "VisibilityHidden":
+                session.VisibilityLossEvents++;
+                if (session.VisibilityLossEvents >= 6)
+                {
+                    await BlockSessionAsync(session, "Múltiples pérdidas de foco detectadas (posible captura)");
+                    viewerEvent.WasBlocked = true;
+                }
+                break;
+
+            case "WindowBlur":
+                session.WindowBlurEvents++;
+                break;
+
+            case "FullscreenExit":
+                session.FullscreenExitEvents++;
+                if (session.FullscreenExitEvents >= 3)
+                {
+                    await BlockSessionAsync(session, "Salidas de pantalla completa sospechosas");
+                    viewerEvent.WasBlocked = true;
                 }
                 break;
         }
@@ -216,6 +248,26 @@ public class PDFViewerAIService : IPDFViewerAIService
         if (session.CopyAttempts > 0)
         {
             score += Math.Min(0.2, session.CopyAttempts * 0.05);
+        }
+
+        if (session.ClipboardEvents > 0)
+        {
+            score += Math.Min(0.2, session.ClipboardEvents * 0.06);
+        }
+
+        if (session.WindowBlurEvents > 0)
+        {
+            score += Math.Min(0.15, session.WindowBlurEvents * 0.04);
+        }
+
+        if (session.VisibilityLossEvents > 0)
+        {
+            score += Math.Min(0.25, session.VisibilityLossEvents * 0.06);
+        }
+
+        if (session.FullscreenExitEvents > 0)
+        {
+            score += Math.Min(0.2, session.FullscreenExitEvents * 0.08);
         }
 
         // Factor 5: Patrón de lectura anómalo

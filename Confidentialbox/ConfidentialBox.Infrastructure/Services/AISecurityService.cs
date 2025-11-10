@@ -367,6 +367,55 @@ public class AISecurityService : IAISecurityService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<bool> IncreaseMonitoringLevelAsync(string userId, int? desiredLevel, string? reason, string? updatedByUserId)
+    {
+        var profile = await _context.UserBehaviorProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+        if (profile == null)
+        {
+            await UpdateUserBehaviorProfileAsync(userId);
+            profile = await _context.UserBehaviorProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null)
+            {
+                return false;
+            }
+        }
+
+        var targetLevel = desiredLevel.HasValue
+            ? Math.Clamp(desiredLevel.Value, 1, 5)
+            : Math.Min(5, profile.MonitoringLevel + 1);
+
+        if (targetLevel == profile.MonitoringLevel)
+        {
+            return true;
+        }
+
+        profile.MonitoringLevel = targetLevel;
+        profile.MonitoringLevelUpdatedAt = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            var prefix = string.IsNullOrWhiteSpace(profile.MonitoringNotes) ? string.Empty : profile.MonitoringNotes + "\n";
+            profile.MonitoringNotes = prefix + $"[{DateTime.UtcNow:O}] Nivel {targetLevel} - {reason}";
+        }
+
+        await _context.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(updatedByUserId))
+        {
+            await _auditLogRepository.AddAsync(new AuditLog
+            {
+                UserId = updatedByUserId,
+                Action = "MonitoringLevelChanged",
+                EntityType = "UserBehaviorProfile",
+                EntityId = userId,
+                NewValues = $"MonitoringLevel={targetLevel}",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return true;
+    }
+
     private async Task CreateSecurityAlert(
         string alertType,
         string severity,
