@@ -1,6 +1,18 @@
 const sessions = new Map();
 const pdfFrames = new Map();
 
+function forEachSessionByFrame(frameId, callback) {
+    if (!frameId) {
+        return;
+    }
+
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId) {
+            callback(state);
+        }
+    }
+}
+
 const defaultViewerSettings = {
     theme: 'dark',
     accentColor: '#f97316',
@@ -110,20 +122,34 @@ function buildWatermark(container, text, style) {
 
     const watermark = document.createElement('div');
     watermark.className = 'secure-pdf-watermark';
-    watermark.textContent = text;
+    watermark.setAttribute('aria-hidden', 'true');
+
+    const fragment = document.createDocumentFragment();
+    const rows = 5;
+    const columns = 3;
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < columns; col++) {
+            const tile = document.createElement('span');
+            tile.className = 'secure-pdf-watermark__tile';
+            tile.textContent = text;
+            fragment.appendChild(tile);
+        }
+    }
+
+    watermark.appendChild(fragment);
 
     if (style && typeof style === 'object') {
         if (style.color) {
-            watermark.style.color = style.color;
+            watermark.style.setProperty('--secure-watermark-color', style.color);
         }
 
         if (typeof style.opacity === 'number') {
-            watermark.style.opacity = `${Math.min(Math.max(style.opacity, 0), 1)}`;
+            watermark.style.setProperty('--secure-watermark-opacity', `${Math.min(Math.max(style.opacity, 0), 1)}`);
         }
 
         if (style.fontSize) {
             const size = typeof style.fontSize === 'number' ? `${style.fontSize}px` : style.fontSize;
-            watermark.style.fontSize = size;
+            watermark.style.setProperty('--secure-watermark-size', size);
         }
     }
 
@@ -282,6 +308,32 @@ function toggleSelection(container, disabled) {
     } else {
         container.classList.remove('secure-pdf-no-select');
     }
+}
+
+function clearSelectionWithin(container, targetDocument = document) {
+    if (!container || !targetDocument) {
+        return;
+    }
+
+    const selection = typeof targetDocument.getSelection === 'function'
+        ? targetDocument.getSelection()
+        : window.getSelection();
+    if (!selection || selection.isCollapsed) {
+        return;
+    }
+
+    const anchorNode = selection.anchorNode;
+    if (!anchorNode) {
+        return;
+    }
+
+    if (container.contains(anchorNode)) {
+        selection.removeAllRanges();
+    }
+}
+
+function notifyScreenshotAttempt(state, trigger) {
+    sendEvent(state, 'ScreenshotAttempt', null, { trigger });
 }
 
 function updatePageIndicator(state, pageNumber) {
@@ -573,7 +625,8 @@ function createState(sessionId, options, container) {
         zoomLabel: null,
         pageIndicator: null,
         currentPage: null,
-        disableContextMenu: false
+        disableContextMenu: false,
+        devToolsFlagged: false
     };
 }
 
@@ -600,6 +653,12 @@ export function initSecurePdfViewer(elementId, options) {
     toggleSelection(container, settings.disableTextSelection);
 
     registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
+
+    if (settings.disableTextSelection) {
+        const selectionHandler = () => clearSelectionWithin(container);
+        registerHandler(state, document, 'selectionchange', selectionHandler, true);
+        registerHandler(state, container, 'mouseup', selectionHandler, true);
+    }
 
     state.watermarkElement = buildWatermark(container, options.watermarkText, options.watermarkStyle);
 
@@ -641,11 +700,23 @@ export function initSecurePdfViewer(elementId, options) {
     };
 
     registerHandler(state, document, 'contextmenu', contextMenuHandler, true);
+    if (state.frameId) {
+        const frameElement = document.getElementById(state.frameId);
+        if (frameElement) {
+            registerHandler(state, frameElement, 'contextmenu', (event) => {
+                if (!state.disableContextMenu) {
+                    return;
+                }
+                event.preventDefault();
+                sendEvent(state, 'ContextMenuBlocked');
+            }, true);
+        }
+    }
 
     registerHandler(state, document, 'keydown', (e) => {
         const key = e.key.toLowerCase();
         if (key === 'printscreen') {
-            sendEvent(state, 'ScreenshotAttempt');
+            notifyScreenshotAttempt(state, 'KeyDown');
         }
 
         if ((e.ctrlKey || e.metaKey) && key === 'p' && !settings.allowPrint) {
@@ -659,6 +730,25 @@ export function initSecurePdfViewer(elementId, options) {
         }
     }, true);
 
+    registerHandler(state, document, 'keyup', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'printscreen') {
+            notifyScreenshotAttempt(state, 'KeyUp');
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 's') {
+            notifyScreenshotAttempt(state, 'SnippingShortcut');
+        }
+    }, true);
+
+    registerHandler(state, window, 'blur', () => {
+        sendEvent(state, 'WindowBlur');
+    });
+
+    registerHandler(state, window, 'focus', () => {
+        sendEvent(state, 'WindowFocus');
+    });
+
     if (!settings.allowCopy) {
         registerHandler(state, document, 'copy', (e) => {
             e.preventDefault();
@@ -669,7 +759,26 @@ export function initSecurePdfViewer(elementId, options) {
     registerHandler(state, document, 'visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             sendEvent(state, 'WindowHidden');
+        } else if (document.visibilityState === 'visible') {
+            sendEvent(state, 'WindowVisible');
         }
+    });
+
+    const devToolsDetector = setInterval(() => {
+        if (!state || !state.dotNetRef) {
+            return;
+        }
+
+        const widthDelta = Math.abs(window.outerWidth - window.innerWidth);
+        const heightDelta = Math.abs(window.outerHeight - window.innerHeight);
+        if ((widthDelta > 160 || heightDelta > 160) && !state.devToolsFlagged) {
+            state.devToolsFlagged = true;
+            sendEvent(state, 'DeveloperToolsDetected');
+        }
+    }, 2000);
+
+    state.handlers.push({
+        dispose: () => clearInterval(devToolsDetector)
     });
 
     const effectiveMaxMinutes = options.maxViewMinutes && options.maxViewMinutes > 0
@@ -758,17 +867,69 @@ export async function renderPdf(frameId, base64Data, fileName) {
         iframe.addEventListener('load', () => {
             viewport.dispatchEvent(new Event('scroll'));
             try {
-                const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                const frameWindow = iframe.contentWindow;
+                const frameDoc = iframe.contentDocument || frameWindow?.document;
                 if (frameDoc) {
+                    try {
+                        const styleElement = frameDoc.createElement('style');
+                        styleElement.textContent = `* { user-select: none !important; }
+                        ::selection { background: transparent !important; color: inherit !important; }`;
+                        if (frameDoc.head) {
+                            forEachSessionByFrame(frameId, (relatedState) => {
+                                if (relatedState.settings?.disableTextSelection) {
+                                    frameDoc.head.appendChild(styleElement.cloneNode(true));
+                                }
+                            });
+                        }
+                    } catch (styleErr) {
+                        console.warn('No se pudo inyectar estilos anti selección en el visor seguro', styleErr);
+                    }
+
                     frameDoc.addEventListener('contextmenu', (evt) => {
-                        const relatedStates = Array.from(sessions.values()).filter(s => s.frameId === frameId);
-                        for (const relatedState of relatedStates) {
+                        forEachSessionByFrame(frameId, (relatedState) => {
                             if (relatedState.disableContextMenu) {
                                 evt.preventDefault();
                                 sendEvent(relatedState, 'ContextMenuBlocked');
                             } else {
                                 sendEvent(relatedState, 'ContextMenuOpened');
                             }
+                        });
+                    }, true);
+
+                    frameDoc.addEventListener('selectionchange', () => {
+                        forEachSessionByFrame(frameId, (relatedState) => {
+                            if (relatedState.settings?.disableTextSelection) {
+                                clearSelectionWithin(frameDoc.body, frameDoc);
+                                sendEvent(relatedState, 'SelectionCleared');
+                            }
+                        });
+                    });
+
+                    frameDoc.addEventListener('copy', (evt) => {
+                        forEachSessionByFrame(frameId, (relatedState) => {
+                            if (!relatedState.settings?.allowCopy) {
+                                evt.preventDefault();
+                                sendEvent(relatedState, 'CopyAttempt');
+                            }
+                        });
+                    }, true);
+                }
+
+                if (frameWindow) {
+                    frameWindow.addEventListener('keyup', (evt) => {
+                        const key = evt.key.toLowerCase();
+                        if (key === 'printscreen') {
+                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameKeyUp'));
+                        }
+                    }, true);
+
+                    frameWindow.addEventListener('keydown', (evt) => {
+                        const key = evt.key.toLowerCase();
+                        if (key === 'printscreen') {
+                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameKeyDown'));
+                        }
+                        if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey && key === 's') {
+                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameSnippingShortcut'));
                         }
                     }, true);
                 }
