@@ -272,7 +272,9 @@
                     dotNetRef = dotNetReference,
                     frameId = PdfFrameElementId,
                     toolbarId = ToolbarElementId,
-                    watermarkText = viewerConfig.HasWatermark ? viewerConfig.WatermarkText : string.Empty,
+                    watermarkText = (viewerConfig.HasWatermark || (viewerConfig.ViewerSettings?.ForceGlobalWatermark ?? false))
+                        ? viewerConfig.WatermarkText
+                        : string.Empty,
                     watermarkStyle = new
                     {
                         color = viewerConfig.WatermarkColor,

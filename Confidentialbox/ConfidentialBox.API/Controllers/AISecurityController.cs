@@ -1,11 +1,15 @@
 ﻿using ConfidentialBox.Core.DTOs;
 using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
+using ConfidentialBox.Infrastructure.Repositories;
 using ConfidentialBox.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Linq;
+using System.Text.Json;
 
 namespace ConfidentialBox.API.Controllers;
 
@@ -16,13 +20,25 @@ public class AISecurityController : ControllerBase
 {
     private readonly IAISecurityService _aiSecurityService;
     private readonly ApplicationDbContext _context;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IFileRepository _fileRepository;
+    private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IClientContextResolver _clientContextResolver;
 
     public AISecurityController(
         IAISecurityService aiSecurityService,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        IFileRepository fileRepository,
+        IAuditLogRepository auditLogRepository,
+        IClientContextResolver clientContextResolver)
     {
         _aiSecurityService = aiSecurityService;
         _context = context;
+        _userManager = userManager;
+        _fileRepository = fileRepository;
+        _auditLogRepository = auditLogRepository;
+        _clientContextResolver = clientContextResolver;
     }
 
     [HttpGet("dashboard")]
@@ -46,7 +62,14 @@ public class AISecurityController : ControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? severity = null,
-        [FromQuery] bool? isReviewed = null)
+        [FromQuery] bool? isReviewed = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? userId = null,
+        [FromQuery] string? alertType = null,
+        [FromQuery] string? fileName = null,
+        [FromQuery] string? search = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
         try
         {
@@ -55,7 +78,7 @@ public class AISecurityController : ControllerBase
                 .Include(a => a.File)
                 .AsQueryable();
 
-            if (!string.IsNullOrEmpty(severity))
+            if (!string.IsNullOrWhiteSpace(severity))
             {
                 query = query.Where(a => a.Severity == severity);
             }
@@ -63,6 +86,46 @@ public class AISecurityController : ControllerBase
             if (isReviewed.HasValue)
             {
                 query = query.Where(a => a.IsReviewed == isReviewed.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(a => a.Status == status);
+            }
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                query = query.Where(a => a.UserId == userId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(alertType))
+            {
+                query = query.Where(a => a.AlertType == alertType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                query = query.Where(a => a.File != null && EF.Functions.Like(a.File.OriginalFileName, $"%{fileName}%"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(a =>
+                    EF.Functions.Like(a.Description, $"%{search}%") ||
+                    EF.Functions.Like(a.DetectedPattern, $"%{search}%") ||
+                    EF.Functions.Like(a.AlertType, $"%{search}%") ||
+                    (a.File != null && EF.Functions.Like(a.File.OriginalFileName, $"%{search}%")) ||
+                    (a.User != null && EF.Functions.Like(a.User.FirstName + " " + a.User.LastName, $"%{search}%")));
+            }
+
+            if (from.HasValue)
+            {
+                query = query.Where(a => a.DetectedAt >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                query = query.Where(a => a.DetectedAt <= to.Value);
             }
 
             var totalCount = await query.CountAsync();
@@ -76,13 +139,21 @@ public class AISecurityController : ControllerBase
                     Id = a.Id,
                     AlertType = a.AlertType,
                     Severity = a.Severity,
-                    UserName = $"{a.User.FirstName} {a.User.LastName}",
+                    Status = a.Status,
+                    UserName = a.User != null ? $"{a.User.FirstName} {a.User.LastName}" : "Usuario desconocido",
+                    UserId = a.UserId,
                     FileName = a.File != null ? a.File.OriginalFileName : null,
+                    FileId = a.FileId,
                     Description = a.Description,
                     ConfidenceScore = a.ConfidenceScore,
                     DetectedAt = a.DetectedAt,
                     IsReviewed = a.IsReviewed,
-                    ActionTaken = a.ActionTaken
+                    ActionTaken = a.ActionTaken,
+                    ReviewNotes = a.ReviewNotes,
+                    ReviewedAt = a.ReviewedAt,
+                    ReviewedByUserId = a.ReviewedByUserId,
+                    Verdict = a.Verdict,
+                    EscalationLevel = a.EscalationLevel
                 })
                 .ToListAsync();
 
@@ -100,26 +171,329 @@ public class AISecurityController : ControllerBase
         }
     }
 
-    [HttpPost("alerts/{id}/review")]
+    [HttpGet("alerts/summary")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult> ReviewAlert(int id, [FromBody] ReviewAlertRequest request)
+    public async Task<ActionResult<AlertSummaryDto>> GetAlertSummary()
     {
         try
         {
-            var alert = await _context.SecurityAlerts.FindAsync(id);
+            var alerts = await _context.SecurityAlerts.AsNoTracking().ToListAsync();
+            var statusCounts = alerts
+                .GroupBy(a => string.IsNullOrWhiteSpace(a.Status) ? "Pending" : a.Status)
+                .ToDictionary(g => g.Key, g => g.Count());
+            var severityCounts = alerts
+                .GroupBy(a => string.IsNullOrWhiteSpace(a.Severity) ? "Unknown" : a.Severity)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var summary = new AlertSummaryDto
+            {
+                StatusCounts = statusCounts,
+                SeverityCounts = severityCounts,
+                NewAlerts = alerts.Count(a => !a.IsReviewed)
+            };
+
+            return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("alerts/{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<SecurityAlertDetailDto>> GetAlertDetail(int id)
+    {
+        try
+        {
+            var alert = await _context.SecurityAlerts
+                .Include(a => a.User)
+                .Include(a => a.File)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == id);
+
             if (alert == null)
             {
                 return NotFound();
             }
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var actions = await _context.SecurityAlertActions
+                .Include(a => a.CreatedByUser)
+                .Include(a => a.TargetUser)
+                .Include(a => a.TargetFile)
+                .Where(a => a.AlertId == id)
+                .OrderByDescending(a => a.CreatedAt)
+                .AsNoTracking()
+                .ToListAsync();
 
-            alert.IsReviewed = true;
-            alert.ReviewedAt = DateTime.UtcNow;
-            alert.ReviewedByUserId = userId;
+            FileAccess? latestAccess = null;
+            if (!string.IsNullOrWhiteSpace(alert.UserId))
+            {
+                latestAccess = await _fileAccessRepository.GetLatestAccessForUserAsync(alert.UserId, alert.FileId);
+            }
+
+            var dto = new SecurityAlertDetailDto
+            {
+                Alert = new SecurityAlertDto
+                {
+                    Id = alert.Id,
+                    AlertType = alert.AlertType,
+                    Severity = alert.Severity,
+                    Status = alert.Status,
+                    UserName = alert.User != null ? $"{alert.User.FirstName} {alert.User.LastName}" : "Usuario desconocido",
+                    UserId = alert.UserId,
+                    FileName = alert.File?.OriginalFileName,
+                    FileId = alert.FileId,
+                    Description = alert.Description,
+                    ConfidenceScore = alert.ConfidenceScore,
+                    DetectedAt = alert.DetectedAt,
+                    IsReviewed = alert.IsReviewed,
+                    ActionTaken = alert.ActionTaken,
+                    ReviewNotes = alert.ReviewNotes,
+                    ReviewedAt = alert.ReviewedAt,
+                    ReviewedByUserId = alert.ReviewedByUserId,
+                    Verdict = alert.Verdict,
+                    EscalationLevel = alert.EscalationLevel
+                },
+                Actions = actions.Select(a => new SecurityAlertActionDto
+                {
+                    Id = a.Id,
+                    ActionType = a.ActionType,
+                    Notes = a.Notes,
+                    Metadata = a.Metadata,
+                    CreatedAt = a.CreatedAt,
+                    CreatedByUserId = a.CreatedByUserId,
+                    CreatedByUserName = a.CreatedByUser != null ? $"{a.CreatedByUser.FirstName} {a.CreatedByUser.LastName}" : null,
+                    TargetUserId = a.TargetUserId,
+                    TargetUserName = a.TargetUser != null ? $"{a.TargetUser.FirstName} {a.TargetUser.LastName}" : null,
+                    TargetFileId = a.TargetFileId,
+                    TargetFileName = a.TargetFile?.OriginalFileName,
+                    StatusAfterAction = a.StatusAfterAction
+                }).ToList(),
+                CanBlockFile = true,
+                CanBlockUser = true,
+                CanEscalateMonitoring = true,
+                LatestAccess = latestAccess == null ? null : new FileAccessLogDto
+                {
+                    Id = latestAccess.Id,
+                    AccessedAt = latestAccess.AccessedAt,
+                    WasAuthorized = latestAccess.WasAuthorized,
+                    Action = latestAccess.Action,
+                    AccessedByUserName = latestAccess.AccessedByUser != null ? $"{latestAccess.AccessedByUser.FirstName} {latestAccess.AccessedByUser.LastName}" : null,
+                    AccessedByIp = latestAccess.AccessedByIP,
+                    UserAgent = latestAccess.UserAgent,
+                    DeviceName = latestAccess.DeviceName,
+                    DeviceType = latestAccess.DeviceType,
+                    OperatingSystem = latestAccess.OperatingSystem,
+                    Browser = latestAccess.Browser,
+                    Location = latestAccess.Location,
+                    Latitude = latestAccess.Latitude,
+                    Longitude = latestAccess.Longitude
+                }
+            };
+
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("alerts/{id}/review")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> ReviewAlert(int id, [FromBody] ReviewAlertRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest(new { error = "Solicitud inválida" });
+        }
+
+        try
+        {
+            var alert = await _context.SecurityAlerts
+                .Include(a => a.File)
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (alert == null)
+            {
+                return NotFound();
+            }
+
+            var reviewerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var normalizedStatus = NormalizeStatus(request.Status);
+
+            alert.Status = normalizedStatus;
             alert.ReviewNotes = request.ReviewNotes;
-            alert.IsActionTaken = !string.IsNullOrEmpty(request.ActionTaken);
+            alert.Verdict = request.Verdict;
             alert.ActionTaken = request.ActionTaken;
+            alert.IsActionTaken = alert.IsActionTaken || !string.IsNullOrWhiteSpace(request.ActionTaken) || (request.Actions?.Any() == true);
+            alert.IsReviewed = !string.Equals(normalizedStatus, "Pending", StringComparison.OrdinalIgnoreCase);
+            alert.ReviewedAt = DateTime.UtcNow;
+            alert.ReviewedByUserId = reviewerId;
+
+            var actions = new List<SecurityAlertAction>();
+            var clientContext = await _clientContextResolver.ResolveAsync(HttpContext);
+
+            if (request.Actions != null)
+            {
+                foreach (var command in request.Actions)
+                {
+                    if (command == null || string.IsNullOrWhiteSpace(command.ActionType))
+                    {
+                        continue;
+                    }
+
+                    var actionType = command.ActionType.Trim().ToLowerInvariant();
+                    switch (actionType)
+                    {
+                        case "blockfile":
+                        {
+                            var targetFileId = command.TargetFileId ?? alert.FileId;
+                            if (targetFileId.HasValue)
+                            {
+                                var file = await _fileRepository.GetByIdAsync(targetFileId.Value);
+                                if (file != null)
+                                {
+                                    file.IsBlocked = true;
+                                    file.BlockReason = command.Notes ?? request.Verdict ?? "Bloqueado desde alerta";
+                                    await _fileRepository.UpdateAsync(file);
+
+                                    actions.Add(new SecurityAlertAction
+                                    {
+                                        AlertId = alert.Id,
+                                        ActionType = "BlockFile",
+                                        Notes = command.Notes,
+                                        Metadata = JsonSerializer.Serialize(new { file.Id, file.OriginalFileName, file.BlockReason }),
+                                        CreatedAt = DateTime.UtcNow,
+                                        CreatedByUserId = reviewerId,
+                                        TargetFileId = file.Id,
+                                        StatusAfterAction = alert.Status
+                                    });
+
+                                    await RegisterAuditAsync(reviewerId, "AlertBlockFile", "SharedFile", file.Id.ToString(), command.Notes, clientContext);
+                                }
+                            }
+                            break;
+                        }
+
+                        case "blockuser":
+                        {
+                            var targetUserId = command.TargetUserId ?? alert.UserId;
+                            if (!string.IsNullOrEmpty(targetUserId))
+                            {
+                                var targetUser = await _userManager.FindByIdAsync(targetUserId);
+                                if (targetUser != null)
+                                {
+                                    targetUser.IsActive = false;
+                                    await _userManager.UpdateAsync(targetUser);
+
+                                    actions.Add(new SecurityAlertAction
+                                    {
+                                        AlertId = alert.Id,
+                                        ActionType = "BlockUser",
+                                        Notes = command.Notes,
+                                        Metadata = JsonSerializer.Serialize(new { targetUser.Id, targetUser.Email }),
+                                        CreatedAt = DateTime.UtcNow,
+                                        CreatedByUserId = reviewerId,
+                                        TargetUserId = targetUser.Id,
+                                        StatusAfterAction = alert.Status
+                                    });
+
+                                    await RegisterAuditAsync(reviewerId, "AlertDeactivateUser", "ApplicationUser", targetUser.Id, command.Notes, clientContext);
+                                }
+                            }
+                            break;
+                        }
+
+                        case "increasemonitoring":
+                        case "monitoring":
+                        case "escalatemonitoring":
+                        {
+                            var targetUserId = command.TargetUserId ?? alert.UserId;
+                            if (!string.IsNullOrEmpty(targetUserId))
+                            {
+                                await _aiSecurityService.IncreaseMonitoringLevelAsync(targetUserId, command.MonitoringLevel, command.Notes ?? request.ReviewNotes, reviewerId);
+
+                                actions.Add(new SecurityAlertAction
+                                {
+                                    AlertId = alert.Id,
+                                    ActionType = "IncreaseMonitoring",
+                                    Notes = command.Notes,
+                                    Metadata = JsonSerializer.Serialize(new { targetUserId, Level = command.MonitoringLevel }),
+                                    CreatedAt = DateTime.UtcNow,
+                                    CreatedByUserId = reviewerId,
+                                    TargetUserId = targetUserId,
+                                    StatusAfterAction = alert.Status
+                                });
+
+                                await RegisterAuditAsync(reviewerId, "AlertMonitoringEscalated", "ApplicationUser", targetUserId, command.Notes, clientContext);
+                            }
+                            break;
+                        }
+
+                        case "message":
+                        case "note":
+                        {
+                            actions.Add(new SecurityAlertAction
+                            {
+                                AlertId = alert.Id,
+                                ActionType = "Message",
+                                Notes = command.Notes,
+                                Metadata = command.Metadata,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByUserId = reviewerId,
+                                TargetUserId = command.TargetUserId,
+                                TargetFileId = command.TargetFileId,
+                                StatusAfterAction = alert.Status
+                            });
+                            break;
+                        }
+
+                        case "escalate":
+                        {
+                            alert.EscalationLevel = Math.Max(alert.EscalationLevel + 1, command.MonitoringLevel ?? (alert.EscalationLevel + 1));
+                            actions.Add(new SecurityAlertAction
+                            {
+                                AlertId = alert.Id,
+                                ActionType = "Escalate",
+                                Notes = command.Notes,
+                                Metadata = JsonSerializer.Serialize(new { alert.EscalationLevel }),
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByUserId = reviewerId,
+                                StatusAfterAction = alert.Status
+                            });
+                            break;
+                        }
+
+                        case "status":
+                        {
+                            var newStatus = NormalizeStatus(command.Notes);
+                            alert.Status = newStatus;
+                            alert.IsReviewed = !string.Equals(newStatus, "Pending", StringComparison.OrdinalIgnoreCase);
+                            actions.Add(new SecurityAlertAction
+                            {
+                                AlertId = alert.Id,
+                                ActionType = "StatusChange",
+                                Notes = newStatus,
+                                Metadata = command.Metadata,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByUserId = reviewerId,
+                                StatusAfterAction = alert.Status
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+
+            _context.SecurityAlerts.Update(alert);
+
+            if (actions.Count > 0)
+            {
+                _context.SecurityAlertActions.AddRange(actions);
+            }
 
             await _context.SaveChangesAsync();
 
@@ -164,6 +538,53 @@ public class AISecurityController : ControllerBase
         {
             return StatusCode(500, new { error = ex.Message });
         }
+    }
+
+    private async Task RegisterAuditAsync(string? userId, string action, string entityType, string? entityId, string? notes, ClientContext context)
+    {
+        if (string.IsNullOrEmpty(userId))
+        {
+            return;
+        }
+
+        var log = new AuditLog
+        {
+            UserId = userId,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            NewValues = notes,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = context.IpAddress,
+            UserAgent = context.UserAgent,
+            DeviceName = context.DeviceName,
+            DeviceType = context.DeviceType,
+            OperatingSystem = context.OperatingSystem,
+            Browser = context.Browser,
+            Location = context.Location,
+            Latitude = context.Latitude,
+            Longitude = context.Longitude
+        };
+
+        await _auditLogRepository.AddAsync(log);
+    }
+
+    private static string NormalizeStatus(string? rawStatus)
+    {
+        if (string.IsNullOrWhiteSpace(rawStatus))
+        {
+            return "Pending";
+        }
+
+        return rawStatus.Trim().ToLowerInvariant() switch
+        {
+            "pending" or "pendiente" => "Pending",
+            "investigating" or "investigacion" or "investigando" or "inreview" => "Investigating",
+            "escalated" or "escalada" or "escalate" => "Escalated",
+            "resolved" or "resuelta" or "solved" => "Resolved",
+            "dismissed" or "descartada" or "closed" => "Dismissed",
+            _ => "Pending"
+        };
     }
 
     [HttpGet("high-risk-users")]

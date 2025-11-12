@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Security.Claims;
+using ConfidentialBox.Infrastructure.Repositories;
+using ConfidentialBox.Infrastructure.Services;
 
 namespace ConfidentialBox.API.Controllers;
 
@@ -14,10 +17,14 @@ namespace ConfidentialBox.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IClientContextResolver _clientContextResolver;
 
-    public UsersController(UserManager<ApplicationUser> userManager)
+    public UsersController(UserManager<ApplicationUser> userManager, IAuditLogRepository auditLogRepository, IClientContextResolver clientContextResolver)
     {
         _userManager = userManager;
+        _auditLogRepository = auditLogRepository;
+        _clientContextResolver = clientContextResolver;
     }
 
     [HttpGet]
@@ -115,18 +122,22 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}/toggle-active")]
-    public async Task<ActionResult> ToggleActive(string id)
+    public async Task<ActionResult<OperationResultDto>> ToggleActive(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null)
         {
-            return NotFound();
+            return NotFound(new OperationResultDto { Success = false, Error = "Usuario no encontrado" });
         }
 
         user.IsActive = !user.IsActive;
         await _userManager.UpdateAsync(user);
 
-        return Ok();
+        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(actorId, user.IsActive ? "UserActivated" : "UserDeactivated", "ApplicationUser", id, null, context);
+
+        return Ok(new OperationResultDto { Success = true });
     }
 
     [HttpPut("{id}/roles")]
@@ -142,43 +153,172 @@ public class UsersController : ControllerBase
         await _userManager.RemoveFromRolesAsync(user, currentRoles);
         await _userManager.AddToRolesAsync(user, roles);
 
+        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(actorId, "UserRolesUpdated", "ApplicationUser", id, string.Join(",", roles), context);
+
         return Ok();
     }
 
-    [HttpDelete("{id}")]
-    public async Task<ActionResult<OperationResultDto>> Delete(string id)
+    [HttpPut("{id}/password")]
+    public async Task<ActionResult<OperationResultDto>> ChangePassword(string id, [FromBody] ChangeUserPasswordRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            return BadRequest(new OperationResultDto { Success = false, Error = "La nueva contraseña es obligatoria" });
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound(new OperationResultDto { Success = false, Error = "Usuario no encontrado" });
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var resetResult = await _userManager.ResetPasswordAsync(user, resetToken, request.NewPassword);
+        if (!resetResult.Succeeded)
+        {
+            var detail = string.Join("; ", resetResult.Errors.Select(e => e.Description));
+            return BadRequest(new OperationResultDto { Success = false, Detail = detail });
+        }
+
+        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(actorId, "UserPasswordReset", "ApplicationUser", id, request.Reason, context);
+
+        return Ok(new OperationResultDto { Success = true });
+    }
+
+    [HttpPut("{id}/profile")]
+    public async Task<ActionResult<UserDto>> UpdateProfile(string id, [FromBody] UpdateUserProfileRequest request)
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user == null)
         {
-            return NotFound(new OperationResultDto
-            {
-                Success = false,
-                Error = "Usuario no encontrado"
-            });
+            return NotFound();
         }
+
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            user.Email = request.Email;
+            user.UserName = request.Email;
+        }
+
+        await _userManager.UpdateAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
-        if (roles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(actorId, "UserProfileUpdated", "ApplicationUser", id, $"{request.FirstName} {request.LastName}", context);
+
+        return Ok(new UserDto
         {
-            return BadRequest(new OperationResultDto
-            {
-                Success = false,
-                Error = "Los usuarios administradores no pueden ser eliminados."
-            });
+            Id = user.Id,
+            Email = user.Email!,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FullName = $"{user.FirstName} {user.LastName}",
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt,
+            Roles = roles.ToList()
+        });
+    }
+
+    [HttpGet("{id}/audit")]
+    public async Task<ActionResult<List<AuditLogDto>>> GetUserAudit(string id, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+    {
+        var logs = await _auditLogRepository.GetByUserIdAsync(id, pageNumber, pageSize);
+        var dtos = logs.Select(l => new AuditLogDto
+        {
+            Id = l.Id,
+            UserName = l.User != null ? $"{l.User.FirstName} {l.User.LastName}" : l.UserId,
+            Action = l.Action,
+            EntityType = l.EntityType,
+            EntityId = l.EntityId,
+            Timestamp = l.Timestamp,
+            IpAddress = l.IpAddress,
+            DeviceName = l.DeviceName,
+            DeviceType = l.DeviceType,
+            OperatingSystem = l.OperatingSystem,
+            Browser = l.Browser,
+            Location = l.Location,
+            Latitude = l.Latitude,
+            Longitude = l.Longitude,
+            UserAgent = l.UserAgent
+        }).ToList();
+
+        return Ok(dtos);
+    }
+
+    [HttpPut("me/profile")]
+    public async Task<ActionResult<OperationResultDto>> UpdateMyProfile([FromBody] SelfProfileUpdateRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new OperationResultDto { Success = false, Error = "Sesión inválida" });
         }
 
-        var result = await _userManager.DeleteAsync(user);
-        if (!result.Succeeded)
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
         {
-            var error = result.Errors.FirstOrDefault()?.Description ?? "No fue posible eliminar el usuario.";
-            return BadRequest(new OperationResultDto
-            {
-                Success = false,
-                Error = error
-            });
+            return Unauthorized(new OperationResultDto { Success = false, Error = "Sesión inválida" });
         }
+
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        user.PhoneNumber = request.PhoneNumber;
+
+        await _userManager.UpdateAsync(user);
+
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(userId, "SelfProfileUpdated", "ApplicationUser", userId, null, context);
 
         return Ok(new OperationResultDto { Success = true });
+    }
+
+    [HttpPut("me/password")]
+    public async Task<ActionResult<OperationResultDto>> ChangeMyPassword([FromBody] ChangeOwnPasswordRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.NewPassword) || string.IsNullOrWhiteSpace(request.CurrentPassword))
+        {
+            return BadRequest(new OperationResultDto { Success = false, Error = "Debes ingresar la contraseña actual y la nueva contraseña" });
+        }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new OperationResultDto { Success = false, Error = "Sesión inválida" });
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized(new OperationResultDto { Success = false, Error = "Sesión inválida" });
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var detail = string.Join("; ", result.Errors.Select(e => e.Description));
+            return BadRequest(new OperationResultDto { Success = false, Detail = detail });
+        }
+
+        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        await RegisterAuditAsync(userId, "SelfPasswordChanged", "ApplicationUser", userId, null, context);
+        return Ok(new OperationResultDto { Success = true });
+    }
+
+    [HttpDelete("{id}")]
+    public ActionResult<OperationResultDto> Delete(string id)
+    {
+        return BadRequest(new OperationResultDto
+        {
+            Success = false,
+            Error = "La eliminación de usuarios está deshabilitada. Desactiva el usuario en su lugar."
+        });
     }
 }

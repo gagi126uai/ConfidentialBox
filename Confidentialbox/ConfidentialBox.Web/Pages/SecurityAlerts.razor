@@ -1,88 +1,168 @@
-﻿@page "/security-alerts"
-@using Microsoft.AspNetCore.Authorization
+@page "/security-alerts"
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.WebUtilities
+@using ConfidentialBox.Core.DTOs
+@using System.Globalization
+@using System.Linq
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
+@inject NavigationManager NavigationManager
 
 <PageTitle>Alertas de Seguridad - ConfidentialBox</PageTitle>
 
-<h1><i class="fas fa-shield-alt"></i> Alertas de Seguridad</h1>
+<h1 class="d-flex align-items-center gap-2 mb-0">
+    <i class="fas fa-shield-alt text-danger"></i>
+    <span>Alertas de Seguridad</span>
+</h1>
+<p class="text-muted">Monitorea, filtra y actúa sobre los incidentes detectados por la IA en tiempo real.</p>
 
-<div class="card mt-4">
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>@error
+        <button type="button" class="btn-close" @onclick="() => error = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-white">
+        <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+            <div class="d-flex flex-wrap gap-3">
+                <span class="badge rounded-pill text-bg-danger-subtle text-danger fw-semibold px-3 py-2">
+                    <i class="fas fa-bell me-1"></i> Nuevas alertas: @((summary?.NewAlerts ?? 0).ToString(CultureInfo.InvariantCulture))
+                </span>
+                @if (summary?.SeverityCounts?.Any() == true)
+                {
+                    foreach (var pair in summary.SeverityCounts.OrderByDescending(p => SeverityOrder(p.Key)))
+                    {
+                        <span class="badge rounded-pill bg-light text-dark border">
+                            <i class="fas fa-signal me-1"></i>@pair.Key: @pair.Value
+                        </span>
+                    }
+                }
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="RefreshAsync">
+                <i class="fas fa-sync-alt"></i> Actualizar
+            </button>
+        </div>
+    </div>
     <div class="card-body">
-        <div class="row mb-3">
+        <div class="row g-3 align-items-end">
             <div class="col-md-3">
-                <select class="form-select" @bind="filterSeverity">
-                    <option value="">Todas las severidades</option>
-                    <option value="Critical">Críticas</option>
-                    <option value="High">Altas</option>
-                    <option value="Medium">Medias</option>
-                    <option value="Low">Bajas</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" @bind="filterReviewed">
+                <label class="form-label">Severidad</label>
+                <InputSelect class="form-select" @bind-Value="filterSeverity">
                     <option value="">Todas</option>
-                    <option value="false">Sin revisar</option>
-                    <option value="true">Revisadas</option>
-                </select>
+                    @foreach (var level in SeverityOptions)
+                    {
+                        <option value="@level">@level</option>
+                    }
+                </InputSelect>
             </div>
-            <div class="col-md-2">
-                <button class="btn btn-primary w-100" @onclick="ApplyFilters">
-                    <i class="fas fa-search"></i> Buscar
+            <div class="col-md-3">
+                <label class="form-label">Usuario</label>
+                <InputSelect class="form-select" @bind-Value="filterUserId">
+                    <option value="">Todos</option>
+                    @foreach (var user in availableUsers)
+                    {
+                        <option value="@user.Id">@user.FullName (@user.Email)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tipo de alerta</label>
+                <InputText class="form-control" @bind-Value="filterType" placeholder="Ej. SuspiciousFile" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Archivo involucrado</label>
+                <InputText class="form-control" @bind-Value="filterFileName" placeholder="Nombre del archivo" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Descripción / palabra clave</label>
+                <InputText class="form-control" @bind-Value="filterDescription" placeholder="Motivo, patrón o detalle" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Desde</label>
+                <InputDate class="form-control" @bind-Value="filterFrom" TValue="DateTime?" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Hasta</label>
+                <InputDate class="form-control" @bind-Value="filterTo" TValue="DateTime?" />
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" @onclick="ApplyFilters">
+                    <i class="fas fa-filter me-1"></i> Aplicar filtros
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="ResetFilters">
+                    <i class="fas fa-eraser me-1"></i> Limpiar
                 </button>
             </div>
         </div>
 
-        @if (!string.IsNullOrEmpty(error))
-        {
-            <div class="alert alert-danger">@error</div>
-        }
+        <ul class="nav nav-pills mt-4 mb-3 flex-wrap gap-2">
+            @foreach (var tab in StatusTabs)
+            {
+                var isActive = activeStatusTab.Equals(tab.Key, StringComparison.OrdinalIgnoreCase);
+                var badgeClass = isActive ? "bg-white text-primary" : "bg-light text-dark";
+                <li class="nav-item">
+                    <button type="button"
+                            class="nav-link d-flex align-items-center gap-2 @(isActive ? "active" : string.Empty)"
+                            @onclick="() => ChangeStatusTab(tab.Key)">
+                        <span>@tab.Value</span>
+                        <span class="badge @badgeClass">@GetStatusCount(tab.Key)</span>
+                    </button>
+                </li>
+            }
+        </ul>
 
         @if (isLoading)
         {
             <div class="text-center my-5">
                 <div class="spinner-border" role="status"></div>
+                <p class="mt-3 text-muted">Cargando alertas monitorizadas…</p>
             </div>
         }
-        else if (alerts != null && alerts.Items.Any())
+        else if (alerts is null || alerts.Items.Count == 0)
+        {
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-check-circle me-2"></i>No se encontraron alertas que coincidan con los filtros seleccionados.
+            </div>
+        }
+        else
         {
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
                             <th>Tipo</th>
                             <th>Severidad</th>
+                            <th>Estado</th>
                             <th>Usuario</th>
                             <th>Archivo</th>
                             <th>Descripción</th>
                             <th>Confianza</th>
-                            <th>Fecha</th>
-                            <th>Acciones</th>
+                            <th>Detectada</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var alert in alerts.Items)
                         {
-                            <tr class="@(alert.IsReviewed ? "" : "table-warning")">
+                            <tr class="@(alert.IsReviewed ? string.Empty : "table-warning")">
                                 <td><span class="badge bg-secondary">@alert.AlertType</span></td>
                                 <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
-                                <td>@alert.UserName</td>
-                                <td>@(alert.FileName ?? "-")</td>
-                                <td><small>@alert.Description</small></td>
+                                <td>@(RenderStatusBadgeMarkup(alert.Status))</td>
+                                <td>@(string.IsNullOrWhiteSpace(alert.UserName) ? "-" : alert.UserName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(alert.FileName) ? "-" : alert.FileName)</td>
+                                <td style="max-width: 280px;"><small>@alert.Description</small></td>
                                 <td>@($"{alert.ConfidenceScore * 100:F0}%")</td>
-                                <td>@alert.DetectedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>
-                                    @if (!alert.IsReviewed)
-                                    {
-                                        <button class="btn btn-sm btn-primary" @onclick="() => ShowReviewModal(alert)">
-                                            <i class="fas fa-check"></i> Revisar
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-success">Revisada</span>
-                                    }
+                                <td>@alert.DetectedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => ShowReviewModal(alert)">
+                                        <i class="fas fa-clipboard-check"></i> Revisar
+                                    </button>
                                 </td>
                             </tr>
                         }
@@ -90,31 +170,23 @@
                 </table>
             </div>
 
-            <nav>
+            <nav class="mt-3">
                 <ul class="pagination justify-content-center">
-                    <li class="page-item @(alerts.HasPreviousPage ? "" : "disabled")">
-                        <button class="page-link"
-                                disabled="@(alerts is null || !alerts.HasPreviousPage)"
-                                @onclick="() => ChangePage(alerts!.PageNumber - 1)">
+                    <li class="page-item @(alerts.HasPreviousPage ? string.Empty : "disabled")">
+                        <button class="page-link" @onclick="() => ChangePage(alerts.PageNumber - 1)" disabled="@(!alerts.HasPreviousPage)">
                             Anterior
                         </button>
                     </li>
                     <li class="page-item disabled">
                         <span class="page-link">Página @alerts.PageNumber de @alerts.TotalPages</span>
                     </li>
-                    <li class="page-item @(alerts.HasNextPage ? "" : "disabled")">
-                        <button class="page-link"
-                                disabled="@(alerts is null || !alerts.HasNextPage)"
-                                @onclick="() => ChangePage(alerts!.PageNumber + 1)">
+                    <li class="page-item @(alerts.HasNextPage ? string.Empty : "disabled")">
+                        <button class="page-link" @onclick="() => ChangePage(alerts.PageNumber + 1)" disabled="@(!alerts.HasNextPage)">
                             Siguiente
                         </button>
                     </li>
                 </ul>
             </nav>
-        }
-        else
-        {
-            <div class="alert alert-info">No hay alertas para mostrar</div>
         }
     </div>
 </div>
@@ -122,66 +194,183 @@
 @if (showReviewModal && selectedAlert != null)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(15, 23, 42, 0.65);">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-clipboard-check me-2"></i> Revisar alerta de seguridad</h5>
+                    <div>
+                        <h5 class="modal-title d-flex align-items-center gap-2">
+                            <i class="fas fa-clipboard-list text-primary"></i>
+                            <span>Revisar alerta @("#" + selectedAlert.Id)</span>
+                        </h5>
+                        <small class="text-muted">Detectada el @selectedAlert.DetectedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                    </div>
                     <button type="button" class="btn-close" @onclick="CloseReviewModal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Descripción</label>
-                        <p class="form-control-plaintext">@selectedAlert.Description</p>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Usuario</label>
-                            <p class="form-control-plaintext">@selectedAlert.UserName</p>
+                    @if (detailLoading)
+                    {
+                        <div class="text-center my-4">
+                            <div class="spinner-border" role="status"></div>
+                            <p class="mt-2 text-muted">Recuperando detalles y auditoría…</p>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Archivo</label>
-                            <p class="form-control-plaintext">@(selectedAlert.FileName ?? "-")</p>
-                        </div>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Severidad</label>
-                            <span class="badge bg-@GetSeverityColor(selectedAlert.Severity)">@selectedAlert.Severity</span>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Confianza</label>
-                            <span class="badge bg-secondary">@($"{selectedAlert.ConfidenceScore * 100:F0}%")</span>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Detectada</label>
-                            <p class="form-control-plaintext">@selectedAlert.DetectedAt.ToString("dd/MM/yyyy HH:mm")</p>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Notas de revisión</label>
-                        <textarea class="form-control" rows="3" @bind="reviewNotes" placeholder="Acciones tomadas, hallazgos o recomendaciones"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Acción tomada (opcional)</label>
-                        <input class="form-control" @bind="actionTaken" placeholder="Ej. Bloqueo de usuario, reseteo de credenciales" />
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(reviewError))
+                    }
+                    else if (!string.IsNullOrEmpty(reviewError) && alertDetail is null)
                     {
                         <div class="alert alert-danger">@reviewError</div>
                     }
+                    else if (alertDetail is not null)
+                    {
+                        <div class="row g-4">
+                            <div class="col-lg-7">
+                                <div class="border rounded p-3 h-100">
+                                    <h6 class="fw-semibold mb-3">Resumen de la alerta</h6>
+                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                        <span class="badge bg-secondary"><i class="fas fa-tag me-1"></i>@alertDetail.Alert.AlertType</span>
+                                        <span class="badge bg-@GetSeverityColor(alertDetail.Alert.Severity)">@alertDetail.Alert.Severity</span>
+                                        @(RenderStatusBadgeMarkup(alertDetail.Alert.Status))
+                                        <span class="badge bg-info text-dark">Confianza @($"{alertDetail.Alert.ConfidenceScore * 100:F0}%")</span>
+                                    </div>
+                                    <p class="mb-2"><strong>Usuario:</strong> @(string.IsNullOrWhiteSpace(alertDetail.Alert.UserName) ? "-" : alertDetail.Alert.UserName)</p>
+                                    <p class="mb-2"><strong>Archivo:</strong> @(string.IsNullOrWhiteSpace(alertDetail.Alert.FileName) ? "-" : alertDetail.Alert.FileName)</p>
+                                    <p class="mb-2"><strong>Descripción:</strong> @alertDetail.Alert.Description</p>
+                                    @if (!string.IsNullOrWhiteSpace(alertDetail.Alert.ReviewNotes))
+                                    {
+                                        <div class="alert alert-info py-2"><i class="fas fa-sticky-note me-1"></i>Notas previas: @alertDetail.Alert.ReviewNotes</div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-lg-5">
+                                <div class="border rounded p-3 h-100">
+                                    <h6 class="fw-semibold mb-3">Último acceso monitorizado</h6>
+                                    @if (alertDetail.LatestAccess is null)
+                                    {
+                                        <p class="text-muted mb-0">No hay accesos auditados para este evento.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="list-unstyled small mb-0">
+                                            <li><strong>IP:</strong> @alertDetail.LatestAccess.AccessedByIp</li>
+                                            <li><strong>Dispositivo:</strong> @(string.IsNullOrWhiteSpace(alertDetail.LatestAccess.DeviceName) ? alertDetail.LatestAccess.DeviceType ?? "-" : alertDetail.LatestAccess.DeviceName)</li>
+                                            <li><strong>SO / Navegador:</strong> @(string.IsNullOrWhiteSpace(alertDetail.LatestAccess.OperatingSystem) ? "-" : alertDetail.LatestAccess.OperatingSystem) / @(string.IsNullOrWhiteSpace(alertDetail.LatestAccess.Browser) ? "-" : alertDetail.LatestAccess.Browser)</li>
+                                            <li><strong>Ubicación:</strong> @(string.IsNullOrWhiteSpace(alertDetail.LatestAccess.Location) ? "-" : alertDetail.LatestAccess.Location)</li>
+                                            <li><strong>Fecha:</strong> @alertDetail.LatestAccess.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</li>
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="row g-4">
+                            <div class="col-lg-7">
+                                <h6 class="fw-semibold mb-3">Definir dictamen</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <InputSelect class="form-select" @bind-Value="selectedStatusForReview">
+                                            @foreach (var option in StatusTabs.Where(s => !s.Key.Equals("all", StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <option value="@option.Key">@option.Value</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Dictamen</label>
+                                        <InputText class="form-control" @bind-Value="reviewVerdict" placeholder="Ej. Bloqueado, Escalado, Falso positivo" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Notas de revisión</label>
+                                        <InputTextArea class="form-control" @bind-Value="reviewNotes" rows="3" placeholder="Descripción de hallazgos y seguimiento" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Acción resumida (visible en tablero)</label>
+                                        <InputText class="form-control" @bind-Value="actionTaken" placeholder="Ej. Usuario bloqueado temporalmente" />
+                                    </div>
+                                </div>
+
+                                <div class="mt-4">
+                                    <h6 class="fw-semibold mb-2">Acciones automáticas</h6>
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" id="blockFileCheck" @bind-Value="blockFileAction" disabled="@(selectedAlert.FileId is null)" />
+                                        <label class="form-check-label" for="blockFileCheck">Bloquear archivo compartido</label>
+                                    </div>
+                                    @if (blockFileAction)
+                                    {
+                                        <InputTextArea class="form-control mb-3" @bind-Value="blockFileNotes" rows="2" placeholder="Motivo del bloqueo" />
+                                    }
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" id="blockUserCheck" @bind-Value="blockUserAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                        <label class="form-check-label" for="blockUserCheck">Desactivar usuario involucrado</label>
+                                    </div>
+                                    @if (blockUserAction)
+                                    {
+                                        <InputTextArea class="form-control mb-3" @bind-Value="blockUserNotes" rows="2" placeholder="Detalle para la auditoría" />
+                                    }
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" id="escalateCheck" @bind-Value="escalateMonitoring" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                        <label class="form-check-label" for="escalateCheck">Aumentar nivel de seguimiento del usuario</label>
+                                    </div>
+                                    @if (escalateMonitoring)
+                                    {
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-sm-6">
+                                                <label class="form-label">Nuevo nivel</label>
+                                                <InputNumber class="form-control" @bind-Value="monitoringLevel" Min="1" />
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <label class="form-label">Notas</label>
+                                                <InputText class="form-control" @bind-Value="escalationNotes" />
+                                            </div>
+                                        </div>
+                                    }
+                                    <label class="form-label">Mensaje interno al usuario</label>
+                                    <InputTextArea class="form-control" @bind-Value="chatMessage" rows="2" placeholder="Consulta o aviso para el usuario (opcional)" />
+                                </div>
+                            </div>
+
+                            <div class="col-lg-5">
+                                <h6 class="fw-semibold mb-3">Historial de acciones</h6>
+                                @if (alertDetail.Actions.Count == 0)
+                                {
+                                    <p class="text-muted">Aún no se registraron acciones sobre esta alerta.</p>
+                                }
+                                else
+                                {
+                                    <div class="timeline-small">
+                                        @foreach (var action in alertDetail.Actions)
+                                        {
+                                            <div class="timeline-item">
+                                                <div class="timeline-time">@action.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                                <div class="timeline-body">
+                                                    <strong>@action.ActionType</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(action.Notes))
+                                                    {
+                                                        <div>@action.Notes</div>
+                                                    }
+                                                    <small class="text-muted">@(string.IsNullOrWhiteSpace(action.CreatedByUserName) ? "Sistema" : action.CreatedByUserName)</small>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(reviewError) && alertDetail is not null)
+                    {
+                        <div class="alert alert-danger mt-3">@reviewError</div>
+                    }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseReviewModal" disabled="@reviewSubmitting">
-                        Cancelar
-                    </button>
-                    <button class="btn btn-primary" type="button" @onclick="SubmitReview" disabled="@reviewSubmitting">
+                    <button class="btn btn-outline-secondary" @onclick="CloseReviewModal" disabled="@reviewSubmitting">Cancelar</button>
+                    <button class="btn btn-primary" @onclick="SubmitReview" disabled="@reviewSubmitting">
                         @if (reviewSubmitting)
                         {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
                         }
-                        Confirmar revisión
+                        Guardar dictamen
                     </button>
                 </div>
             </div>
@@ -189,37 +378,148 @@
     </div>
     <div class="modal-backdrop fade show"></div>
 }
+
 @code {
+    private const int PageSize = 20;
+    private readonly Dictionary<string, string> StatusTabs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["all"] = "Todas",
+        ["Pending"] = "A revisar",
+        ["Investigating"] = "En investigación",
+        ["Escalated"] = "Escaladas",
+        ["Resolved"] = "Resueltas",
+        ["Dismissed"] = "Descartadas"
+    };
+    private readonly string[] SeverityOptions = new[] { "Critical", "High", "Medium", "Low" };
+
+    private AlertSummaryDto? summary;
     private PagedResult<SecurityAlertDto>? alerts;
+    private List<UserDto> availableUsers = new();
+    private SecurityAlertDto? selectedAlert;
+    private SecurityAlertDetailDto? alertDetail;
+
+    private string activeStatusTab = "all";
+    private string? filterSeverity;
+    private string? filterType;
+    private string? filterUserId;
+    private string? filterFileName;
+    private string? filterDescription;
+    private DateTime? filterFrom;
+    private DateTime? filterTo;
+
+    private int currentPage = 1;
     private bool isLoading = true;
     private string? error;
 
-    private string filterSeverity = "";
-    private string filterReviewed = "";
-    private int currentPage = 1;
-
-    private bool showReviewModal = false;
-    private SecurityAlertDto? selectedAlert;
-    private string reviewNotes = "";
-    private string actionTaken = "";
-    private string? reviewError;
+    private bool showReviewModal;
+    private bool detailLoading;
     private bool reviewSubmitting;
+    private string selectedStatusForReview = "Investigating";
+    private string? reviewNotes;
+    private string? reviewVerdict;
+    private string? actionTaken;
+    private bool blockFileAction;
+    private bool blockUserAction;
+    private bool escalateMonitoring;
+    private int? monitoringLevel;
+    private string? blockFileNotes;
+    private string? blockUserNotes;
+    private string? escalationNotes;
+    private string? chatMessage;
+    private string? reviewError;
 
     protected override async Task OnInitializedAsync()
     {
-        await SearchAlerts();
+        await LoadUsersAsync();
+        ParseQueryFilters();
+        await LoadSummaryAsync();
+        await SearchAlertsAsync();
     }
 
-    private async Task SearchAlerts()
+    private async Task RefreshAsync()
     {
-        isLoading = true;
-        error = null;
+        await LoadSummaryAsync();
+        await SearchAlertsAsync();
+    }
+
+    private void ParseQueryFilters()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("status", out var statusValue))
+        {
+            var normalized = NormalizeStatusKey(statusValue!);
+            if (StatusTabs.ContainsKey(normalized))
+            {
+                activeStatusTab = normalized;
+            }
+        }
+        if (query.TryGetValue("severity", out var severityValue))
+        {
+            filterSeverity = SeverityOptions.Contains(severityValue!) ? severityValue! : null;
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
         try
         {
-            var url = $"api/aisecurity/alerts?pageNumber={currentPage}&pageSize=20";
-            if (!string.IsNullOrWhiteSpace(filterSeverity)) url += $"&severity={filterSeverity}";
-            if (!string.IsNullOrWhiteSpace(filterReviewed)) url += $"&isReviewed={filterReviewed}";
+            availableUsers = await Http.GetFromJsonAsync<List<UserDto>>("api/users") ?? new List<UserDto>();
+            availableUsers = availableUsers
+                .OrderBy(u => u.FullName)
+                .ToList();
+        }
+        catch
+        {
+            availableUsers = new List<UserDto>();
+        }
+    }
 
+    private async Task LoadSummaryAsync()
+    {
+        try
+        {
+            summary = await Http.GetFromJsonAsync<AlertSummaryDto>("api/aisecurity/alerts/summary");
+            if (summary != null)
+            {
+                summary.StatusCounts = summary.StatusCounts
+                    .GroupBy(pair => NormalizeStatusKey(pair.Key))
+                    .ToDictionary(g => g.Key, g => g.Sum(p => p.Value), StringComparer.OrdinalIgnoreCase);
+                summary.SeverityCounts = summary.SeverityCounts
+                    .GroupBy(pair => string.IsNullOrWhiteSpace(pair.Key) ? "Desconocida" : pair.Key)
+                    .ToDictionary(g => g.Key, g => g.Sum(p => p.Value), StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo cargar el resumen de alertas: {ex.Message}";
+        }
+    }
+
+    private async Task SearchAlertsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var query = new Dictionary<string, string?>
+            {
+                ["pageNumber"] = currentPage.ToString(CultureInfo.InvariantCulture),
+                ["pageSize"] = PageSize.ToString(CultureInfo.InvariantCulture),
+                ["severity"] = string.IsNullOrWhiteSpace(filterSeverity) ? null : filterSeverity,
+                ["status"] = activeStatusTab.Equals("all", StringComparison.OrdinalIgnoreCase) ? null : activeStatusTab,
+                ["userId"] = string.IsNullOrWhiteSpace(filterUserId) ? null : filterUserId,
+                ["alertType"] = string.IsNullOrWhiteSpace(filterType) ? null : filterType,
+                ["fileName"] = string.IsNullOrWhiteSpace(filterFileName) ? null : filterFileName,
+                ["search"] = string.IsNullOrWhiteSpace(filterDescription) ? null : filterDescription,
+                ["from"] = filterFrom.HasValue ? filterFrom.Value.ToString("o", CultureInfo.InvariantCulture) : null,
+                ["to"] = filterTo.HasValue ? filterTo.Value.ToString("o", CultureInfo.InvariantCulture) : null
+            };
+
+            var filtered = query
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+                .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.OrdinalIgnoreCase);
+
+            var url = QueryHelpers.AddQueryString("api/aisecurity/alerts", filtered);
             alerts = await Http.GetFromJsonAsync<PagedResult<SecurityAlertDto>>(url);
         }
         catch (Exception ex)
@@ -235,67 +535,128 @@
     private async Task ApplyFilters()
     {
         currentPage = 1;
-        await SearchAlerts();
+        await SearchAlertsAsync();
+        await LoadSummaryAsync();
+    }
+
+    private async Task ResetFilters()
+    {
+        filterSeverity = null;
+        filterType = null;
+        filterUserId = null;
+        filterFileName = null;
+        filterDescription = null;
+        filterFrom = null;
+        filterTo = null;
+        activeStatusTab = "all";
+        await ApplyFilters();
+    }
+
+    private async Task ChangeStatusTab(string statusKey)
+    {
+        if (!StatusTabs.ContainsKey(statusKey))
+        {
+            return;
+        }
+
+        activeStatusTab = statusKey;
+        currentPage = 1;
+        await SearchAlertsAsync();
     }
 
     private async Task ChangePage(int page)
     {
-        if (page < 1) return;
-        if (alerts != null && page > alerts.TotalPages) return;
+        if (alerts == null || page < 1 || page > alerts.TotalPages)
+        {
+            return;
+        }
 
         currentPage = page;
-        await SearchAlerts();
+        await SearchAlertsAsync();
     }
 
-    private void ShowReviewModal(SecurityAlertDto alert)
+    private async Task ShowReviewModal(SecurityAlertDto alert)
     {
         selectedAlert = alert;
-        reviewNotes = "";
-        actionTaken = "";
+        reviewNotes = alert.ReviewNotes ?? string.Empty;
+        reviewVerdict = alert.Verdict;
+        actionTaken = alert.ActionTaken ?? string.Empty;
+        selectedStatusForReview = string.IsNullOrWhiteSpace(alert.Status) ? "Pending" : alert.Status;
+        blockFileAction = false;
+        blockUserAction = false;
+        escalateMonitoring = false;
+        monitoringLevel = null;
+        blockFileNotes = null;
+        blockUserNotes = null;
+        escalationNotes = null;
+        chatMessage = null;
         reviewError = null;
-        reviewSubmitting = false;
         showReviewModal = true;
+        detailLoading = true;
+
+        try
+        {
+            alertDetail = await Http.GetFromJsonAsync<SecurityAlertDetailDto>($"api/aisecurity/alerts/{alert.Id}");
+        }
+        catch (Exception ex)
+        {
+            reviewError = $"No se pudo cargar el detalle de la alerta: {ex.Message}";
+            alertDetail = null;
+        }
+        finally
+        {
+            detailLoading = false;
+        }
     }
 
     private void CloseReviewModal()
     {
         showReviewModal = false;
         selectedAlert = null;
+        alertDetail = null;
         reviewError = null;
         reviewSubmitting = false;
     }
 
     private async Task SubmitReview()
     {
-        if (selectedAlert == null) return;
+        if (selectedAlert == null)
+        {
+            return;
+        }
 
-        reviewError = null;
         reviewSubmitting = true;
+        reviewError = null;
 
         try
         {
+            var actions = BuildActionsForRequest();
             var request = new ReviewAlertRequest
             {
                 AlertId = selectedAlert.Id,
-                ReviewNotes = reviewNotes,
-                ActionTaken = actionTaken
+                Status = selectedStatusForReview,
+                ReviewNotes = reviewNotes ?? string.Empty,
+                Verdict = reviewVerdict,
+                ActionTaken = actionTaken ?? string.Empty,
+                Actions = actions
             };
 
             var response = await Http.PostAsJsonAsync($"api/aisecurity/alerts/{selectedAlert.Id}/review", request);
             if (response.IsSuccessStatusCode)
             {
+                await LoadSummaryAsync();
+                await SearchAlertsAsync();
                 CloseReviewModal();
-                await SearchAlerts();
             }
             else
             {
                 var message = await response.Content.ReadAsStringAsync();
-                reviewError = string.IsNullOrWhiteSpace(message) ? "No se pudo registrar la revisión." : message;
+                reviewError = string.IsNullOrWhiteSpace(message) ? "No se pudo guardar la revisión." : message;
             }
         }
         catch (Exception ex)
         {
-            reviewError = $"Error al revisar la alerta: {ex.Message}";
+            reviewError = $"Error al guardar la revisión: {ex.Message}";
         }
         finally
         {
@@ -303,12 +664,119 @@
         }
     }
 
-    private static string GetSeverityColor(string? severity) => severity switch
+    private List<AlertActionCommand> BuildActionsForRequest()
+    {
+        var actions = new List<AlertActionCommand>();
+        if (blockFileAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "BlockFile",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = blockFileNotes
+            });
+        }
+
+        if (blockUserAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "BlockUser",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = blockUserNotes
+            });
+        }
+
+        if (escalateMonitoring && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            var level = monitoringLevel ?? ((alertDetail?.Alert.EscalationLevel ?? 0) + 1);
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "IncreaseMonitoring",
+                TargetUserId = selectedAlert?.UserId,
+                MonitoringLevel = level,
+                Notes = escalationNotes
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(chatMessage) && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "Message",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = chatMessage,
+                Metadata = "{"channel":"internal"}"
+            });
+        }
+
+        return actions;
+    }
+
+    private string RenderStatusBadge(string? status)
+    {
+        status = NormalizeStatusKey(status);
+        return status switch
+        {
+            "Resolved" => "<span class="badge bg-success">Resuelta</span>",
+            "Dismissed" => "<span class="badge bg-secondary">Descartada</span>",
+            "Investigating" => "<span class="badge bg-warning text-dark">En investigación</span>",
+            "Escalated" => "<span class="badge bg-danger">Escalada</span>",
+            "Pending" or _ => "<span class="badge bg-primary">A revisar</span>"
+        };
+    }
+
+    private MarkupString RenderStatusBadgeMarkup(string? status) => (MarkupString)RenderStatusBadge(status);
+
+    private int GetStatusCount(string statusKey)
+    {
+        if (summary?.StatusCounts == null)
+        {
+            return 0;
+        }
+
+        if (statusKey.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            return summary.StatusCounts.Values.Sum();
+        }
+
+        summary.StatusCounts.TryGetValue(statusKey, out var count);
+        return count;
+    }
+
+    private string GetSeverityColor(string? severity) => severity switch
     {
         "Critical" => "danger",
         "High" => "warning",
         "Medium" => "info",
         "Low" => "secondary",
         _ => "secondary"
+    };
+
+    private static string NormalizeStatusKey(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "Pending";
+        }
+
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "pending" or "pendiente" => "Pending",
+            "investigating" or "investigacion" or "investigando" => "Investigating",
+            "escalated" or "escalada" => "Escalated",
+            "resolved" or "resuelta" or "solved" => "Resolved",
+            "dismissed" or "descartada" or "closed" => "Dismissed",
+            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(raw.Trim().ToLowerInvariant())
+        };
+    }
+
+    private static int SeverityOrder(string severity) => severity switch
+    {
+        "Critical" => 4,
+        "High" => 3,
+        "Medium" => 2,
+        "Low" => 1,
+        _ => 0
     };
 }

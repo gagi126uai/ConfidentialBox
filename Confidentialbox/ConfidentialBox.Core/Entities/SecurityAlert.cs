@@ -1,4 +1,6 @@
-﻿namespace ConfidentialBox.Core.Entities;
+using System;
+
+namespace ConfidentialBox.Core.Entities;
 
 public class SecurityAlert
 {
@@ -7,6 +9,11 @@ public class SecurityAlert
     public string AlertType { get; set; } = string.Empty; // BehavioralAnomaly, MaliciousFile, DataExfiltration, etc.
 
     public string Severity { get; set; } = string.Empty; // Low, Medium, High, Critical
+
+    /// <summary>
+    /// Workflow status of the alert (Pending, Investigating, Escalated, Resolved, Dismissed).
+    /// </summary>
+    public string Status { get; set; } = "Pending";
 
     public string UserId { get; set; } = string.Empty;
     public virtual ApplicationUser User { get; set; } = null!;
@@ -33,6 +40,16 @@ public class SecurityAlert
     public bool IsActionTaken { get; set; } = false;
 
     public string? ActionTaken { get; set; }
+
+    /// <summary>
+    /// Final verdict/decision for the alert (e.g. Blocked, Escalated, Dismissed).
+    /// </summary>
+    public string? Verdict { get; set; }
+
+    /// <summary>
+    /// Level of escalation applied to the alert workflow (0 = none).
+    /// </summary>
+    public int EscalationLevel { get; set; } = 0;
 
     public string RawData { get; set; } = string.Empty; // JSON con detalles
 }
