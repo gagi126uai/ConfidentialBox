@@ -336,7 +336,7 @@ public class AISecurityController : ControllerBase
             alert.ReviewedByUserId = reviewerId;
 
             var actions = new List<SecurityAlertAction>();
-            var clientContext = await _clientContextResolver.ResolveAsync(HttpContext);
+            var clientContext = _clientContextResolver.Resolve(HttpContext);
 
             if (request.Actions != null)
             {

@@ -456,7 +456,10 @@
         }
         if (query.TryGetValue("severity", out var severityValue))
         {
-            filterSeverity = SeverityOptions.Contains(severityValue!) ? severityValue! : null;
+            var severity = severityValue.ToString();
+            filterSeverity = SeverityOptions.Any(level => level.Equals(severity, StringComparison.OrdinalIgnoreCase))
+                ? severity
+                : null;
         }
     }
 
