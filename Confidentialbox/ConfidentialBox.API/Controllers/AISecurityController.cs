@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Linq;
 using System.Text.Json;
+using FileAccess = ConfidentialBox.Core.Entities.FileAccess;
 
 namespace ConfidentialBox.API.Controllers;
 

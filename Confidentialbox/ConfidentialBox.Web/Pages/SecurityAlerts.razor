@@ -108,7 +108,7 @@
                 var badgeClass = isActive ? "bg-white text-primary" : "bg-light text-dark";
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link d-flex align-items-center gap-2 @(isActive ? "active" : string.Empty)"
+                            class='nav-link d-flex align-items-center gap-2 @(isActive ? "active" : string.Empty)'
                             @onclick="() => ChangeStatusTab(tab.Key)">
                         <span>@tab.Value</span>
                         <span class="badge @badgeClass">@GetStatusCount(tab.Key)</span>
@@ -706,7 +706,7 @@
                 ActionType = "Message",
                 TargetUserId = selectedAlert?.UserId,
                 Notes = chatMessage,
-                Metadata = "{"channel":"internal"}"
+                Metadata = "{\"channel\":\"internal\"}"
             });
         }
 
@@ -718,15 +718,15 @@
         status = NormalizeStatusKey(status);
         return status switch
         {
-            "Resolved" => "<span class="badge bg-success">Resuelta</span>",
-            "Dismissed" => "<span class="badge bg-secondary">Descartada</span>",
-            "Investigating" => "<span class="badge bg-warning text-dark">En investigación</span>",
-            "Escalated" => "<span class="badge bg-danger">Escalada</span>",
-            "Pending" or _ => "<span class="badge bg-primary">A revisar</span>"
+            "Resolved" => @"<span class=""badge bg-success"">Resuelta</span>",
+            "Dismissed" => @"<span class=""badge bg-secondary"">Descartada</span>",
+            "Investigating" => @"<span class=""badge bg-warning text-dark"">En investigación</span>",
+            "Escalated" => @"<span class=""badge bg-danger"">Escalada</span>",
+            "Pending" or _ => @"<span class=""badge bg-primary"">A revisar</span>"
         };
     }
 
-    private MarkupString RenderStatusBadgeMarkup(string? status) => (MarkupString)RenderStatusBadge(status);
+    private MarkupString RenderStatusBadgeMarkup(string? status) => new MarkupString(RenderStatusBadge(status));
 
     private int GetStatusCount(string statusKey)
     {
