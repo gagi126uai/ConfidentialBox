@@ -202,12 +202,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.HasOne(e => e.CreatedByUser)
                   .WithMany()
                   .HasForeignKey(e => e.CreatedByUserId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(e => e.TargetUser)
                   .WithMany()
                   .HasForeignKey(e => e.TargetUserId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(e => e.TargetFile)
                   .WithMany()
