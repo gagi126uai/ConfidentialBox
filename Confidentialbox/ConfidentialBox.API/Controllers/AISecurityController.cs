@@ -226,6 +226,12 @@ public class AISecurityController : ControllerBase
                 .AsNoTracking()
                 .ToListAsync();
 
+            FileAccess? latestAccess = null;
+            if (!string.IsNullOrWhiteSpace(alert.UserId))
+            {
+                latestAccess = await _fileAccessRepository.GetLatestAccessForUserAsync(alert.UserId, alert.FileId);
+            }
+
             var dto = new SecurityAlertDetailDto
             {
                 Alert = new SecurityAlertDto
@@ -266,6 +272,24 @@ public class AISecurityController : ControllerBase
                 }).ToList(),
                 CanBlockFile = true,
                 CanBlockUser = true,
+                CanEscalateMonitoring = true,
+                LatestAccess = latestAccess == null ? null : new FileAccessLogDto
+                {
+                    Id = latestAccess.Id,
+                    AccessedAt = latestAccess.AccessedAt,
+                    WasAuthorized = latestAccess.WasAuthorized,
+                    Action = latestAccess.Action,
+                    AccessedByUserName = latestAccess.AccessedByUser != null ? $"{latestAccess.AccessedByUser.FirstName} {latestAccess.AccessedByUser.LastName}" : null,
+                    AccessedByIp = latestAccess.AccessedByIP,
+                    UserAgent = latestAccess.UserAgent,
+                    DeviceName = latestAccess.DeviceName,
+                    DeviceType = latestAccess.DeviceType,
+                    OperatingSystem = latestAccess.OperatingSystem,
+                    Browser = latestAccess.Browser,
+                    Location = latestAccess.Location,
+                    Latitude = latestAccess.Latitude,
+                    Longitude = latestAccess.Longitude
+                }
                 CanEscalateMonitoring = true
             };
 

@@ -65,6 +65,16 @@
                     <i class="fas fa-sliders-h"></i> Configuración de IA
                 </button>
             </li>
+            <li class="nav-item ms-auto">
+                <a class="nav-link d-flex align-items-center gap-2"
+                   href="/security-alerts">
+                    <span><i class="fas fa-bell"></i> Alertas</span>
+                    @if ((alertSummary?.NewAlerts ?? 0) > 0)
+                    {
+                        <span class="badge rounded-pill text-bg-danger">@alertSummary!.NewAlerts</span>
+                    }
+                </a>
+            </li>
         </ul>
     </div>
     <div class="card-body">
@@ -372,6 +382,7 @@
 
 @code {
     private AISecurityDashboardDto? dashboard;
+    private AlertSummaryDto? alertSummary;
     private bool isLoading = true;
 
     private AIScoringSettingsDto aiSettings = new();
@@ -389,7 +400,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadDashboard(), LoadAIScoringSettings());
+        await Task.WhenAll(LoadDashboard(), LoadAIScoringSettings(), LoadAlertSummary());
     }
 
     private async Task LoadDashboard()
@@ -420,6 +431,19 @@
         finally
         {
             aiSettingsLoading = false;
+        }
+    }
+
+    private async Task LoadAlertSummary()
+    {
+        try
+        {
+            alertSummary = await Http.GetFromJsonAsync<AlertSummaryDto>("api/aisecurity/alerts/summary");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading alert summary: {ex.Message}");
+            alertSummary = null;
         }
     }
 

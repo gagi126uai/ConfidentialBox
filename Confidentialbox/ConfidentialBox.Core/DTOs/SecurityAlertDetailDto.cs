@@ -9,4 +9,5 @@ public class SecurityAlertDetailDto
     public bool CanBlockFile { get; set; }
     public bool CanBlockUser { get; set; }
     public bool CanEscalateMonitoring { get; set; }
+    public FileAccessLogDto? LatestAccess { get; set; }
 }

@@ -611,6 +611,8 @@ function createState(sessionId, options, container) {
         handlers: [],
         trackingHandlers: [],
         watermarkElement: null,
+        watermarkHost: null,
+        watermarkOptions: { text: null, style: null },
         lastReportedPage: null,
         hasInitialPageReport: false,
         awaitingFrame: false,
@@ -628,6 +630,31 @@ function createState(sessionId, options, container) {
         disableContextMenu: false,
         devToolsFlagged: false
     };
+}
+
+function ensureWatermarkHost(frameState) {
+    if (!frameState || !frameState.viewport) {
+        return null;
+    }
+
+    if (!frameState.overlay) {
+        const overlay = document.createElement('div');
+        overlay.className = 'secure-pdf-overlay';
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+        overlay.style.pointerEvents = 'none';
+        frameState.viewport.appendChild(overlay);
+        frameState.overlay = overlay;
+    }
+
+    if (!frameState.watermarkLayer) {
+        const layer = document.createElement('div');
+        layer.className = 'secure-pdf-watermark-layer';
+        frameState.overlay.appendChild(layer);
+        frameState.watermarkLayer = layer;
+    }
+
+    return frameState.watermarkLayer;
 }
 
 export function initSecurePdfViewer(elementId, options) {
@@ -660,7 +687,14 @@ export function initSecurePdfViewer(elementId, options) {
         registerHandler(state, container, 'mouseup', selectionHandler, true);
     }
 
-    state.watermarkElement = buildWatermark(container, options.watermarkText, options.watermarkStyle);
+    state.watermarkOptions = {
+        text: options.watermarkText,
+        style: options.watermarkStyle
+    };
+    const frameState = pdfFrames.get(state.frameId);
+    state.watermarkHost = ensureWatermarkHost(frameState);
+    const watermarkTarget = state.watermarkHost || container;
+    state.watermarkElement = buildWatermark(watermarkTarget, state.watermarkOptions.text, state.watermarkOptions.style);
 
     if (settings.customCss) {
         const style = document.createElement('style');
@@ -669,11 +703,13 @@ export function initSecurePdfViewer(elementId, options) {
         state.customStyleElement = style;
     }
 
-    const frameState = pdfFrames.get(state.frameId);
     if (!frameState) {
         state.awaitingFrame = true;
     } else {
         updateZoom(state, frameState, state.currentZoom, { silent: true });
+        if (state.watermarkElement && state.watermarkHost) {
+            state.watermarkHost.appendChild(state.watermarkElement);
+        }
     }
 
     state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
@@ -715,18 +751,23 @@ export function initSecurePdfViewer(elementId, options) {
 
     registerHandler(state, document, 'keydown', (e) => {
         const key = e.key.toLowerCase();
+        const meta = e.metaKey || e.ctrlKey;
         if (key === 'printscreen') {
             notifyScreenshotAttempt(state, 'KeyDown');
         }
 
-        if ((e.ctrlKey || e.metaKey) && key === 'p' && !settings.allowPrint) {
+        if (meta && key === 'p' && !settings.allowPrint) {
             e.preventDefault();
             sendEvent(state, 'PrintAttempt');
         }
 
-        if ((e.ctrlKey || e.metaKey) && key === 's' && !settings.allowDownload) {
+        if (meta && key === 's' && !settings.allowDownload) {
             e.preventDefault();
             sendEvent(state, 'DownloadAttempt');
+        }
+
+        if ((e.metaKey && e.shiftKey && (key === '3' || key === '4')) || (e.ctrlKey && e.altKey && key === 'printscreen')) {
+            notifyScreenshotAttempt(state, 'SystemCaptureShortcut');
         }
     }, true);
 
@@ -832,6 +873,11 @@ export async function disposePdfFrame(frameId) {
             cleanupPageTracking(state);
             state.lastReportedPage = null;
             state.hasInitialPageReport = false;
+            state.watermarkHost = null;
+            if (state.watermarkElement) {
+                state.watermarkElement.remove();
+                state.watermarkElement = null;
+            }
         }
     }
 }
@@ -856,6 +902,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
 
         const viewport = document.createElement('div');
         viewport.className = 'secure-pdf-viewport';
+        viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
 
         const iframe = document.createElement('iframe');
         iframe.className = 'secure-pdf-iframe';
@@ -863,6 +910,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
         iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
         iframe.setAttribute('frameborder', '0');
         iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
 
         iframe.addEventListener('load', () => {
             viewport.dispatchEvent(new Event('scroll'));
@@ -873,7 +921,10 @@ export async function renderPdf(frameId, base64Data, fileName) {
                     try {
                         const styleElement = frameDoc.createElement('style');
                         styleElement.textContent = `* { user-select: none !important; }
-                        ::selection { background: transparent !important; color: inherit !important; }`;
+                        ::selection { background: transparent !important; color: inherit !important; }
+                        html, body { cursor: not-allowed; }
+                        body { -webkit-user-drag: none !important; }
+                        a, button { pointer-events: none !important; }`;
                         if (frameDoc.head) {
                             forEachSessionByFrame(frameId, (relatedState) => {
                                 if (relatedState.settings?.disableTextSelection) {
@@ -939,6 +990,17 @@ export async function renderPdf(frameId, base64Data, fileName) {
         });
 
         viewport.appendChild(iframe);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'secure-pdf-overlay';
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+
+        const watermarkLayer = document.createElement('div');
+        watermarkLayer.className = 'secure-pdf-watermark-layer';
+        overlay.appendChild(watermarkLayer);
+
+        viewport.appendChild(overlay);
         frame.appendChild(viewport);
 
         pdfFrames.set(frameId, {
@@ -948,7 +1010,29 @@ export async function renderPdf(frameId, base64Data, fileName) {
             pages: [],
             objectUrl,
             base64: base64Data,
-            fileName
+            fileName,
+            overlay,
+            watermarkLayer
+        });
+
+        forEachSessionByFrame(frameId, (state) => {
+            const currentFrameState = pdfFrames.get(frameId);
+            state.watermarkHost = ensureWatermarkHost(currentFrameState);
+            if (state.watermarkElement) {
+                state.watermarkElement.remove();
+            }
+
+            const desiredText = state.settings?.forceGlobalWatermark
+                ? state.settings.globalWatermarkText
+                : state.watermarkOptions?.text;
+
+            const desiredStyle = state.watermarkOptions?.style || (state.settings ? {
+                color: state.settings.watermarkColor,
+                opacity: state.settings.watermarkOpacity,
+                fontSize: state.settings.watermarkFontSize
+            } : null);
+
+            state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);
         });
 
         ensureTrackingForFrame(frameId);
