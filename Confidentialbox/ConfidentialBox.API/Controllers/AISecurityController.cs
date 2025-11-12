@@ -290,6 +290,7 @@ public class AISecurityController : ControllerBase
                     Latitude = latestAccess.Latitude,
                     Longitude = latestAccess.Longitude
                 }
+                CanEscalateMonitoring = true
             };
 
             return Ok(dto);
