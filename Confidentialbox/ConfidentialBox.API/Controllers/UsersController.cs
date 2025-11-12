@@ -321,4 +321,33 @@ public class UsersController : ControllerBase
             Error = "La eliminación de usuarios está deshabilitada. Desactiva el usuario en su lugar."
         });
     }
+
+    private async Task RegisterAuditAsync(string? userId, string action, string entityType, string? entityId, string? notes, ClientContext context)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var log = new AuditLog
+        {
+            UserId = userId,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            NewValues = notes,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = context?.IpAddress,
+            UserAgent = context?.UserAgent,
+            DeviceName = context?.DeviceName,
+            DeviceType = context?.DeviceType,
+            OperatingSystem = context?.OperatingSystem,
+            Browser = context?.Browser,
+            Location = context?.Location,
+            Latitude = context?.Latitude,
+            Longitude = context?.Longitude
+        };
+
+        await _auditLogRepository.AddAsync(log);
+    }
 }
