@@ -134,7 +134,7 @@ public class UsersController : ControllerBase
         await _userManager.UpdateAsync(user);
 
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(actorId, user.IsActive ? "UserActivated" : "UserDeactivated", "ApplicationUser", id, null, context);
 
         return Ok(new OperationResultDto { Success = true });
@@ -154,7 +154,7 @@ public class UsersController : ControllerBase
         await _userManager.AddToRolesAsync(user, roles);
 
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(actorId, "UserRolesUpdated", "ApplicationUser", id, string.Join(",", roles), context);
 
         return Ok();
@@ -183,7 +183,7 @@ public class UsersController : ControllerBase
         }
 
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(actorId, "UserPasswordReset", "ApplicationUser", id, request.Reason, context);
 
         return Ok(new OperationResultDto { Success = true });
@@ -210,7 +210,7 @@ public class UsersController : ControllerBase
 
         var roles = await _userManager.GetRolesAsync(user);
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(actorId, "UserProfileUpdated", "ApplicationUser", id, $"{request.FirstName} {request.LastName}", context);
 
         return Ok(new UserDto
@@ -274,7 +274,7 @@ public class UsersController : ControllerBase
 
         await _userManager.UpdateAsync(user);
 
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(userId, "SelfProfileUpdated", "ApplicationUser", userId, null, context);
 
         return Ok(new OperationResultDto { Success = true });
@@ -307,7 +307,7 @@ public class UsersController : ControllerBase
             return BadRequest(new OperationResultDto { Success = false, Detail = detail });
         }
 
-        var context = await _clientContextResolver.ResolveAsync(HttpContext);
+        var context = _clientContextResolver.Resolve(HttpContext);
         await RegisterAuditAsync(userId, "SelfPasswordChanged", "ApplicationUser", userId, null, context);
         return Ok(new OperationResultDto { Success = true });
     }
@@ -320,5 +320,34 @@ public class UsersController : ControllerBase
             Success = false,
             Error = "La eliminación de usuarios está deshabilitada. Desactiva el usuario en su lugar."
         });
+    }
+
+    private async Task RegisterAuditAsync(string? userId, string action, string entityType, string? entityId, string? notes, ClientContext context)
+    {
+        if (string.IsNullOrEmpty(userId))
+        {
+            return;
+        }
+
+        var log = new AuditLog
+        {
+            UserId = userId,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            NewValues = notes,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = context.IpAddress,
+            UserAgent = context.UserAgent,
+            DeviceName = context.DeviceName,
+            DeviceType = context.DeviceType,
+            OperatingSystem = context.OperatingSystem,
+            Browser = context.Browser,
+            Location = context.Location,
+            Latitude = context.Latitude,
+            Longitude = context.Longitude
+        };
+
+        await _auditLogRepository.AddAsync(log);
     }
 }
