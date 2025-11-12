@@ -24,6 +24,7 @@ public class AISecurityController : ControllerBase
     private readonly IFileRepository _fileRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IClientContextResolver _clientContextResolver;
+    private readonly IFileAccessRepository _fileAccessRepository;
 
     public AISecurityController(
         IAISecurityService aiSecurityService,
@@ -31,7 +32,8 @@ public class AISecurityController : ControllerBase
         UserManager<ApplicationUser> userManager,
         IFileRepository fileRepository,
         IAuditLogRepository auditLogRepository,
-        IClientContextResolver clientContextResolver)
+        IClientContextResolver clientContextResolver,
+        IFileAccessRepository fileAccessRepository)
     {
         _aiSecurityService = aiSecurityService;
         _context = context;
@@ -39,6 +41,7 @@ public class AISecurityController : ControllerBase
         _fileRepository = fileRepository;
         _auditLogRepository = auditLogRepository;
         _clientContextResolver = clientContextResolver;
+        _fileAccessRepository = fileAccessRepository;
     }
 
     [HttpGet("dashboard")]
@@ -290,7 +293,6 @@ public class AISecurityController : ControllerBase
                     Latitude = latestAccess.Latitude,
                     Longitude = latestAccess.Longitude
                 }
-                CanEscalateMonitoring = true
             };
 
             return Ok(dto);
