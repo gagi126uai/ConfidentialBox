@@ -1,83 +1,74 @@
 ﻿@inject NavigationManager NavigationManager
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/">
-            <i class="fas fa-lock"></i> ConfidentialBox
+<div class="cbx-nav">
+    <div class="cbx-nav__brand">
+        <a href="/" class="cbx-nav__brand-link">
+            <div class="cbx-nav__logo">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div>
+                <span class="cbx-nav__brand-title">ConfidentialBox</span>
+                <span class="cbx-nav__brand-subtitle">Protección integral</span>
+            </div>
         </a>
     </div>
-</div>
 
-<div class="nav-scrollable">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Dashboard
+    <div class="cbx-nav__section">
+        <p class="cbx-nav__section-label">Principal</p>
+        <NavLink class="cbx-nav__link" href="/dashboard" Match="NavLinkMatch.All">
+            <i class="fas fa-gauge"></i>
+            <span>Dashboard</span>
+        </NavLink>
+        <NavLink class="cbx-nav__link" href="profile">
+            <i class="fas fa-user-circle"></i>
+            <span>Mi Perfil</span>
+        </NavLink>
+        <NavLink class="cbx-nav__link" href="files">
+            <i class="fas fa-folder-shield"></i>
+            <span>Mis Archivos</span>
+        </NavLink>
+        <NavLink class="cbx-nav__link" href="upload">
+            <i class="fas fa-cloud-arrow-up"></i>
+            <span>Subir Archivo</span>
+        </NavLink>
+    </div>
+
+    <AuthorizeView Roles="Admin">
+        <div class="cbx-nav__section">
+            <p class="cbx-nav__section-label">Seguridad</p>
+            <NavLink class="cbx-nav__link" href="ai-security">
+                <i class="fas fa-brain"></i>
+                <span>AI Security</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="users">
+                <i class="fas fa-users-gear"></i>
+                <span>Usuarios</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="roles">
+                <i class="fas fa-user-shield"></i>
+                <span>Roles y Permisos</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="audit">
+                <i class="fas fa-file-signature"></i>
+                <span>Auditoría</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="all-files">
+                <i class="fas fa-folder-tree"></i>
+                <span>Todos los Archivos</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="settings">
+                <i class="fas fa-sliders"></i>
+                <span>Configuración</span>
             </NavLink>
         </div>
+    </AuthorizeView>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="profile">
-                <span class="oi oi-person" aria-hidden="true"></span> Mi Perfil
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="files">
-                <span class="oi oi-file" aria-hidden="true"></span> Mis Archivos
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="upload">
-                <span class="oi oi-cloud-upload" aria-hidden="true"></span> Subir Archivo
-            </NavLink>
-        </div>
-
-        <AuthorizeView Roles="Admin">
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="ai-security">
-                    <span class="oi oi-shield" aria-hidden="true"></span> AI Security
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="security-alerts">
-                    <span class="oi oi-warning" aria-hidden="true"></span> Alertas Seguridad
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="users">
-                    <span class="oi oi-people" aria-hidden="true"></span> Usuarios
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="roles">
-                    <span class="oi oi-shield" aria-hidden="true"></span> Roles y Permisos
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="audit">
-                    <span class="oi oi-list" aria-hidden="true"></span> Auditoría
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="all-files">
-                    <span class="oi oi-folder" aria-hidden="true"></span> Todos los Archivos
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="settings">
-                    <span class="oi oi-cog" aria-hidden="true"></span> Configuración
-                </NavLink>
-            </div>
-        </AuthorizeView>
-    </nav>
+    <div class="cbx-nav__footer">
+        <span class="cbx-nav__status">
+            <i class="fas fa-lock"></i>
+            Seguridad reforzada
+        </span>
+    </div>
 </div>
 
 @code {

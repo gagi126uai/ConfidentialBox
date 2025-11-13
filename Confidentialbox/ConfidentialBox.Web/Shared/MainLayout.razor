@@ -4,33 +4,38 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @using System.Security.Claims
 
-<div class="page">
-    <div class="sidebar">
+<div class="layout-shell">
+    <aside class="layout-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
+    <section class="layout-main">
+        <header class="layout-header">
+            <div class="layout-header__title">
+                <h1 class="app-title">ConfidentialBox</h1>
+                <p class="app-subtitle">Tu centro seguro para archivos sensibles</p>
+            </div>
+
             <AuthorizeView>
                 <Authorized Context="authContext">
-                    <div class="top-actions">
+                    <div class="layout-header__actions">
                         <NotificationBell />
-                        <div class="user-greeting">
-                            <span class="hello">¡Hola!</span>
-                            <span class="name">@GetDisplayName(authContext.User)</span>
+                        <div class="layout-header__profile">
+                            <span class="greeting">Hola,</span>
+                            <span class="username">@GetDisplayName(authContext.User)</span>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger logout-button" @onclick="Logout">
-                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        <button class="btn btn-sm btn-outline-light" @onclick="Logout">
+                            <i class="fas fa-sign-out-alt me-1"></i> Salir
                         </button>
                     </div>
                 </Authorized>
             </AuthorizeView>
-        </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="layout-content">
             @Body
-        </article>
-    </main>
+        </main>
+    </section>
 </div>
 
 @code {

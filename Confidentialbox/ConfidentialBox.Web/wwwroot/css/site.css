@@ -607,6 +607,35 @@ main {
     user-select: none;
 }
 
+.alert-severity {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.alert-severity--danger {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.9), rgba(220, 53, 69, 0.7));
+}
+
+.alert-severity--warning {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(255, 193, 7, 0.7));
+    color: #1f2937;
+}
+
+.alert-severity--info {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.9), rgba(13, 110, 253, 0.7));
+}
+
+.alert-severity--secondary {
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.9), rgba(108, 117, 125, 0.7));
+}
+
 .secure-file-summary {
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.82));
     border-radius: 1rem;

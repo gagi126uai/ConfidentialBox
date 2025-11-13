@@ -3,54 +3,73 @@
 @using System.Linq
 
 <div class="notification-bell" @onclick:stopPropagation="true">
-    <button class="btn btn-link text-decoration-none notification-button" @onclick="ToggleDropdown" title="Notificaciones">
-        <i class="fas fa-bell"></i>
-        @if (unreadCount > 0)
-        {
-            <span class="badge bg-danger notification-count">@unreadCount</span>
-        }
+    <button class="notification-trigger" @onclick="ToggleDropdown" title="Notificaciones">
+        <span class="notification-icon">
+            <i class="fas fa-bell"></i>
+            @if (unreadCount > 0)
+            {
+                <span class="notification-count">@unreadCount</span>
+            }
+        </span>
+        <span class="notification-label">Alertas</span>
     </button>
 
     @if (showDropdown)
     {
-        <div class="notification-dropdown shadow">
-            <div class="notification-header d-flex justify-content-between align-items-center">
-                <strong>Notificaciones</strong>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync">Actualizar</button>
+        <div class="notification-panel shadow-lg">
+            <div class="notification-panel__header">
+                <div>
+                    <h6 class="mb-0">Centro de notificaciones</h6>
+                    <small class="text-muted">Monitoreo en vivo de tu actividad sensible</small>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" @onclick="RefreshAsync">
+                    <i class="fas fa-rotate"></i>
+                </button>
             </div>
+
             @if (!string.IsNullOrEmpty(loadError))
             {
-                <div class="alert alert-warning py-2 px-3 small mb-2" role="alert">
+                <div class="alert alert-warning py-2 px-3 small mb-3" role="alert">
                     <i class="fas fa-circle-exclamation me-1"></i>@loadError
                 </div>
             }
+
             @if (isLoading)
             {
-                <div class="text-center py-3">
+                <div class="notification-panel__loading">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <span>Cargando notificaciones…</span>
                 </div>
             }
             else if (notifications.Count == 0)
             {
-                <p class="text-muted small mb-0">No tienes notificaciones recientes.</p>
+                <div class="notification-panel__empty">
+                    <i class="fas fa-magic"></i>
+                    <p class="mb-0">¡Todo en orden! No tienes alertas pendientes.</p>
+                </div>
             }
             else
             {
-                <ul class="list-unstyled mb-0">
+                <ul class="notification-list">
                     @foreach (var notification in notifications)
                     {
-                        <li class="notification-item @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")">
-                            <div class="d-flex justify-content-between">
-                                <div class="notification-content">
-                                    <div class="fw-bold">@notification.Title</div>
-                                    <div class="small">@notification.Message</div>
-                                    <div class="text-muted tiny-text">@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(notification.Link))
-                                {
-                                    <a class="btn btn-sm btn-outline-primary" href="@notification.Link">Ver</a>
-                                }
+                        <li class="notification-card @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")">
+                            <div class="notification-card__icon">
+                                <i class="fas fa-shield-alt"></i>
                             </div>
+                            <div class="notification-card__body">
+                                <div class="notification-card__title">@notification.Title</div>
+                                <div class="notification-card__message">@notification.Message</div>
+                                <div class="notification-card__meta">
+                                    <i class="fas fa-clock me-1"></i>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(notification.Link))
+                            {
+                                <a class="notification-card__action" href="@notification.Link" title="Ver detalle">
+                                    <i class="fas fa-arrow-up-right-from-square"></i>
+                                </a>
+                            }
                         </li>
                     }
                 </ul>
