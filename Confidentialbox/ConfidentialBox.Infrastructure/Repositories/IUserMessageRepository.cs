@@ -11,4 +11,5 @@ public interface IUserMessageRepository
     Task<UserMessage?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<UserMessage> AddAsync(UserMessage message, CancellationToken cancellationToken = default);
     Task MarkAsReadAsync(string userId, int messageId, CancellationToken cancellationToken = default);
+    Task UpdateAsync(UserMessage message, CancellationToken cancellationToken = default);
 }

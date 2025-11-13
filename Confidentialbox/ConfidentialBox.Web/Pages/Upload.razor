@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.Forms;
+@using System.Linq;
 @attribute [Authorize]
 @inject IFileService FileService
 @inject IJSRuntime JS
@@ -228,12 +229,10 @@
     {
         isDragging = false;
 
-        // Files es string[], así que usamos Length
-        if (e.DataTransfer?.Files is { Length: > 0 } files)
+        var browserFile = e.DataTransfer?.Files?.FirstOrDefault();
+        if (browserFile != null)
         {
-            var droppedFileName = files[0];
-            // acá NO podemos llamar SelectFileAsync porque espera IBrowserFile, no string
-            // si querés usar drag & drop real, hay que implementar otra lógica para mapear esto a un IBrowserFile
+            await SelectFileAsync(browserFile);
         }
     }
 

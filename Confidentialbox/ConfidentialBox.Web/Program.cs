@@ -1,8 +1,9 @@
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
-using Blazored.LocalStorage;
 using ConfidentialBox.Web;
 using ConfidentialBox.Web.Services;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,17 @@ builder.Services.AddServerSideBlazor();
 
 // Configurar HttpClient con la URL base del API
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7233/";
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+builder.Services.AddScoped<ClientContextService>();
+builder.Services.AddScoped<ClientContextMessageHandler>();
+builder.Services.AddHttpClient("ConfidentialBox.Api", client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(100);
+    })
+    .AddHttpMessageHandler<ClientContextMessageHandler>();
+
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("ConfidentialBox.Api"));
 
 // Agregar Blazored LocalStorage
 builder.Services.AddBlazoredLocalStorage();

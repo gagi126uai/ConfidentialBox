@@ -1,6 +1,88 @@
 const sessions = new Map();
 const pdfFrames = new Map();
 
+async function resolveGeoMetadata() {
+    try {
+        const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json();
+        return {
+            ip: data.ip || null,
+            location: data.city && data.country_name
+                ? `${data.city}, ${data.country_name}`
+                : data.country_name || null,
+            latitude: typeof data.latitude === 'number' ? data.latitude : null,
+            longitude: typeof data.longitude === 'number' ? data.longitude : null
+        };
+    } catch (error) {
+        console.warn('No se pudo obtener información geográfica', error);
+        return null;
+    }
+}
+
+export async function collectClientContext() {
+    const [{
+        userAgent,
+        platform
+    }, geo] = await Promise.all([
+        Promise.resolve({
+            userAgent: navigator.userAgent || null,
+            platform: navigator.platform || null,
+            deviceMemory: navigator.deviceMemory || null
+        }),
+        resolveGeoMetadata()
+    ]);
+
+    const timezone = (() => {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+        } catch {
+            return null;
+        }
+    })();
+
+    const deviceType = (() => {
+        const ua = (navigator.userAgent || '').toLowerCase();
+        if (/tablet|ipad/.test(ua)) {
+            return 'Tablet';
+        }
+        if (/mobile|iphone|android/.test(ua)) {
+            return 'Mobile';
+        }
+        return 'Desktop';
+    })();
+
+    const browserName = (() => {
+        if (navigator.userAgentData?.brands?.length) {
+            return navigator.userAgentData.brands.map(b => b.brand).join(' / ');
+        }
+
+        const ua = navigator.userAgent || '';
+        if (ua.includes('Edg/')) return 'Microsoft Edge';
+        if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+        if (ua.includes('Chrome/')) return 'Google Chrome';
+        if (ua.includes('Firefox/')) return 'Mozilla Firefox';
+        if (ua.includes('Safari/')) return 'Safari';
+        return null;
+    })();
+
+    return {
+        ipAddress: geo?.ip ?? null,
+        userAgent: userAgent,
+        deviceName: navigator.userAgentData?.platform || platform || null,
+        deviceType: deviceType,
+        operatingSystem: navigator.userAgentData?.platform || platform || null,
+        browser: browserName,
+        location: geo?.location ?? null,
+        latitude: geo?.latitude ?? null,
+        longitude: geo?.longitude ?? null,
+        timeZone: timezone
+    };
+}
+
 function forEachSessionByFrame(frameId, callback) {
     if (!frameId) {
         return;
@@ -910,7 +992,9 @@ export async function renderPdf(frameId, base64Data, fileName) {
         iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
         iframe.setAttribute('frameborder', '0');
         iframe.setAttribute('allowfullscreen', 'true');
-        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        iframe.setAttribute('allow', 'fullscreen');
+        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation');
 
         iframe.addEventListener('load', () => {
             viewport.dispatchEvent(new Event('scroll'));

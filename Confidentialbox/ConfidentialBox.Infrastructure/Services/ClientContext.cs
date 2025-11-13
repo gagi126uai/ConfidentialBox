@@ -9,4 +9,5 @@ public record ClientContext(
     string? Browser,
     string? Location,
     double? Latitude,
-    double? Longitude);
+    double? Longitude,
+    string? TimeZone);

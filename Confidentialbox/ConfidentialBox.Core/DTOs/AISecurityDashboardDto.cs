@@ -25,5 +25,6 @@ namespace ConfidentialBox.Core.DTOs
 
         public Dictionary<string, int> AlertsByType { get; set; } = new();
         public Dictionary<string, int> ThreatTrends { get; set; } = new();
+        public List<string> ActionRecommendations { get; set; } = new();
     }
 }

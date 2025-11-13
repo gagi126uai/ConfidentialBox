@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ConfidentialBox.Core.Configuration;
@@ -36,4 +37,5 @@ public class AIScoringSettings
     public double RiskLevelHighThreshold { get; set; } = 0.7;
     public double RiskLevelMediumThreshold { get; set; } = 0.4;
     public List<string> SuspiciousExtensions { get; set; } = new() { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".js" };
+    public string PlatformTimeZone { get; set; } = TimeZoneInfo.Utc.Id;
 }

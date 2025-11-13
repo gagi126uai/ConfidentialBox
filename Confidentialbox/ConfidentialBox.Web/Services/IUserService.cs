@@ -18,6 +18,7 @@ public interface IUserService
     Task<OperationResultDto> ChangeMyPasswordAsync(ChangeOwnPasswordRequest request);
     Task<List<UserMessageDto>> GetMyMessagesAsync();
     Task MarkMyMessageAsReadAsync(int messageId);
+    Task<OperationResultDto> ReplyToMessageAsync(int messageId, string body);
     Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request);
     Task<OperationResultDto> ChangeUserPasswordAsync(string id, ChangeUserPasswordRequest request);
 }
