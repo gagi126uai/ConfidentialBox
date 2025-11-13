@@ -26,10 +26,13 @@
                         <div class="alert alert-info">@infoMessage</div>
                     }
 
-                    @if (viewerBlocked)
+                    @if (fileBlocked || viewerBlocked)
                     {
                         <div class="alert alert-danger">
-                            <i class="fas fa-ban"></i> Acceso bloqueado por IA: @blockedReason
+                            <i class="fas fa-ban"></i>
+                            @(blockedByAi
+                                ? $"Acceso bloqueado por IA: {blockedReason}"
+                                : $"Acceso bloqueado: {blockedReason}")
                         </div>
                     }
 
@@ -144,6 +147,7 @@
     public string ShareLink { get; set; } = string.Empty;
 
     private FileDto? fileMetadata;
+    private FileAccessResultDto? metadataSummary;
     private PDFViewerConfigDto? viewerConfig;
     private string? sessionId;
     private SecureViewerForm formModel = new();
@@ -153,6 +157,8 @@
     private bool isLoading = true;
     private bool isStarting;
     private bool viewerBlocked;
+    private bool fileBlocked;
+    private bool blockedByAi;
     private string? blockedReason;
     private DotNetObjectReference<ViewPdf>? dotNetReference;
     private IJSObjectReference? confidentialBoxModule;
@@ -170,7 +176,36 @@
         try
         {
             isLoading = true;
-            fileMetadata = await FileService.AccessFileAsync(ShareLink, null);
+            errorMessage = null;
+            infoMessage = null;
+            fileBlocked = false;
+            blockedByAi = false;
+            blockedReason = null;
+            viewerBlocked = false;
+            metadataSummary = await FileService.AccessFileAsync(ShareLink, null);
+            fileMetadata = metadataSummary?.File;
+            viewerBlocked = metadataSummary?.Blocked ?? false;
+
+            if (metadataSummary == null)
+            {
+                errorMessage = "No fue posible cargar la información del PDF.";
+                return;
+            }
+
+            if (metadataSummary.Blocked)
+            {
+                fileBlocked = true;
+                blockedByAi = metadataSummary.BlockedByAi;
+                blockedReason = metadataSummary.BlockReason ?? metadataSummary.ErrorMessage;
+                blockedReason ??= blockedByAi
+                    ? "La IA no proporcionó un motivo específico."
+                    : "Motivo no disponible.";
+                errorMessage = blockedByAi
+                    ? $"La IA bloqueó este archivo: {blockedReason}"
+                    : $"Este archivo está bloqueado: {blockedReason}";
+                return;
+            }
+
             if (fileMetadata == null || !fileMetadata.IsPdf)
             {
                 errorMessage = "No fue posible cargar la información del PDF.";
@@ -196,11 +231,20 @@
             return;
         }
 
+        if (fileBlocked)
+        {
+            errorMessage = blockedByAi
+                ? $"La IA bloqueó este archivo: {blockedReason}"
+                : $"Este archivo está bloqueado: {blockedReason}";
+            return;
+        }
+
         try
         {
             isStarting = true;
             viewerBlocked = false;
             blockedReason = null;
+            blockedByAi = false;
             errorMessage = null;
             infoMessage = null;
             pdfLoaded = false;
@@ -320,7 +364,10 @@
         if (result?.Blocked == true)
         {
             viewerBlocked = true;
+            fileBlocked = true;
+            blockedByAi = true;
             blockedReason = result.Reason ?? "Comportamiento bloqueado.";
+            blockedReason ??= "Comportamiento bloqueado.";
             infoMessage = null;
             pdfLoaded = false;
 

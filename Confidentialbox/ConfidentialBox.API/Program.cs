@@ -112,6 +112,10 @@ builder.Services.AddScoped<IPDFViewerAIService, PDFViewerAIService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+builder.Services.AddScoped<IUserNotificationRepository, UserNotificationRepository>();
+builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
+builder.Services.AddScoped<IUserMessageRepository, UserMessageRepository>();
+builder.Services.AddScoped<IUserMessageService, UserMessageService>();
 builder.Services.AddSingleton<IClientContextResolver, ClientContextResolver>();
 
 // Configurar CORS

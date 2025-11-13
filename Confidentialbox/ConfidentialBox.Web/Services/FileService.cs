@@ -44,7 +44,7 @@ public class FileService : IFileService
             ?? new FileUploadResponse { Success = false, ErrorMessage = "Error desconocido" };
     }
 
-    public async Task<FileDto?> AccessFileAsync(string shareLink, string? masterPassword)
+    public async Task<FileAccessResultDto?> AccessFileAsync(string shareLink, string? masterPassword)
     {
         var url = $"api/files/access/{shareLink}";
         if (!string.IsNullOrEmpty(masterPassword))
@@ -54,7 +54,7 @@ public class FileService : IFileService
 
         try
         {
-            return await _httpClient.GetFromJsonAsync<FileDto>(url);
+            return await _httpClient.GetFromJsonAsync<FileAccessResultDto>(url);
         }
         catch
         {
@@ -82,7 +82,11 @@ public class FileService : IFileService
 
     public async Task<bool> BlockFileAsync(int id, string reason)
     {
-        var response = await _httpClient.PutAsJsonAsync($"api/files/{id}/block", reason);
+        var response = await _httpClient.PutAsJsonAsync($"api/files/{id}/block", new BlockFileRequest
+        {
+            Block = true,
+            Reason = reason
+        });
         return response.IsSuccessStatusCode;
     }
 
@@ -119,5 +123,35 @@ public class FileService : IFileService
     {
         var response = await _httpClient.DeleteAsync($"api/files/{id}/purge");
         return response.IsSuccessStatusCode;
+    }
+
+    public async Task<FileDto?> RenameFileAsync(int id, string newName)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/files/{id}/rename", new RenameFileRequest
+        {
+            NewName = newName
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<FileDto>();
+    }
+
+    public async Task<FileDto?> ChangeOwnerAsync(int id, string newOwnerUserId)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/files/{id}/owner", new ChangeFileOwnerRequest
+        {
+            NewOwnerUserId = newOwnerUserId
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<FileDto>();
     }
 }

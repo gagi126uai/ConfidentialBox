@@ -3,7 +3,10 @@
 @inject IFileService FileService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@inject IUserService UserService
 @using System.Linq
+@using ConfidentialBox.Core.DTOs
+@using System.Net
 
 <PageTitle>Archivos de la organización - ConfidentialBox</PageTitle>
 
@@ -90,6 +93,10 @@ else
                                         @file.OriginalFileName
                                     </button>
                                     <div class="text-muted small">@FormatBytes(file.FileSizeBytes)</div>
+                                    @if (file.IsBlocked && !string.IsNullOrWhiteSpace(file.BlockReason))
+                                    {
+                                        <div class="text-danger small"><i class="fas fa-ban me-1"></i>@file.BlockReason</div>
+                                    }
                                 </td>
                                 <td>@file.UploadedByUserName</td>
                                 <td>
@@ -116,10 +123,40 @@ else
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-secondary"
                                                     title="Ver archivo"
-                                                    disabled="@(isProcessing || string.IsNullOrWhiteSpace(file.ShareLink))"
+                                                    disabled="@(isProcessing || string.IsNullOrWhiteSpace(file.ShareLink) || file.IsBlocked)"
                                                     @onclick="() => OpenFile(file)">
                                                 <i class="fas fa-eye"></i>
                                             </button>
+                                            <button class="btn btn-outline-primary"
+                                                    title="Renombrar archivo"
+                                                    disabled="@isProcessing"
+                                                    @onclick="() => OpenRenameModal(file)">
+                                                <i class="fas fa-pen"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary"
+                                                    title="Cambiar propietario"
+                                                    disabled="@isProcessing"
+                                                    @onclick="async () => await OpenChangeOwnerModalAsync(file)">
+                                                <i class="fas fa-user-cog"></i>
+                                            </button>
+                                            @if (!file.IsBlocked)
+                                            {
+                                                <button class="btn btn-outline-warning"
+                                                        title="Bloquear archivo"
+                                                        disabled="@isProcessing"
+                                                        @onclick="() => OpenBlockModal(file, true)">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-success"
+                                                        title="Desbloquear archivo"
+                                                        disabled="@isProcessing"
+                                                        @onclick="() => OpenBlockModal(file, false)">
+                                                    <i class="fas fa-unlock"></i>
+                                                </button>
+                                            }
                                             <button class="btn btn-outline-danger"
                                                     title="Enviar a papelera"
                                                     disabled="@isProcessing"
@@ -155,6 +192,122 @@ else
     </div>
 }
 
+@if (showRenameModal && selectedFile != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Renombrar @selectedFile.OriginalFileName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRenameModal" disabled="@isProcessing"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nuevo nombre</label>
+                        <input class="form-control" @bind="newFileName" />
+                        <small class="form-text text-muted">Mantén la extensión original si deseas conservar el tipo de archivo.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseRenameModal" disabled="@isProcessing">Cancelar</button>
+                    <button class="btn btn-primary" @onclick="async () => await ConfirmRenameAsync()" disabled="@(isProcessing || string.IsNullOrWhiteSpace(newFileName))">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@if (showOwnerModal && selectedFile != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cambiar propietario</h5>
+                    <button type="button" class="btn-close" @onclick="CloseOwnerModal" disabled="@isProcessing"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Selecciona al nuevo responsable de <strong>@selectedFile.OriginalFileName</strong>.</p>
+                    @if (usersLoading)
+                    {
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spinner-border spinner-border-sm"></div>
+                            <span>Cargando usuarios...</span>
+                        </div>
+                    }
+                    else if (GetOwnerOptions().Any())
+                    {
+                        <select class="form-select" @bind="selectedOwnerId">
+                            @foreach (var user in GetOwnerOptions())
+                            {
+                                <option value="@user.Id">@user.FullName (@user.Email)</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">No hay usuarios activos disponibles para asignar este archivo.</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseOwnerModal" disabled="@isProcessing">Cancelar</button>
+                    <button class="btn btn-primary" @onclick="async () => await ConfirmOwnerChangeAsync()" disabled="@(isProcessing || string.IsNullOrWhiteSpace(selectedOwnerId) || selectedOwnerId == selectedFile.UploadedByUserId)">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@if (showBlockModal && selectedFile != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(blockAction ? "Bloquear" : "Desbloquear") archivo</h5>
+                    <button type="button" class="btn-close" @onclick="CloseBlockModal" disabled="@isProcessing"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">
+                        @(blockAction
+                            ? "Describe el motivo del bloqueo para que quede registrado en la auditoría."
+                            : "Confirma el desbloqueo para restaurar el acceso al archivo.")
+                    </p>
+                    @if (blockAction)
+                    {
+                        <textarea class="form-control" rows="3" @bind="blockNotes" placeholder="Motivo del bloqueo"></textarea>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseBlockModal" disabled="@isProcessing">Cancelar</button>
+                    <button class="btn btn-danger" @onclick="async () => await ConfirmBlockChangeAsync()" disabled="@(isProcessing || (blockAction && string.IsNullOrWhiteSpace(blockNotes)))">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        @(blockAction ? "Bloquear" : "Desbloquear")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
 @code {
     private List<FileDto>? activeFiles;
     private List<FileDto>? deletedFiles;
@@ -167,6 +320,16 @@ else
     private string? deletedError;
     private string? alertMessage;
     private bool alertSuccess;
+    private bool showRenameModal;
+    private bool showOwnerModal;
+    private bool showBlockModal;
+    private FileDto? selectedFile;
+    private string? newFileName;
+    private string? selectedOwnerId;
+    private string? blockNotes;
+    private bool blockAction = true;
+    private List<UserDto>? cachedUsers;
+    private bool usersLoading;
 
     private IEnumerable<FileDto>? CurrentFiles => activeTab == "active" ? activeFiles : deletedFiles;
     private string? CurrentError => activeTab == "active" ? activeError : deletedError;
@@ -365,8 +528,213 @@ else
         }
     }
 
+    private void OpenRenameModal(FileDto file)
+    {
+        selectedFile = file;
+        newFileName = file.OriginalFileName;
+        showRenameModal = true;
+    }
+
+    private void CloseRenameModal()
+    {
+        showRenameModal = false;
+        selectedFile = null;
+        newFileName = null;
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        if (selectedFile == null)
+        {
+            return;
+        }
+
+        var desiredName = newFileName?.Trim();
+        if (string.IsNullOrWhiteSpace(desiredName))
+        {
+            return;
+        }
+
+        isProcessing = true;
+        try
+        {
+            var updated = await FileService.RenameFileAsync(selectedFile.Id, desiredName);
+            if (updated != null)
+            {
+                alertSuccess = true;
+                alertMessage = $"El archivo ahora se llama '{updated.OriginalFileName}'.";
+                await LoadActiveAsync(force: true);
+            }
+            else
+            {
+                alertSuccess = false;
+                alertMessage = "No se pudo renombrar el archivo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            alertSuccess = false;
+            alertMessage = $"No se pudo renombrar el archivo: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+            CloseRenameModal();
+            await EnsureTabDataAsync(activeTab);
+        }
+    }
+
+    private async Task OpenChangeOwnerModalAsync(FileDto file)
+    {
+        selectedFile = file;
+        selectedOwnerId = file.UploadedByUserId;
+        showOwnerModal = true;
+
+        if (cachedUsers != null)
+        {
+            return;
+        }
+
+        try
+        {
+            usersLoading = true;
+            cachedUsers = await UserService.GetAllUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            alertSuccess = false;
+            alertMessage = $"No se pudieron cargar los usuarios: {ex.Message}";
+            cachedUsers = new List<UserDto>();
+        }
+        finally
+        {
+            usersLoading = false;
+        }
+    }
+
+    private void CloseOwnerModal()
+    {
+        showOwnerModal = false;
+        selectedFile = null;
+        selectedOwnerId = null;
+    }
+
+    private async Task ConfirmOwnerChangeAsync()
+    {
+        if (selectedFile == null || string.IsNullOrWhiteSpace(selectedOwnerId) || selectedOwnerId == selectedFile.UploadedByUserId)
+        {
+            return;
+        }
+
+        isProcessing = true;
+        try
+        {
+            var updated = await FileService.ChangeOwnerAsync(selectedFile.Id, selectedOwnerId);
+            if (updated != null)
+            {
+                alertSuccess = true;
+                alertMessage = $"'{selectedFile.OriginalFileName}' fue asignado correctamente.";
+                await LoadActiveAsync(force: true);
+            }
+            else
+            {
+                alertSuccess = false;
+                alertMessage = "No se pudo cambiar el propietario.";
+            }
+        }
+        catch (Exception ex)
+        {
+            alertSuccess = false;
+            alertMessage = $"No se pudo cambiar el propietario: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+            CloseOwnerModal();
+            await EnsureTabDataAsync(activeTab);
+        }
+    }
+
+    private void OpenBlockModal(FileDto file, bool block)
+    {
+        selectedFile = file;
+        blockAction = block;
+        blockNotes = block ? file.BlockReason : null;
+        showBlockModal = true;
+    }
+
+    private void CloseBlockModal()
+    {
+        showBlockModal = false;
+        selectedFile = null;
+        blockNotes = null;
+    }
+
+    private async Task ConfirmBlockChangeAsync()
+    {
+        if (selectedFile == null)
+        {
+            return;
+        }
+
+        isProcessing = true;
+        try
+        {
+            bool result;
+            if (blockAction)
+            {
+                var reason = string.IsNullOrWhiteSpace(blockNotes)
+                    ? "Bloqueo aplicado desde el panel de administración"
+                    : blockNotes!;
+                result = await FileService.BlockFileAsync(selectedFile.Id, reason);
+            }
+            else
+            {
+                result = await FileService.UnblockFileAsync(selectedFile.Id);
+            }
+
+            if (result)
+            {
+                alertSuccess = true;
+                alertMessage = blockAction
+                    ? $"'{selectedFile.OriginalFileName}' fue bloqueado."
+                    : $"'{selectedFile.OriginalFileName}' fue desbloqueado.";
+                await LoadActiveAsync(force: true);
+            }
+            else
+            {
+                alertSuccess = false;
+                alertMessage = blockAction
+                    ? "No se pudo bloquear el archivo."
+                    : "No se pudo desbloquear el archivo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            alertSuccess = false;
+            alertMessage = blockAction
+                ? $"No se pudo bloquear el archivo: {ex.Message}"
+                : $"No se pudo desbloquear el archivo: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+            CloseBlockModal();
+            await EnsureTabDataAsync(activeTab);
+        }
+    }
+
     private void OpenFile(FileDto file)
     {
+        if (file.IsBlocked)
+        {
+            alertMessage = file.BlockReason != null
+                ? $"'{file.OriginalFileName}' está bloqueado: {file.BlockReason}"
+                : $"'{file.OriginalFileName}' está bloqueado.";
+            alertSuccess = false;
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(file.ShareLink))
         {
             return;
@@ -403,7 +771,10 @@ else
 
         if (file.IsBlocked)
         {
-            return (MarkupString)"<span class='badge bg-danger'><i class=\"fas fa-ban\"></i> Bloqueado</span>";
+            var reason = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(file.BlockReason)
+                ? "Motivo no disponible"
+                : file.BlockReason);
+            return (MarkupString)$"<span class='badge bg-danger' title='{reason}'><i class=\"fas fa-ban\"></i> Bloqueado</span>";
         }
 
         if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
@@ -412,5 +783,10 @@ else
         }
 
         return (MarkupString)"<span class='badge bg-success'><i class=\"fas fa-check\"></i> Activo</span>";
+    }
+
+    private IEnumerable<UserDto> GetOwnerOptions()
+    {
+        return (cachedUsers ?? Enumerable.Empty<UserDto>()).Where(u => u.IsActive && !u.IsBlocked);
     }
 }

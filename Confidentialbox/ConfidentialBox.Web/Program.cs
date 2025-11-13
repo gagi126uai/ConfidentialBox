@@ -25,6 +25,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPdfViewerService, PdfViewerService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Configurar autenticación
 builder.Services.AddScoped<CustomAuthStateProvider>();

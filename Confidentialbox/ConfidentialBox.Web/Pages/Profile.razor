@@ -1,0 +1,443 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IUserService UserService
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+
+<PageTitle>Mi perfil - ConfidentialBox</PageTitle>
+
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="mb-1"><i class="fas fa-user-circle"></i> Mi Perfil</h1>
+        <p class="text-muted mb-0">Actualiza tus datos personales, cambia tu contraseña y revisa los mensajes del equipo.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <span class="badge bg-light text-dark border"><i class="fas fa-calendar me-1"></i>@(profile?.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy"))</span>
+        @if (profile?.LastLoginAt != null)
+        {
+            <span class="badge bg-success-subtle text-success border"><i class="fas fa-sign-in-alt me-1"></i>Último acceso @profile.LastLoginAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(globalMessage))
+{
+    <div class="alert @(globalMessageSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+        @globalMessage
+        <button type="button" class="btn-close" @onclick="() => globalMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pb-0">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <button class='nav-link @(activeTab == "profile" ? "active" : null)' @onclick='() => SwitchTab("profile")'>Perfil</button>
+            </li>
+            <li class="nav-item">
+                <button class='nav-link @(activeTab == "password" ? "active" : null)' @onclick='() => SwitchTab("password")'>Contraseña</button>
+            </li>
+            <li class="nav-item">
+                <button class='nav-link @(activeTab == "messages" ? "active" : null)' @onclick='() => SwitchTab("messages")'>Mensajes</button>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        @if (isLoadingProfile)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border" role="status"></div>
+            </div>
+        }
+        else if (profile == null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>No fue posible cargar tu información de perfil.
+            </div>
+        }
+        else
+        {
+            @switch (activeTab)
+            {
+                case "profile":
+                    <EditForm Model="profileForm" OnValidSubmit="SaveProfileAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(profileError))
+                        {
+                            <div class="alert alert-danger">@profileError</div>
+                        }
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <InputText @bind-Value="profileForm.FirstName" class="form-control" />
+                                <ValidationMessage For="() => profileForm.FirstName" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <InputText @bind-Value="profileForm.LastName" class="form-control" />
+                                <ValidationMessage For="() => profileForm.LastName" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo electrónico</label>
+                                <InputText @bind-Value="profileForm.Email" class="form-control" />
+                                <ValidationMessage For="() => profileForm.Email" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono</label>
+                                <InputText @bind-Value="profileForm.PhoneNumber" class="form-control" />
+                            </div>
+                        </div>
+
+                        @if (profile.IsBlocked)
+                        {
+                            <div class="alert alert-warning mt-4" role="alert">
+                                <i class="fas fa-ban me-2"></i>Tu cuenta está bloqueada.
+                                @if (!string.IsNullOrWhiteSpace(profile.BlockReason))
+                                {
+                                    <span> Motivo: @profile.BlockReason</span>
+                                }
+                            </div>
+                        }
+                        else if (!profile.IsActive)
+                        {
+                            <div class="alert alert-info mt-4" role="alert">
+                                <i class="fas fa-moon me-2"></i>Tu cuenta está desactivada temporalmente. Consulta al administrador para restablecerla.
+                            </div>
+                        }
+
+                        <div class="mt-4 d-flex justify-content-end">
+                            <button class="btn btn-primary" type="submit" disabled="@savingProfile">
+                                @if (savingProfile)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Guardar cambios
+                            </button>
+                        </div>
+                    </EditForm>;
+                    break;
+                case "password":
+                    <EditForm Model="passwordForm" OnValidSubmit="ChangePasswordAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(passwordError))
+                        {
+                            <div class="alert alert-danger">@passwordError</div>
+                        }
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Contraseña actual</label>
+                                <InputText @bind-Value="passwordForm.CurrentPassword" type="password" class="form-control" autocomplete="current-password" />
+                                <ValidationMessage For="() => passwordForm.CurrentPassword" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nueva contraseña</label>
+                                <InputText @bind-Value="passwordForm.NewPassword" type="password" class="form-control" autocomplete="new-password" />
+                                <ValidationMessage For="() => passwordForm.NewPassword" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Confirmar nueva contraseña</label>
+                                <InputText @bind-Value="passwordForm.ConfirmPassword" type="password" class="form-control" autocomplete="new-password" />
+                                <ValidationMessage For="() => passwordForm.ConfirmPassword" />
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex justify-content-end">
+                            <button class="btn btn-primary" type="submit" disabled="@changingPassword">
+                                @if (changingPassword)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Actualizar contraseña
+                            </button>
+                        </div>
+                    </EditForm>;
+                    break;
+                case "messages":
+                    <div>
+                        @if (messagesLoading)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border" role="status"></div>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(messagesError))
+                        {
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>@messagesError
+                            </div>
+                        }
+                        else if (messages.Count == 0)
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-3x mb-3"></i>
+                                <p class="mb-0">No tienes mensajes nuevos. Cuando recibas comunicaciones aparecerán aquí.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="list-group secure-message-list">
+                                @foreach (var message in messages)
+                                {
+                                    var isExpanded = expandedMessages.Contains(message.Id);
+                                    <div class="list-group-item list-group-item-action @(message.IsRead ? string.Empty : "unread")">
+                                        <div class="d-flex justify-content-between align-items-center" role="button" @onclick="() => ToggleMessageAsync(message)">
+                                            <div>
+                                                <div class="fw-semibold">@message.Subject</div>
+                                                <div class="small text-muted">@message.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                                @if (message.RequiresResponse)
+                                                {
+                                                    <span class="badge bg-warning text-dark mt-1">Requiere respuesta</span>
+                                                }
+                                            </div>
+                                            <i class="fas @(isExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                                        </div>
+                                        @if (isExpanded)
+                                        {
+                                            <hr />
+                                            <p class="mb-0">@message.Body</p>
+                                            @if (!string.IsNullOrWhiteSpace(message.SenderName))
+                                            {
+                                                <div class="small text-muted mt-2">Enviado por @message.SenderName</div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>;
+                    break;
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private UserProfileDto? profile;
+    private ProfileForm profileForm = new();
+    private ChangePasswordForm passwordForm = new();
+    private readonly List<UserMessageDto> messages = new();
+    private readonly HashSet<int> expandedMessages = new();
+
+    private string activeTab = "profile";
+    private bool isLoadingProfile = true;
+    private bool savingProfile;
+    private bool changingPassword;
+    private bool messagesLoading;
+    private bool messagesLoaded;
+
+    private string? profileError;
+    private string? passwordError;
+    private string? messagesError;
+    private string? globalMessage;
+    private bool globalMessageSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoadingProfile = true;
+        profileError = null;
+
+        try
+        {
+            profile = await UserService.GetMyProfileAsync();
+            if (profile == null)
+            {
+                profileError = "No fue posible recuperar tu información.";
+                return;
+            }
+
+            profileForm = new ProfileForm
+            {
+                FirstName = profile.FirstName,
+                LastName = profile.LastName,
+                Email = profile.Email,
+                PhoneNumber = profile.PhoneNumber
+            };
+        }
+        catch (Exception ex)
+        {
+            profileError = ex.Message;
+            profile = null;
+        }
+        finally
+        {
+            isLoadingProfile = false;
+        }
+    }
+
+    private void SwitchTab(string tab)
+    {
+        if (activeTab == tab)
+        {
+            return;
+        }
+
+        activeTab = tab;
+        if (tab == "messages" && !messagesLoaded)
+        {
+            _ = LoadMessagesAsync();
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (profile == null)
+        {
+            return;
+        }
+
+        profileError = null;
+        savingProfile = true;
+
+        try
+        {
+            var request = new SelfProfileUpdateRequest
+            {
+                FirstName = profileForm.FirstName!,
+                LastName = profileForm.LastName!,
+                Email = profileForm.Email,
+                PhoneNumber = profileForm.PhoneNumber
+            };
+
+            var result = await UserService.UpdateMyProfileAsync(request);
+            globalMessageSuccess = result.Success;
+            globalMessage = result.Success
+                ? "Tus datos fueron actualizados correctamente."
+                : result.Error ?? result.Detail ?? "No se pudo actualizar tu perfil.";
+
+            if (result.Success)
+            {
+                await LoadProfileAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            profileError = ex.Message;
+        }
+        finally
+        {
+            savingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordError = null;
+        changingPassword = true;
+
+        try
+        {
+            var request = new ChangeOwnPasswordRequest
+            {
+                CurrentPassword = passwordForm.CurrentPassword!,
+                NewPassword = passwordForm.NewPassword!
+            };
+
+            var result = await UserService.ChangeMyPasswordAsync(request);
+            globalMessageSuccess = result.Success;
+            globalMessage = result.Success
+                ? "Tu contraseña fue actualizada correctamente."
+                : result.Error ?? result.Detail ?? "No se pudo cambiar la contraseña.";
+
+            if (result.Success)
+            {
+                passwordForm = new ChangePasswordForm();
+            }
+        }
+        catch (Exception ex)
+        {
+            passwordError = ex.Message;
+        }
+        finally
+        {
+            changingPassword = false;
+        }
+    }
+
+    private async Task LoadMessagesAsync()
+    {
+        messagesLoading = true;
+        await InvokeAsync(StateHasChanged);
+        messagesError = null;
+
+        try
+        {
+            messages.Clear();
+            var items = await UserService.GetMyMessagesAsync();
+            messages.AddRange(items.OrderByDescending(m => m.CreatedAt));
+            messagesLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            messagesError = ex.Message;
+        }
+        finally
+        {
+            messagesLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ToggleMessageAsync(UserMessageDto message)
+    {
+        if (expandedMessages.Contains(message.Id))
+        {
+            expandedMessages.Remove(message.Id);
+            return;
+        }
+
+        expandedMessages.Add(message.Id);
+
+        if (!message.IsRead)
+        {
+            try
+            {
+                await UserService.MarkMyMessageAsReadAsync(message.Id);
+                message.IsRead = true;
+            }
+            catch (Exception ex)
+            {
+                messagesError = ex.Message;
+            }
+        }
+    }
+
+    private sealed class ProfileForm
+    {
+        [Required(ErrorMessage = "El nombre es obligatorio")]
+        public string? FirstName { get; set; }
+
+        [Required(ErrorMessage = "El apellido es obligatorio")]
+        public string? LastName { get; set; }
+
+        [Required(ErrorMessage = "El correo es obligatorio")]
+        [EmailAddress(ErrorMessage = "Formato de correo inválido")]
+        public string? Email { get; set; }
+
+        public string? PhoneNumber { get; set; }
+    }
+
+    private sealed class ChangePasswordForm
+    {
+        [Required(ErrorMessage = "Debes ingresar la contraseña actual")]
+        public string? CurrentPassword { get; set; }
+
+        [Required(ErrorMessage = "Debes ingresar una nueva contraseña")]
+        [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
+        public string? NewPassword { get; set; }
+
+        [Required(ErrorMessage = "Debes confirmar la nueva contraseña")]
+        [Compare(nameof(NewPassword), ErrorMessage = "Las contraseñas no coinciden")]
+        public string? ConfirmPassword { get; set; }
+    }
+}
