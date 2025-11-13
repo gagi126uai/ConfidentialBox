@@ -40,4 +40,14 @@ public class UserMessageService : IUserMessageService
     {
         return _repository.MarkAsReadAsync(userId, messageId, cancellationToken);
     }
+
+    public Task<UserMessage?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return _repository.GetByIdAsync(id, cancellationToken);
+    }
+
+    public Task UpdateAsync(UserMessage message, CancellationToken cancellationToken = default)
+    {
+        return _repository.UpdateAsync(message, cancellationToken);
+    }
 }

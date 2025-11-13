@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using ConfidentialBox.Core.Configuration
 @using ConfidentialBox.Core.DTOs
+@using System.Linq
 @inject ISettingsService SettingsService
 
 <PageTitle>Configuración avanzada - ConfidentialBox</PageTitle>
@@ -51,6 +52,13 @@ else
                 </li>
                 <li class="nav-item">
                     <button type="button"
+                            class="nav-link @(activeTab == "ai" ? "active" : string.Empty)"
+                            @onclick='() => SetActiveTab("ai")'>
+                        <i class="fas fa-robot"></i> IA Security
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button"
                             class="nav-link @(activeTab == "security" ? "active" : string.Empty)"
                             @onclick='() => SetActiveTab("security")'>
                         <i class="fas fa-user-shield"></i> Seguridad de acceso
@@ -58,7 +66,6 @@ else
                 </li>
             </ul>
         </div>
-    </div>
         <div class="card-body">
             @switch (activeTab)
             {
@@ -491,6 +498,206 @@ else
                         </div>
                     </EditForm>
                     break;
+                case "ai":
+                    <EditForm Model="aiSettings" OnValidSubmit="SaveAiSettingsAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(aiMessage))
+                        {
+                            <div class="alert @(aiSuccess ? "alert-success" : "alert-danger")">@aiMessage</div>
+                        }
+
+                        <div class="row g-4">
+                            <div class="col-xl-5">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-clock me-2"></i> Zona horaria y jornada</h5>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Zona horaria de la plataforma</label>
+                                            <InputSelect @bind-Value="aiSettings.PlatformTimeZone" class="form-select">
+                                                @foreach (var zone in availableTimeZones)
+                                                {
+                                                    <option value="@zone.Id">@zone.Label</option>
+                                                }
+                                            </InputSelect>
+                                            <div class="form-text">La IA interpreta todos los eventos según esta zona horaria.</div>
+                                        </div>
+
+                                        <div class="row g-3">
+                                            <div class="col">
+                                                <label class="form-label">Inicio jornada (hora)</label>
+                                                <InputNumber @bind-Value="aiSettings.BusinessHoursStart" class="form-control" min="0" max="23" TValue="int" />
+                                            </div>
+                                            <div class="col">
+                                                <label class="form-label">Fin jornada (hora)</label>
+                                                <InputNumber @bind-Value="aiSettings.BusinessHoursEnd" class="form-control" min="0" max="23" TValue="int" />
+                                            </div>
+                                        </div>
+
+                                        <p class="small text-muted mt-3">Los accesos fuera de este rango incrementan el puntaje de riesgo.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-7">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-signal me-2"></i> Umbrales de riesgo</h5>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label">Riesgo alto</label>
+                                                <InputNumber @bind-Value="aiSettings.HighRiskThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Riesgo sospechoso</label>
+                                                <InputNumber @bind-Value="aiSettings.SuspiciousThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Riesgo medio</label>
+                                                <InputNumber @bind-Value="aiSettings.RiskLevelMediumThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Riesgo alto operativo</label>
+                                                <InputNumber @bind-Value="aiSettings.RiskLevelHighThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Recomendar bloqueo</label>
+                                                <InputNumber @bind-Value="aiSettings.RecommendationBlockThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Recomendar revisión</label>
+                                                <InputNumber @bind-Value="aiSettings.RecommendationReviewThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Recomendar monitoreo</label>
+                                                <InputNumber @bind-Value="aiSettings.RecommendationMonitorThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Incremento actividad inusual</label>
+                                                <InputNumber @bind-Value="aiSettings.UnusualActivityIncrement" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Puntaje fuera de horario</label>
+                                                <InputNumber @bind-Value="aiSettings.OutsideBusinessHoursScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-sliders-h me-2"></i> Sensibilidad y patrones</h5>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label">Puntaje extensiones sospechosas</label>
+                                                <InputNumber @bind-Value="aiSettings.SuspiciousExtensionScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Archivos grandes</label>
+                                                <InputNumber @bind-Value="aiSettings.LargeFileScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Tamaño inusual</label>
+                                                <InputNumber @bind-Value="aiSettings.UnusualFileSizeScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Conducta fuera de hora</label>
+                                                <InputNumber @bind-Value="aiSettings.OutsideHoursBehaviorScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Subidas inusuales</label>
+                                                <InputNumber @bind-Value="aiSettings.UnusualUploadsScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Multiplicador subidas anómalas</label>
+                                                <InputNumber @bind-Value="aiSettings.UploadAnomalyMultiplier" class="form-control" step="0.1" min="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Multiplicador tamaño anómalo</label>
+                                                <InputNumber @bind-Value="aiSettings.FileSizeAnomalyMultiplier" class="form-control" step="0.1" min="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Tamaño máximo analizado (MB)</label>
+                                                <InputNumber @bind-Value="aiSettings.MaxFileSizeMB" class="form-control" min="1" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Archivo grande (MB)</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileMB" class="form-control" min="1" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Archivo muy grande (MB)</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileMB" class="form-control" min="1" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso malware</label>
+                                                <InputNumber @bind-Value="aiSettings.MalwareProbabilityWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso exfiltración</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso archivo grande</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso archivo muy grande</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso archivos comprimidos</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationArchiveWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso fuera de horario</label>
+                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationOffHoursWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso extensión (malware)</label>
+                                                <InputNumber @bind-Value="aiSettings.MalwareSuspiciousExtensionWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso keyword "crack"</label>
+                                                <InputNumber @bind-Value="aiSettings.MalwareCrackKeywordWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso keyword "keygen"</label>
+                                                <InputNumber @bind-Value="aiSettings.MalwareKeygenKeywordWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Peso ejecutables</label>
+                                                <InputNumber @bind-Value="aiSettings.MalwareExecutableWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3 mt-3">
+                                            <label class="form-label">Lista de extensiones sospechosas</label>
+                                            <InputTextArea @bind-Value="aiSettings.SuspiciousExtensions" class="form-control" rows="3" />
+                                            <div class="form-text">Separar por comas o saltos de línea. Se normalizan automáticamente.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-4">
+                            <button class="btn btn-primary" disabled="@aiSaving">
+                                @if (aiSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Guardando…</span>
+                                }
+                                else
+                                {
+                                    <span><i class="fas fa-robot me-2"></i>Guardar configuración IA</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                    break;
                 case "security":
                     <div class="row g-4">
                         <div class="col-lg-6">
@@ -557,7 +764,9 @@ else
                     break;
             }
         </div>
-    
+
+    </div>
+
 }
 
 @code {
@@ -567,6 +776,8 @@ else
     private RegistrationSettingsDto registrationSettings = new();
     private TokenSettingsDto tokenSettings = new();
     private PDFViewerSettingsDto pdfViewerSettings = new();
+    private AIScoringSettingsDto aiSettings = new();
+    private List<TimeZoneItem> availableTimeZones = new();
 
     private bool isLoading = true;
     private bool storageSaving;
@@ -575,6 +786,7 @@ else
     private bool registrationSaving;
     private bool tokenSaving;
     private bool pdfViewerSaving;
+    private bool aiSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -588,6 +800,8 @@ else
     private bool tokenSuccess;
     private string? pdfViewerMessage;
     private bool pdfViewerSuccess;
+    private string? aiMessage;
+    private bool aiSuccess;
 
     private string activeTab = "storage";
 
@@ -611,10 +825,39 @@ else
             registrationSettings = await SettingsService.GetRegistrationSettingsAsync() ?? new RegistrationSettingsDto();
             tokenSettings = await SettingsService.GetTokenSettingsAsync() ?? new TokenSettingsDto();
             pdfViewerSettings = await SettingsService.GetPdfViewerSettingsAsync() ?? new PDFViewerSettingsDto();
+            LoadAvailableTimeZones();
+            aiSettings = await SettingsService.GetAIScoringSettingsAsync() ?? new AIScoringSettingsDto();
+            EnsureValidTimeZoneSelection();
         }
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private void LoadAvailableTimeZones()
+    {
+        availableTimeZones = TimeZoneInfo.GetSystemTimeZones()
+            .Select(zone => new TimeZoneItem(
+                zone.Id,
+                $"{FormatOffset(zone.BaseUtcOffset)} · {zone.DisplayName}",
+                (int)zone.BaseUtcOffset.TotalMinutes))
+            .OrderBy(zone => zone.OffsetMinutes)
+            .ThenBy(zone => zone.Label)
+            .ToList();
+    }
+
+    private void EnsureValidTimeZoneSelection()
+    {
+        if (!availableTimeZones.Any())
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(aiSettings.PlatformTimeZone) ||
+            !availableTimeZones.Any(zone => zone.Id == aiSettings.PlatformTimeZone))
+        {
+            aiSettings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
         }
     }
 
@@ -738,6 +981,32 @@ else
         }
     }
 
+    private async Task SaveAiSettingsAsync()
+    {
+        aiMessage = null;
+        aiSaving = true;
+
+        try
+        {
+            aiSuccess = await SettingsService.UpdateAIScoringSettingsAsync(aiSettings);
+            aiMessage = aiSuccess ? "Configuración de IA actualizada." : "No fue posible guardar los parámetros de IA.";
+
+            if (aiSuccess)
+            {
+                var refreshed = await SettingsService.GetAIScoringSettingsAsync();
+                if (refreshed is not null)
+                {
+                    aiSettings = refreshed;
+                    EnsureValidTimeZoneSelection();
+                }
+            }
+        }
+        finally
+        {
+            aiSaving = false;
+        }
+    }
+
     private async Task UpdateRegistrationSettingsAsync()
     {
         registrationMessage = null;
@@ -766,4 +1035,15 @@ else
             registrationSaving = false;
         }
     }
+
+    private static string FormatOffset(TimeSpan offset)
+    {
+        var totalMinutes = (int)Math.Abs(offset.TotalMinutes);
+        var hours = totalMinutes / 60;
+        var minutes = totalMinutes % 60;
+        var sign = offset < TimeSpan.Zero ? "-" : "+";
+        return $"UTC{sign}{hours:00}:{minutes:00}";
+    }
+
+    private sealed record TimeZoneItem(string Id, string Label, int OffsetMinutes);
 }

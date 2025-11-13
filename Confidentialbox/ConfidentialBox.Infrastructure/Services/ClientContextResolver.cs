@@ -17,17 +17,35 @@ public class ClientContextResolver : IClientContextResolver
     public ClientContext Resolve(HttpContext context)
     {
         var headers = context.Request.Headers;
-        var ip = headers.TryGetValue("X-Forwarded-For", out var forwarded) && forwarded.Count > 0
-            ? forwarded[0].Split(',')[0].Trim()
-            : context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+        var ipHeader = headers.TryGetValue("X-Client-IP", out var clientIp) ? clientIp.FirstOrDefault() : null;
+        var forwardedHeader = headers.TryGetValue("X-Forwarded-For", out var forwarded) ? forwarded.FirstOrDefault() : null;
+        var ip = !string.IsNullOrWhiteSpace(ipHeader)
+            ? ipHeader
+            : !string.IsNullOrWhiteSpace(forwardedHeader)
+                ? forwardedHeader.Split(',')[0].Trim()
+                : context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
 
-        var userAgent = headers["User-Agent"].ToString();
+        var userAgent = headers.TryGetValue("X-Client-UserAgent", out var forwardedUa) && !string.IsNullOrWhiteSpace(forwardedUa)
+            ? forwardedUa.ToString()
+            : headers["User-Agent"].ToString();
         var deviceName = headers["X-Device-Name"].ToString();
+        if (string.IsNullOrWhiteSpace(deviceName) && headers.TryGetValue("X-Device-Name", out var deviceNameHeader))
+        {
+            deviceName = deviceNameHeader.ToString();
+        }
+
+        var explicitDeviceType = headers.TryGetValue("X-Device-Type", out var deviceTypeHeader) ? deviceTypeHeader.ToString() : null;
+        var explicitOs = headers.TryGetValue("X-Device-OS", out var osHeader) ? osHeader.ToString() : null;
+        var explicitBrowser = headers.TryGetValue("X-Device-Browser", out var browserHeader) ? browserHeader.ToString() : null;
 
         var parsedUa = ParseUserAgent(userAgent);
         var (regexDeviceType, regexOs) = ParseOperatingSystem(userAgent);
-        var operatingSystem = parsedUa.OperatingSystem ?? regexOs;
-        var browser = parsedUa.Browser ?? ParseBrowser(userAgent);
+        var operatingSystem = !string.IsNullOrWhiteSpace(explicitOs)
+            ? explicitOs
+            : parsedUa.OperatingSystem ?? regexOs;
+        var browser = !string.IsNullOrWhiteSpace(explicitBrowser)
+            ? explicitBrowser
+            : parsedUa.Browser ?? ParseBrowser(userAgent);
 
         var locationHeader = headers["X-Geo-Location"].ToString();
         string? location = null;
@@ -53,7 +71,17 @@ public class ClientContextResolver : IClientContextResolver
             location = "Red local";
         }
 
-        var deviceTypeName = DetermineDeviceType(userAgent, parsedUa.DeviceType ?? regexDeviceType);
+        var timeZone = headers.TryGetValue("X-Client-TimeZone", out var timeZoneHeader)
+            ? timeZoneHeader.ToString()
+            : null;
+        if (string.IsNullOrWhiteSpace(timeZone))
+        {
+            timeZone = null;
+        }
+
+        var deviceTypeName = !string.IsNullOrWhiteSpace(explicitDeviceType)
+            ? explicitDeviceType
+            : DetermineDeviceType(userAgent, parsedUa.DeviceType ?? regexDeviceType);
 
         return new ClientContext(
             ip,
@@ -64,7 +92,8 @@ public class ClientContextResolver : IClientContextResolver
             browser,
             location,
             latitude,
-            longitude);
+            longitude,
+            timeZone);
     }
 
     private static bool IsLoopback(string ip)

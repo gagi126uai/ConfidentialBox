@@ -11,4 +11,5 @@ public interface IAISecurityService
     Task<AISecurityDashboardDto> GetSecurityDashboardAsync();
     Task UpdateUserBehaviorProfileAsync(string userId);
     Task<bool> IncreaseMonitoringLevelAsync(string userId, int? desiredLevel, string? reason, string? updatedByUserId);
+    Task<int> TransferAlertsToNewOwnerAsync(int fileId, string newOwnerId, string? actorUserId, CancellationToken cancellationToken = default);
 }

@@ -205,6 +205,40 @@
                                             {
                                                 <div class="small text-muted mt-2">Enviado por @message.SenderName</div>
                                             }
+
+                                            @if (replyStatuses.TryGetValue(message.Id, out var replyStatus))
+                                            {
+                                                <div class="alert mt-3 @(replyStatus.Success ? "alert-success" : "alert-danger")" role="alert">
+                                                    @replyStatus.Message
+                                                </div>
+                                            }
+
+                                            @if (message.RequiresResponse)
+                                            {
+                                                <div class="mt-3 bg-light border rounded p-3">
+                                                    <label class="form-label fw-semibold">Responder al administrador</label>
+                                                    <textarea class="form-control"
+                                                              rows="3"
+                                                              placeholder="Escribe tu respuesta..."
+                                                              value="@GetReplyDraft(message.Id)"
+                                                              @oninput="e => UpdateReplyDraft(message.Id, e.Value?.ToString() ?? string.Empty)"></textarea>
+                                                    <div class="d-flex justify-content-end mt-2">
+                                                        <button class="btn btn-sm btn-primary"
+                                                                @onclick="() => SendReplyAsync(message)"
+                                                                disabled="@sendingReplies.Contains(message.Id)">
+                                                            @if (sendingReplies.Contains(message.Id))
+                                                            {
+                                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                                <span>Enviando…</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span><i class="fas fa-paper-plane me-1"></i>Enviar respuesta</span>
+                                                            }
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
                                         }
                                     </div>
                                 }
@@ -223,6 +257,9 @@
     private ChangePasswordForm passwordForm = new();
     private readonly List<UserMessageDto> messages = new();
     private readonly HashSet<int> expandedMessages = new();
+    private readonly Dictionary<int, string> replyDrafts = new();
+    private readonly HashSet<int> sendingReplies = new();
+    private readonly Dictionary<int, ReplyStatus> replyStatuses = new();
 
     private string activeTab = "profile";
     private bool isLoadingProfile = true;
@@ -364,6 +401,74 @@
         }
     }
 
+    private string GetReplyDraft(int messageId)
+        => replyDrafts.TryGetValue(messageId, out var value) ? value : string.Empty;
+
+    private void UpdateReplyDraft(int messageId, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            replyDrafts.Remove(messageId);
+        }
+        else
+        {
+            replyDrafts[messageId] = value;
+        }
+    }
+
+    private async Task SendReplyAsync(UserMessageDto message)
+    {
+        replyStatuses.Remove(message.Id);
+
+        if (!replyDrafts.TryGetValue(message.Id, out var draft) || string.IsNullOrWhiteSpace(draft))
+        {
+            replyStatuses[message.Id] = new ReplyStatus
+            {
+                Message = "Escribe un mensaje antes de enviarlo.",
+                Success = false
+            };
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        sendingReplies.Add(message.Id);
+        try
+        {
+            var result = await UserService.ReplyToMessageAsync(message.Id, draft);
+            if (result.Success)
+            {
+                replyStatuses[message.Id] = new ReplyStatus
+                {
+                    Message = "Tu respuesta fue enviada al equipo de seguridad.",
+                    Success = true
+                };
+                replyDrafts.Remove(message.Id);
+                message.RequiresResponse = false;
+            }
+            else
+            {
+                replyStatuses[message.Id] = new ReplyStatus
+                {
+                    Message = result.Error ?? result.Detail ?? "No se pudo enviar la respuesta.",
+                    Success = false
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            replyStatuses[message.Id] = new ReplyStatus
+            {
+                Message = ex.Message,
+                Success = false
+            };
+        }
+        finally
+        {
+            sendingReplies.Remove(message.Id);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
     private async Task LoadMessagesAsync()
     {
         messagesLoading = true;
@@ -439,5 +544,11 @@
         [Required(ErrorMessage = "Debes confirmar la nueva contraseña")]
         [Compare(nameof(NewPassword), ErrorMessage = "Las contraseñas no coinciden")]
         public string? ConfirmPassword { get; set; }
+    }
+
+    private sealed class ReplyStatus
+    {
+        public string Message { get; set; } = string.Empty;
+        public bool Success { get; set; }
     }
 }

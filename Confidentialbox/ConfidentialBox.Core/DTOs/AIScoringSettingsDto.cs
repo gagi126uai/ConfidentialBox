@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace ConfidentialBox.Core.DTOs;
@@ -99,4 +100,7 @@ public class AIScoringSettingsDto
 
     [Required]
     public string SuspiciousExtensions { get; set; } = ".exe, .bat, .cmd, .ps1, .vbs, .js";
+
+    [Required]
+    public string PlatformTimeZone { get; set; } = TimeZoneInfo.Utc.Id;
 }
