@@ -92,7 +92,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.HasOne(e => e.User)
                   .WithMany(u => u.AuditLogs)
                   .HasForeignKey(e => e.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.Action);
@@ -152,7 +152,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.HasOne<ApplicationUser>()
                   .WithMany()
                   .HasForeignKey(e => e.BlockedByUserId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                  .OnDelete(DeleteBehavior.Restrict);
             // entity.HasIndex(e => e.Email).IsUnique(); // si no lo maneja Identity
         });
 
@@ -173,7 +173,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.HasOne(e => e.User)
                   .WithMany(u => u.Notifications)
                   .HasForeignKey(e => e.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(e => e.CreatedByUser)
                   .WithMany()

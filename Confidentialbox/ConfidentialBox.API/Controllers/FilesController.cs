@@ -857,15 +857,15 @@ public class FilesController : ControllerBase
     }
 
     private async Task<AccessValidationResult> ValidateFileAccessAsync(
-        SharedFile file,
-        string? masterPassword,
-        bool incrementCounter,
-        bool requireMasterPassword = true)
+    SharedFile file,
+    string? masterPassword,
+    bool incrementCounter,
+    bool requireMasterPassword = true)
     {
         if (file.IsBlocked)
         {
             await LogFileAccess(file.Id, "AccessBlocked", false);
-            return AccessValidationResult.Blocked(
+            return AccessValidationResult.FromBlocked( // antes: Blocked(
                 file.BlockReason,
                 file.BlockReason != null && file.BlockReason.Contains("IA", StringComparison.OrdinalIgnoreCase));
         }
@@ -902,8 +902,9 @@ public class FilesController : ControllerBase
             await _fileRepository.UpdateAsync(file);
         }
 
-        return AccessValidationResult.Success();
+        return AccessValidationResult.FromSuccess(); // antes: Success()
     }
+
 
     private FileDto MapToDto(SharedFile file)
     {
@@ -933,20 +934,21 @@ public class FilesController : ControllerBase
     }
 
     private sealed record AccessValidationResult(
-        bool Success,
-        string? ErrorMessage,
-        bool Blocked,
-        bool BlockedByAi,
-        string? BlockReason)
+    bool Success,
+    string? ErrorMessage,
+    bool Blocked,
+    bool BlockedByAi,
+    string? BlockReason)
     {
         public static AccessValidationResult SuccessResult { get; } = new(true, null, false, false, null);
 
-        public static AccessValidationResult Success() => SuccessResult;
+        // Renombrados para evitar choque con las propiedades
+        public static AccessValidationResult FromSuccess() => SuccessResult;
 
         public static AccessValidationResult Fail(string errorMessage) =>
             new(false, errorMessage, false, false, null);
 
-        public static AccessValidationResult Blocked(string? reason, bool blockedByAi) =>
+        public static AccessValidationResult FromBlocked(string? reason, bool blockedByAi) =>
             new(false, reason ?? "Este archivo ha sido bloqueado", true, blockedByAi, reason);
     }
 }

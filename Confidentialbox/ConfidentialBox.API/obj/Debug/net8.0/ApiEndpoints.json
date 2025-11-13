@@ -551,12 +551,43 @@
         "IsRequired": true
       },
       {
-        "Name": "reason",
-        "Type": "System.String",
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.BlockFileRequest",
         "IsRequired": true
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "ChangeOwner",
+    "RelativePath": "api/Files/{id}/owner",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.ChangeFileOwnerRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.FileDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
@@ -573,6 +604,37 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
+    "Method": "RenameFile",
+    "RelativePath": "api/Files/{id}/rename",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.RenameFileRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.FileDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.FilesController",
@@ -627,7 +689,7 @@
     ],
     "ReturnTypes": [
       {
-        "Type": "ConfidentialBox.Core.DTOs.FileDto",
+        "Type": "ConfidentialBox.Core.DTOs.FileAccessResultDto",
         "MediaTypes": [
           "text/plain",
           "application/json",
@@ -751,6 +813,68 @@
     "ReturnTypes": [
       {
         "Type": "ConfidentialBox.Core.DTOs.FileUploadResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.NotificationsController",
+    "Method": "GetMyNotifications",
+    "RelativePath": "api/Notifications",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.DTOs.UserNotificationDto, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.NotificationsController",
+    "Method": "MarkNotificationsAsRead",
+    "RelativePath": "api/Notifications/read",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.API.Controllers.NotificationsController\u002BMarkNotificationsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.NotificationsController",
+    "Method": "GetUnreadCount",
+    "RelativePath": "api/Notifications/unread-count",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Int32",
         "MediaTypes": [
           "text/plain",
           "application/json",
@@ -1493,6 +1617,37 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
+    "Method": "SendMessageToUser",
+    "RelativePath": "api/Users/{id}/messages",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.CreateUserMessageRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
     "Method": "ChangePassword",
     "RelativePath": "api/Users/{id}/password",
     "HttpMethod": "PUT",
@@ -1599,6 +1754,62 @@
         "StatusCode": 200
       }
     ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
+    "Method": "GetMyProfile",
+    "RelativePath": "api/Users/me",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.UserProfileDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
+    "Method": "GetMyMessages",
+    "RelativePath": "api/Users/me/messages",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[ConfidentialBox.Core.DTOs.UserMessageDto, ConfidentialBox.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
+    "Method": "MarkMyMessageAsRead",
+    "RelativePath": "api/Users/me/messages/{messageId}/read",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "messageId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.UsersController",

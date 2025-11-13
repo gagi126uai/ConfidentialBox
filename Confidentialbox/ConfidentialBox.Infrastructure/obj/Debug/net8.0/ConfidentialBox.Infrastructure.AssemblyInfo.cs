@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ConfidentialBox.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9a1f5ed8479a3147847ba414138b4f40d4070815")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25f6b9e6064549d5550c7b596e30d3bcfef013be")]
 [assembly: System.Reflection.AssemblyProductAttribute("ConfidentialBox.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ConfidentialBox.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

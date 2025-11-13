@@ -47,3 +47,4 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ConfidentialBox.Web.pdb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ConfidentialBox.Web.genruntimeconfig.cache
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ref\ConfidentialBox.Web.dll
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\Shared\NotificationBell.razor.rz.scp.css
