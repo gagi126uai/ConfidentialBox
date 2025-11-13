@@ -12,4 +12,12 @@ public interface IUserService
     Task<bool> ToggleActiveAsync(string id);
     Task<bool> UpdateRolesAsync(string id, List<string> roles);
     Task<OperationResultDto> DeleteUserAsync(string id);
+    Task<UserDto?> UpdateUserAsync(string id, UpdateUserProfileRequest request);
+    Task<UserProfileDto?> GetMyProfileAsync();
+    Task<OperationResultDto> UpdateMyProfileAsync(SelfProfileUpdateRequest request);
+    Task<OperationResultDto> ChangeMyPasswordAsync(ChangeOwnPasswordRequest request);
+    Task<List<UserMessageDto>> GetMyMessagesAsync();
+    Task MarkMyMessageAsReadAsync(int messageId);
+    Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request);
+    Task<OperationResultDto> ChangeUserPasswordAsync(string id, ChangeUserPasswordRequest request);
 }

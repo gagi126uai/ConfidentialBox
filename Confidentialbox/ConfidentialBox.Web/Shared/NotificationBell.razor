@@ -1,0 +1,152 @@
+@inject INotificationService NotificationService
+@inject AuthenticationStateProvider AuthStateProvider
+@using System.Linq
+
+<div class="notification-bell" @onclick:stopPropagation="true">
+    <button class="btn btn-link text-decoration-none notification-button" @onclick="ToggleDropdown" title="Notificaciones">
+        <i class="fas fa-bell"></i>
+        @if (unreadCount > 0)
+        {
+            <span class="badge bg-danger notification-count">@unreadCount</span>
+        }
+    </button>
+
+    @if (showDropdown)
+    {
+        <div class="notification-dropdown shadow">
+            <div class="notification-header d-flex justify-content-between align-items-center">
+                <strong>Notificaciones</strong>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync">Actualizar</button>
+            </div>
+            @if (!string.IsNullOrEmpty(loadError))
+            {
+                <div class="alert alert-warning py-2 px-3 small mb-2" role="alert">
+                    <i class="fas fa-circle-exclamation me-1"></i>@loadError
+                </div>
+            }
+            @if (isLoading)
+            {
+                <div class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            }
+            else if (notifications.Count == 0)
+            {
+                <p class="text-muted small mb-0">No tienes notificaciones recientes.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var notification in notifications)
+                    {
+                        <li class="notification-item @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")">
+                            <div class="d-flex justify-content-between">
+                                <div class="notification-content">
+                                    <div class="fw-bold">@notification.Title</div>
+                                    <div class="small">@notification.Message</div>
+                                    <div class="text-muted tiny-text">@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(notification.Link))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@notification.Link">Ver</a>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<UserNotificationDto> notifications = new();
+    private int unreadCount;
+    private bool showDropdown;
+    private bool isLoading;
+    private bool initialized;
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            await LoadAsync();
+            initialized = true;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            loadError = null;
+            unreadCount = await NotificationService.GetUnreadCountAsync();
+            notifications = await NotificationService.GetNotificationsAsync();
+        }
+        catch (Exception ex)
+        {
+            notifications = new List<UserNotificationDto>();
+            loadError = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudieron obtener las notificaciones."
+                : ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task ToggleDropdown()
+    {
+        if (!initialized)
+        {
+            await LoadAsync();
+            initialized = true;
+        }
+
+        showDropdown = !showDropdown;
+
+        if (showDropdown)
+        {
+            var unreadIds = notifications.Where(n => !n.IsRead).Select(n => n.Id).ToList();
+            if (unreadIds.Count > 0)
+            {
+                try
+                {
+                    await NotificationService.MarkAsReadAsync(unreadIds);
+                    unreadCount = 0;
+                    foreach (var notification in notifications)
+                    {
+                        notification.IsRead = true;
+                    }
+                    loadError = null;
+                }
+                catch (Exception ex)
+                {
+                    loadError = string.IsNullOrWhiteSpace(ex.Message)
+                        ? "No se pudieron marcar las notificaciones como leídas."
+                        : ex.Message;
+                }
+            }
+        }
+    }
+
+    private static string GetSeverityClass(UserNotificationDto notification)
+    {
+        return notification.Severity switch
+        {
+            "danger" => "notification-danger",
+            "warning" => "notification-warning",
+            "success" => "notification-success",
+            _ => "notification-info"
+        };
+    }
+}

@@ -1,7 +1,8 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
+@using System.Security.Claims
 
 <div class="page">
     <div class="sidebar">
@@ -11,12 +12,14 @@
     <main>
         <div class="top-row px-4">
             <AuthorizeView>
-                <Authorized>
-                    <div class="d-flex align-items-center">
-                        <span class="me-3">
-                            <i class="fas fa-user-circle"></i> @context.User.Identity?.Name
-                        </span>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="Logout">
+                <Authorized Context="authContext">
+                    <div class="top-actions">
+                        <NotificationBell />
+                        <div class="user-greeting">
+                            <span class="hello">¡Hola!</span>
+                            <span class="name">@GetDisplayName(authContext.User)</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger logout-button" @onclick="Logout">
                             <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
                         </button>
                     </div>
@@ -39,5 +42,35 @@
             .NotifyUserLogout();
 
         NavigationManager.NavigateTo("/login", replace: true);
+    }
+
+    private static string GetDisplayName(ClaimsPrincipal user)
+    {
+        var fullName = user.FindFirst("FullName")?.Value;
+        if (!string.IsNullOrWhiteSpace(fullName))
+        {
+            var separatorIndex = fullName.IndexOf(' ');
+            if (separatorIndex > 0)
+            {
+                return fullName[..separatorIndex];
+            }
+
+            return fullName;
+        }
+
+        var givenName = user.FindFirst(ClaimTypes.GivenName)?.Value;
+        if (!string.IsNullOrWhiteSpace(givenName))
+        {
+            return givenName;
+        }
+
+        var name = user.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name;
+        }
+
+        var email = user.FindFirst(ClaimTypes.Email)?.Value;
+        return string.IsNullOrWhiteSpace(email) ? "usuario" : email;
     }
 }

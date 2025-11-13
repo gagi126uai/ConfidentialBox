@@ -3,6 +3,7 @@
 @inject IFileService FileService
 @inject IJSRuntime JS
 @using System.Security.Cryptography
+@using ConfidentialBox.Core.DTOs
 @implements IAsyncDisposable
 
 <PageTitle>Acceso Seguro - ConfidentialBox</PageTitle>
@@ -24,10 +25,20 @@
                         <div class="alert alert-info">@infoMessage</div>
                     }
 
-                    @if (!string.IsNullOrEmpty(successMessage))
-                    {
-                        <div class="alert alert-success">@successMessage</div>
-                    }
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (fileBlocked)
+{
+    <div class="alert alert-danger">
+        <i class="fas fa-ban"></i>
+        @(blockedByAi
+            ? $"La IA bloqueó este archivo: {blockReason}"
+            : $"El archivo fue bloqueado: {blockReason}")
+    </div>
+}
 
                     @if (isLoading)
                     {
@@ -68,7 +79,7 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button class="btn btn-primary" @onclick="ValidateAccess" disabled="@isProcessing">
+                            <button class="btn btn-primary" @onclick="ValidateAccess" disabled="@(fileBlocked || isProcessing)">
                                 @if (isProcessing)
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
@@ -76,15 +87,24 @@
                                 <i class="fas fa-check"></i> Validar Acceso
                             </button>
 
-                            <button class="btn btn-success" disabled="@(!hasValidatedPassword || isProcessing)" @onclick="DownloadFile">
+                            <button class="btn btn-success" disabled="@(fileBlocked || !hasValidatedPassword || isProcessing)" @onclick="DownloadFile">
                                 <i class="fas fa-download"></i> Descargar Archivo
                             </button>
 
                             @if (fileMetadata?.IsPdf == true)
                             {
-                                <a class="btn btn-outline-secondary" href="/view-pdf/@ShareLink">
-                                    <i class="fas fa-eye"></i> Abrir en visor seguro
-                                </a>
+                                if (fileBlocked)
+                                {
+                                    <button class="btn btn-outline-secondary" disabled>
+                                        <i class="fas fa-eye-slash"></i> Visor bloqueado
+                                    </button>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-outline-secondary" href="/view-pdf/@ShareLink">
+                                        <i class="fas fa-eye"></i> Abrir en visor seguro
+                                    </a>
+                                }
                             }
                         </div>
                     }
@@ -99,6 +119,7 @@
     public string ShareLink { get; set; } = string.Empty;
 
     private FileDto? fileMetadata;
+    private FileAccessResultDto? accessSummary;
     private string? masterPassword;
     private string? errorMessage;
     private string? successMessage;
@@ -106,6 +127,9 @@
     private bool isLoading = true;
     private bool isProcessing;
     private bool hasValidatedPassword;
+    private bool fileBlocked;
+    private string? blockReason;
+    private bool blockedByAi;
     private IJSObjectReference? confidentialBoxModule;
 
     private async Task<IJSObjectReference> GetConfidentialBoxModuleAsync()
@@ -131,16 +155,41 @@
             errorMessage = null;
             successMessage = null;
             hasValidatedPassword = false;
+            fileBlocked = false;
+            blockReason = null;
+            blockedByAi = false;
 
-            fileMetadata = await FileService.AccessFileAsync(ShareLink, null);
+            accessSummary = await FileService.AccessFileAsync(ShareLink, null);
+            fileMetadata = accessSummary?.File;
 
-            if (fileMetadata == null)
+            if (accessSummary == null)
             {
                 infoMessage = "Introduce la contraseña maestra para continuar con la validación.";
+                return;
+            }
+
+            fileBlocked = accessSummary.Blocked;
+            blockedByAi = accessSummary.BlockedByAi;
+            blockReason = accessSummary.BlockReason ?? accessSummary.ErrorMessage;
+
+            if (fileBlocked)
+            {
+                errorMessage = blockedByAi
+                    ? $"La IA bloqueó este archivo: {blockReason}"
+                    : $"El archivo fue bloqueado: {blockReason}";
+                infoMessage = null;
+                return;
+            }
+
+            if (accessSummary.RequiresPassword)
+            {
+                infoMessage = "Introduce la contraseña maestra para validar el acceso a este archivo.";
+                hasValidatedPassword = false;
             }
             else
             {
                 infoMessage = null;
+                hasValidatedPassword = true;
             }
         }
         catch (Exception ex)
@@ -156,7 +205,7 @@
 
     private async Task ValidateAccess()
     {
-        if (fileMetadata == null)
+        if (fileBlocked)
         {
             return;
         }
@@ -175,7 +224,26 @@
                 errorMessage = "No se pudo validar el acceso al archivo.";
                 return;
             }
-            fileMetadata = response;
+            accessSummary = response;
+            fileMetadata = response.File ?? fileMetadata;
+            fileBlocked = response.Blocked;
+            blockedByAi = response.BlockedByAi;
+            blockReason = response.BlockReason ?? response.ErrorMessage;
+
+            if (fileBlocked)
+            {
+                errorMessage = blockedByAi
+                    ? $"La IA bloqueó este archivo: {blockReason}"
+                    : $"El archivo fue bloqueado: {blockReason}";
+                return;
+            }
+
+            if (!response.Success)
+            {
+                errorMessage = response.ErrorMessage ?? "No se pudo validar el acceso al archivo.";
+                return;
+            }
+
             successMessage = "Acceso validado correctamente. Puedes descargar el archivo.";
             hasValidatedPassword = true;
         }
@@ -197,6 +265,20 @@
             return;
         }
 
+        if (fileBlocked)
+        {
+            errorMessage = blockedByAi
+                ? $"La IA bloqueó este archivo: {blockReason}"
+                : $"El archivo fue bloqueado: {blockReason}";
+            return;
+        }
+
+        if (!hasValidatedPassword && (accessSummary?.RequiresPassword ?? false))
+        {
+            errorMessage = "Debes validar la contraseña antes de descargar.";
+            return;
+        }
+
         try
         {
             isProcessing = true;
@@ -214,7 +296,16 @@
 
             if (!contentResponse.Success)
             {
+                fileBlocked = contentResponse.BlockReason is not null;
+                blockedByAi = contentResponse.BlockedByAi;
+                blockReason = contentResponse.BlockReason ?? contentResponse.ErrorMessage;
                 errorMessage = contentResponse.ErrorMessage ?? "Acceso denegado.";
+                if (fileBlocked)
+                {
+                    errorMessage = blockedByAi
+                        ? $"La IA bloqueó este archivo: {blockReason}"
+                        : $"El archivo fue bloqueado: {blockReason}";
+                }
                 hasValidatedPassword = false;
                 return;
             }

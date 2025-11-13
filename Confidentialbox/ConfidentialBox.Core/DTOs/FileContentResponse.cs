@@ -4,6 +4,8 @@ public class FileContentResponse
 {
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
+    public string? BlockReason { get; set; }
+    public bool BlockedByAi { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string FileExtension { get; set; } = string.Empty;
     public string EncryptedContent { get; set; } = string.Empty;

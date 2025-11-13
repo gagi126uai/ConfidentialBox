@@ -76,4 +76,59 @@ public class UserService : IUserService
             Error = string.IsNullOrWhiteSpace(message) ? "No fue posible eliminar el usuario." : message
         };
     }
+
+    public async Task<UserDto?> UpdateUserAsync(string id, UpdateUserProfileRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/users/{id}/profile", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<UserDto>();
+    }
+
+    public async Task<UserProfileDto?> GetMyProfileAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<UserProfileDto>("api/users/me");
+    }
+
+    public async Task<OperationResultDto> UpdateMyProfileAsync(SelfProfileUpdateRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync("api/users/me/profile", request);
+        return await response.Content.ReadFromJsonAsync<OperationResultDto>()
+            ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
+
+    public async Task<OperationResultDto> ChangeMyPasswordAsync(ChangeOwnPasswordRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync("api/users/me/password", request);
+        return await response.Content.ReadFromJsonAsync<OperationResultDto>()
+            ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
+
+    public async Task<List<UserMessageDto>> GetMyMessagesAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<UserMessageDto>>("api/users/me/messages")
+            ?? new List<UserMessageDto>();
+    }
+
+    public async Task MarkMyMessageAsReadAsync(int messageId)
+    {
+        await _httpClient.PostAsync($"api/users/me/messages/{messageId}/read", null);
+    }
+
+    public async Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"api/users/{userId}/messages", request);
+        return await response.Content.ReadFromJsonAsync<OperationResultDto>()
+            ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
+
+    public async Task<OperationResultDto> ChangeUserPasswordAsync(string id, ChangeUserPasswordRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/users/{id}/password", request);
+        return await response.Content.ReadFromJsonAsync<OperationResultDto>()
+            ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
 }

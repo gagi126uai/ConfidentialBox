@@ -18,6 +18,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RolePolicy> RolePolicies { get; set; }
     public DbSet<SystemSetting> SystemSettings { get; set; }
     public DbSet<RecycleBinItem> RecycleBinItems { get; set; }
+    public DbSet<UserNotification> UserNotifications { get; set; }
+    public DbSet<UserMessage> UserMessages { get; set; }
 
 
     // AI Security Module
@@ -146,6 +148,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.LastName).HasMaxLength(100);
+            entity.Property(e => e.BlockReason).HasMaxLength(512);
+            entity.HasOne<ApplicationUser>()
+                  .WithMany()
+                  .HasForeignKey(e => e.BlockedByUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
             // entity.HasIndex(e => e.Email).IsUnique(); // si no lo maneja Identity
         });
 
@@ -153,6 +160,46 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<ApplicationRole>(entity =>
         {
             entity.Property(e => e.Description).HasMaxLength(500);
+        });
+
+        builder.Entity<UserNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.Property(e => e.Message).HasMaxLength(2000);
+            entity.Property(e => e.Severity).HasMaxLength(32);
+            entity.Property(e => e.Link).HasMaxLength(512);
+
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.Notifications)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt });
+        });
+
+        builder.Entity<UserMessage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Subject).HasMaxLength(200);
+            entity.Property(e => e.Body).HasMaxLength(4000);
+
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.Messages)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Sender)
+                  .WithMany()
+                  .HasForeignKey(e => e.SenderId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt });
         });
 
         // SecurityAlert

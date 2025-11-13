@@ -11,7 +11,7 @@ public interface IFileService
     Task<PagedResult<FileDto>> SearchFilesAsync(FileSearchRequest request);
     Task<FileDto?> GetFileByIdAsync(int id);
     Task<FileUploadResponse> UploadFileAsync(FileUploadRequest request);
-    Task<FileDto?> AccessFileAsync(string shareLink, string? masterPassword);
+    Task<FileAccessResultDto?> AccessFileAsync(string shareLink, string? masterPassword);
     Task<FileContentResponse?> GetFileContentAsync(string shareLink, string? masterPassword);
     Task<bool> BlockFileAsync(int id, string reason);
     Task<bool> UnblockFileAsync(int id);
@@ -20,4 +20,6 @@ public interface IFileService
     Task<List<FileDto>> GetDeletedFilesAsync();
     Task<bool> RestoreFileAsync(int id);
     Task<bool> PurgeFileAsync(int id);
+    Task<FileDto?> RenameFileAsync(int id, string newName);
+    Task<FileDto?> ChangeOwnerAsync(int id, string newOwnerUserId);
 }

@@ -26,6 +26,8 @@ public class FilesController : ControllerBase
     private readonly IFileStorageService _fileStorageService;
     private readonly ISystemSettingsService _systemSettingsService;
     private readonly IClientContextResolver _clientContextResolver;
+    private readonly IUserNotificationService _userNotificationService;
+    private readonly IUserMessageService _userMessageService;
 
     public FilesController(
         IFileRepository fileRepository,
@@ -36,7 +38,9 @@ public class FilesController : ControllerBase
         IAISecurityService aiSecurityService,
         IFileStorageService fileStorageService,
         ISystemSettingsService systemSettingsService,
-        IClientContextResolver clientContextResolver)
+        IClientContextResolver clientContextResolver,
+        IUserNotificationService userNotificationService,
+        IUserMessageService userMessageService)
     {
         _fileRepository = fileRepository;
         _fileAccessRepository = fileAccessRepository;
@@ -47,6 +51,8 @@ public class FilesController : ControllerBase
         _fileStorageService = fileStorageService;
         _systemSettingsService = systemSettingsService;
         _clientContextResolver = clientContextResolver;
+        _userNotificationService = userNotificationService;
+        _userMessageService = userMessageService;
     }
 
     [HttpGet]
@@ -219,6 +225,19 @@ public class FilesController : ControllerBase
                     savedFile.IsBlocked = true;
                     savedFile.BlockReason = $"Bloqueado automáticamente por IA: {threatAnalysis.Recommendation}";
                     await _fileRepository.UpdateAsync(savedFile);
+
+                    await _userNotificationService.CreateAsync(
+                        userId,
+                        "Archivo bloqueado por IA",
+                        savedFile.BlockReason!,
+                        "danger",
+                        $"/files/{savedFile.Id}",
+                        userId);
+
+                    await _userMessageService.CreateAsync(
+                        userId,
+                        "La IA bloqueó tu archivo",
+                        $"Nuestro monitor inteligente detectó algo extraño en '{savedFile.OriginalFileName}' y lo bloqueó automáticamente. Motivo: {threatAnalysis.Recommendation}.");
                 }
             }
             catch (Exception aiEx)
@@ -268,28 +287,51 @@ public class FilesController : ControllerBase
 
     [HttpGet("access/{shareLink}")]
     [AllowAnonymous]
-    public async Task<ActionResult<FileDto>> AccessFile(string shareLink, [FromQuery] string? masterPassword)
+    public async Task<ActionResult<FileAccessResultDto>> AccessFile(string shareLink, [FromQuery] string? masterPassword)
     {
         var file = await _fileRepository.GetByShareLinkAsync(shareLink);
         if (file == null)
         {
-            return NotFound("Archivo no encontrado");
+            return Ok(new FileAccessResultDto
+            {
+                Success = false,
+                ErrorMessage = "Archivo no encontrado",
+                Blocked = false,
+                RequiresPassword = false
+            });
         }
 
-        var requireMasterPassword = string.IsNullOrEmpty(file.MasterPassword) || !string.IsNullOrEmpty(masterPassword);
+        var requiresPassword = !string.IsNullOrEmpty(file.MasterPassword);
         var validation = await ValidateFileAccessAsync(
             file,
             masterPassword,
             incrementCounter: false,
-            requireMasterPassword: requireMasterPassword);
-        if (!validation.Success)
+            requireMasterPassword: !string.IsNullOrEmpty(masterPassword));
+
+        if (validation.Success)
         {
-            return BadRequest(validation.ErrorMessage);
+            await LogFileAccess(file.Id, "AccessMetadataGranted", true);
         }
 
-        await LogFileAccess(file.Id, "AccessGranted", true);
+        var dto = new FileAccessResultDto
+        {
+            Success = validation.Success,
+            File = MapToDto(file),
+            RequiresPassword = requiresPassword,
+            Blocked = validation.Blocked,
+            BlockedByAi = validation.BlockedByAi,
+            BlockReason = validation.BlockReason ?? file.BlockReason,
+            ErrorMessage = validation.Success ? null : validation.ErrorMessage
+        };
 
-        return Ok(MapToDto(file));
+        if (!validation.Success && !validation.Blocked && requiresPassword && string.IsNullOrEmpty(masterPassword))
+        {
+            // Sin contraseña todavía consideramos acceso válido para mostrar metadatos
+            dto.Success = true;
+            dto.ErrorMessage = null;
+        }
+
+        return Ok(dto);
     }
 
     [HttpGet("content/{shareLink}")]
@@ -309,7 +351,13 @@ public class FilesController : ControllerBase
             requireMasterPassword: true);
         if (!validation.Success)
         {
-            return Ok(validation);
+            return Ok(new FileContentResponse
+            {
+                Success = false,
+                ErrorMessage = validation.ErrorMessage,
+                BlockReason = validation.BlockReason ?? file.BlockReason,
+                BlockedByAi = validation.BlockedByAi
+            });
         }
 
         byte[] encryptedBytes;
@@ -373,13 +421,17 @@ public class FilesController : ControllerBase
 
     [HttpPut("{id}/block")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult> BlockFile(int id, [FromBody] string reason)
+    public async Task<ActionResult> BlockFile(int id, [FromBody] BlockFileRequest request)
     {
         var file = await _fileRepository.GetByIdAsync(id);
         if (file == null)
         {
             return NotFound();
         }
+
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Bloqueado por administrador"
+            : request.Reason.Trim();
 
         file.IsBlocked = true;
         file.BlockReason = reason;
@@ -407,7 +459,161 @@ public class FilesController : ControllerBase
             Longitude = clientContext.Longitude
         });
 
+        if (!string.IsNullOrEmpty(file.UploadedByUserId))
+        {
+            await _userNotificationService.CreateAsync(
+                file.UploadedByUserId,
+                "Archivo bloqueado",
+                $"El archivo '{file.OriginalFileName}' fue bloqueado. Motivo: {reason}",
+                "danger",
+                $"/files/{file.Id}",
+                userId);
+
+            await _userMessageService.CreateAsync(
+                file.UploadedByUserId,
+                "Tu archivo fue bloqueado",
+                $"Hola, necesitamos que revises el archivo '{file.OriginalFileName}'. Se bloqueó por el siguiente motivo: {reason}.",
+                userId,
+                requiresResponse: true);
+        }
+
         return Ok();
+    }
+
+    [HttpPut("{id}/rename")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<FileDto>> RenameFile(int id, [FromBody] RenameFileRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.NewName))
+        {
+            return BadRequest("El nuevo nombre es obligatorio");
+        }
+
+        var file = await _fileRepository.GetByIdAsync(id);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        var previousName = file.OriginalFileName;
+        file.OriginalFileName = request.NewName.Trim();
+        await _fileRepository.UpdateAsync(file);
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
+        await _auditLogRepository.AddAsync(new AuditLog
+        {
+            UserId = userId,
+            Action = "FileRenamed",
+            EntityType = "SharedFile",
+            EntityId = id.ToString(),
+            OldValues = previousName,
+            NewValues = file.OriginalFileName,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
+        });
+
+        if (!string.IsNullOrEmpty(file.UploadedByUserId))
+        {
+            await _userNotificationService.CreateAsync(
+                file.UploadedByUserId,
+                "Archivo renombrado",
+                $"El archivo '{previousName}' ahora se llama '{file.OriginalFileName}'.",
+                "info",
+                $"/files/{file.Id}",
+                userId);
+        }
+
+        return Ok(MapToDto(file));
+    }
+
+    [HttpPut("{id}/owner")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<FileDto>> ChangeOwner(int id, [FromBody] ChangeFileOwnerRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.NewOwnerUserId))
+        {
+            return BadRequest("Debes seleccionar un nuevo propietario");
+        }
+
+        var file = await _fileRepository.GetByIdAsync(id);
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (file.UploadedByUserId == request.NewOwnerUserId)
+        {
+            return BadRequest("El archivo ya pertenece a ese usuario");
+        }
+
+        var newOwner = await _userManager.FindByIdAsync(request.NewOwnerUserId);
+        if (newOwner == null)
+        {
+            return BadRequest("El nuevo propietario no existe");
+        }
+
+        var previousOwnerId = file.UploadedByUserId;
+        var previousOwnerName = file.UploadedByUser != null
+            ? $"{file.UploadedByUser.FirstName} {file.UploadedByUser.LastName}"
+            : previousOwnerId;
+
+        file.UploadedByUserId = newOwner.Id;
+        file.UploadedByUser = newOwner;
+        await _fileRepository.UpdateAsync(file);
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
+        await _auditLogRepository.AddAsync(new AuditLog
+        {
+            UserId = userId,
+            Action = "FileOwnerChanged",
+            EntityType = "SharedFile",
+            EntityId = id.ToString(),
+            OldValues = previousOwnerId,
+            NewValues = newOwner.Id,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
+        });
+
+        if (!string.IsNullOrEmpty(previousOwnerId))
+        {
+            await _userNotificationService.CreateAsync(
+                previousOwnerId,
+                "Archivo reasignado",
+                $"El archivo '{file.OriginalFileName}' ahora pertenece a {newOwner.FirstName} {newOwner.LastName}.",
+                "warning",
+                "/files",
+                userId);
+        }
+
+        await _userNotificationService.CreateAsync(
+            newOwner.Id,
+            "Nuevo archivo asignado",
+            $"Ahora eres el propietario de '{file.OriginalFileName}'.",
+            "success",
+            $"/files/{file.Id}",
+            userId);
+
+        return Ok(MapToDto(file));
     }
 
     [HttpPut("{id}/unblock")]
@@ -444,6 +650,23 @@ public class FilesController : ControllerBase
             Latitude = clientContext.Latitude,
             Longitude = clientContext.Longitude
         });
+
+        if (!string.IsNullOrEmpty(file.UploadedByUserId))
+        {
+            await _userNotificationService.CreateAsync(
+                file.UploadedByUserId,
+                "Archivo desbloqueado",
+                $"El archivo '{file.OriginalFileName}' vuelve a estar disponible.",
+                "success",
+                $"/files/{file.Id}",
+                userId);
+
+            await _userMessageService.CreateAsync(
+                file.UploadedByUserId,
+                "Archivo desbloqueado",
+                $"Buen trabajo. El archivo '{file.OriginalFileName}' ha sido desbloqueado y puedes continuar trabajando normalmente.",
+                userId);
+        }
 
         return Ok();
     }
@@ -633,7 +856,7 @@ public class FilesController : ControllerBase
         });
     }
 
-    private async Task<FileContentResponse> ValidateFileAccessAsync(
+    private async Task<AccessValidationResult> ValidateFileAccessAsync(
         SharedFile file,
         string? masterPassword,
         bool incrementCounter,
@@ -642,40 +865,26 @@ public class FilesController : ControllerBase
         if (file.IsBlocked)
         {
             await LogFileAccess(file.Id, "AccessBlocked", false);
-            return new FileContentResponse
-            {
-                Success = false,
-                ErrorMessage = "Este archivo ha sido bloqueado"
-            };
+            return AccessValidationResult.Blocked(
+                file.BlockReason,
+                file.BlockReason != null && file.BlockReason.Contains("IA", StringComparison.OrdinalIgnoreCase));
         }
 
         if (file.IsDeleted)
         {
-            return new FileContentResponse
-            {
-                Success = false,
-                ErrorMessage = "Archivo no disponible"
-            };
+            return AccessValidationResult.Fail("Archivo no disponible");
         }
 
         if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
         {
             await LogFileAccess(file.Id, "AccessExpired", false);
-            return new FileContentResponse
-            {
-                Success = false,
-                ErrorMessage = "Este archivo ha expirado"
-            };
+            return AccessValidationResult.Fail("Este archivo ha expirado");
         }
 
         if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
         {
             await LogFileAccess(file.Id, "AccessLimitReached", false);
-            return new FileContentResponse
-            {
-                Success = false,
-                ErrorMessage = "Se alcanzó el límite de accesos"
-            };
+            return AccessValidationResult.Fail("Se alcanzó el límite de accesos");
         }
 
         if (requireMasterPassword && !string.IsNullOrEmpty(file.MasterPassword))
@@ -683,11 +892,7 @@ public class FilesController : ControllerBase
             if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
             {
                 await LogFileAccess(file.Id, "InvalidPassword", false);
-                return new FileContentResponse
-                {
-                    Success = false,
-                    ErrorMessage = "Contraseña incorrecta"
-                };
+                return AccessValidationResult.Fail("Contraseña incorrecta");
             }
         }
 
@@ -697,7 +902,7 @@ public class FilesController : ControllerBase
             await _fileRepository.UpdateAsync(file);
         }
 
-        return new FileContentResponse { Success = true };
+        return AccessValidationResult.Success();
     }
 
     private FileDto MapToDto(SharedFile file)
@@ -715,6 +920,7 @@ public class FilesController : ControllerBase
             CurrentAccessCount = file.CurrentAccessCount,
             IsBlocked = file.IsBlocked,
             BlockReason = file.BlockReason,
+            UploadedByUserId = file.UploadedByUserId,
             UploadedByUserName = $"{file.UploadedByUser?.FirstName} {file.UploadedByUser?.LastName}",
             HasMasterPassword = !string.IsNullOrEmpty(file.MasterPassword),
             IsPdf = file.IsPDF,
@@ -724,5 +930,23 @@ public class FilesController : ControllerBase
             IsDeleted = file.IsDeleted,
             DeletedAt = file.DeletedAt
         };
+    }
+
+    private sealed record AccessValidationResult(
+        bool Success,
+        string? ErrorMessage,
+        bool Blocked,
+        bool BlockedByAi,
+        string? BlockReason)
+    {
+        public static AccessValidationResult SuccessResult { get; } = new(true, null, false, false, null);
+
+        public static AccessValidationResult Success() => SuccessResult;
+
+        public static AccessValidationResult Fail(string errorMessage) =>
+            new(false, errorMessage, false, false, null);
+
+        public static AccessValidationResult Blocked(string? reason, bool blockedByAi) =>
+            new(false, reason ?? "Este archivo ha sido bloqueado", true, blockedByAi, reason);
     }
 }
