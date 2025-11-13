@@ -2,6 +2,8 @@
 @inject NavigationManager NavigationManager
 @inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject ClientContextService ClientContextService
+@inject IJSRuntime JSRuntime
 @using System.Security.Claims
 
 <div class="layout-shell">
@@ -39,6 +41,17 @@
 </div>
 
 @code {
+    private bool contextInitialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !contextInitialized)
+        {
+            await ClientContextService.EnsureInitializedAsync(JSRuntime);
+            contextInitialized = true;
+        }
+    }
+
     private async Task Logout()
     {
         await AuthService.LogoutAsync();

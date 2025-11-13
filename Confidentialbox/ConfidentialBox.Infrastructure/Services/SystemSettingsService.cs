@@ -339,6 +339,26 @@ public class SystemSettingsService : ISystemSettingsService
 
         settings.SuspiciousExtensions = NormalizeExtensions(settings.SuspiciousExtensions);
 
+        if (string.IsNullOrWhiteSpace(settings.PlatformTimeZone))
+        {
+            settings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
+        }
+        else
+        {
+            try
+            {
+                _ = TimeZoneInfo.FindSystemTimeZoneById(settings.PlatformTimeZone);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                settings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                settings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
+            }
+        }
+
         return settings;
     }
 

@@ -56,4 +56,10 @@ public class UserMessageRepository : IUserMessageRepository
         message.IsRead = true;
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateAsync(UserMessage message, CancellationToken cancellationToken = default)
+    {
+        _context.UserMessages.Update(message);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

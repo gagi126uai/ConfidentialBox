@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using ConfidentialBox.Infrastructure.Repositories;
@@ -445,6 +446,78 @@ public class UsersController : ControllerBase
 
         await _userMessageService.MarkAsReadAsync(userId, messageId);
         return NoContent();
+    }
+
+    [HttpPost("me/messages/{messageId}/reply")]
+    [Authorize]
+    public async Task<ActionResult<OperationResultDto>> ReplyToMessage(int messageId, [FromBody] UserMessageReplyRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Body))
+        {
+            return BadRequest(new OperationResultDto
+            {
+                Success = false,
+                Error = "Debes escribir un mensaje para responder."
+            });
+        }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new OperationResultDto { Success = false, Error = "Sesión inválida" });
+        }
+
+        var message = await _userMessageService.GetByIdAsync(messageId);
+        if (message == null || !string.Equals(message.UserId, userId, StringComparison.Ordinal))
+        {
+            return NotFound(new OperationResultDto { Success = false, Error = "Mensaje no encontrado" });
+        }
+
+        var recipients = new HashSet<string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(message.SenderId))
+        {
+            recipients.Add(message.SenderId);
+        }
+
+        if (recipients.Count == 0)
+        {
+            var admins = await _userManager.GetUsersInRoleAsync("Admin");
+            foreach (var admin in admins)
+            {
+                if (!string.Equals(admin.Id, userId, StringComparison.Ordinal))
+                {
+                    recipients.Add(admin.Id);
+                }
+            }
+        }
+
+        var sender = await _userManager.FindByIdAsync(userId);
+        var senderName = sender != null
+            ? $"{sender.FirstName} {sender.LastName}".Trim()
+            : "Usuario";
+        var subject = string.IsNullOrWhiteSpace(message.Subject)
+            ? "Respuesta del usuario"
+            : $"Re: {message.Subject}";
+
+        var replyBody = request.Body.Trim();
+
+        foreach (var recipient in recipients)
+        {
+            await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
+            await _userNotificationService.CreateAsync(
+                recipient,
+                "Nueva respuesta recibida",
+                $"{senderName} respondió: {subject}",
+                "info",
+                $"/users/{recipient}?tab=messages",
+                userId);
+        }
+
+        message.RequiresResponse = false;
+        message.IsRead = true;
+        await _userMessageService.UpdateAsync(message);
+
+        return Ok(new OperationResultDto { Success = true });
     }
 
     [HttpPost("{id}/messages")]

@@ -241,36 +241,37 @@
         else if (activeTab == "alerts")
         {
             <div class="row g-4">
-                <div class="col-lg-4">
+                <div class="col-xl-4">
                     <div class="card h-100 shadow-sm border-0">
-                        <div class="card-body">
-                            <h5 class="card-title d-flex align-items-center gap-2">
-                                <i class="fas fa-signal"></i>
-                                Salud del sistema
-                            </h5>
-
-                            <ul class="list-unstyled mb-0 small mt-3">
-                                <li class="d-flex justify-content-between align-items-center mb-2">
-                                    <span>Alertas nuevas hoy</span>
-                                    <span class="badge text-bg-primary">@((alertSummary?.NewAlerts ?? 0).ToString())</span>
-                                </li>
-                                <li class="d-flex justify-content-between align-items-center mb-2">
-                                    <span>Críticas sin revisar</span>
-                                    <span class="badge text-bg-danger">@((dashboard?.CriticalAlertsUnreviewed ?? 0).ToString())</span>
-                                </li>
-                                <li class="d-flex justify-content-between align-items-center mb-2">
-                                    <span>Usuarios de alto riesgo</span>
-                                    <span class="badge text-bg-warning text-dark">@((dashboard?.HighRiskUsers ?? 0).ToString())</span>
-                                </li>
-                                <li class="d-flex justify-content-between align-items-center">
-                                    <span>Archivos sospechosos</span>
-                                    <span class="badge text-bg-info">@((dashboard?.SuspiciousFilesDetected ?? 0).ToString())</span>
-                                </li>
-                            </ul>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div>
+                                <h5 class="card-title d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-signal"></i>
+                                    Salud del sistema
+                                </h5>
+                                <ul class="list-unstyled mb-0 small">
+                                    <li class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Alertas nuevas hoy</span>
+                                        <span class="badge text-bg-primary">@((alertSummary?.NewAlerts ?? 0).ToString())</span>
+                                    </li>
+                                    <li class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Críticas sin revisar</span>
+                                        <span class="badge text-bg-danger">@((dashboard?.CriticalAlertsUnreviewed ?? 0).ToString())</span>
+                                    </li>
+                                    <li class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Usuarios de alto riesgo</span>
+                                        <span class="badge text-bg-warning text-dark">@((dashboard?.HighRiskUsers ?? 0).ToString())</span>
+                                    </li>
+                                    <li class="d-flex justify-content-between align-items-center">
+                                        <span>Archivos sospechosos</span>
+                                        <span class="badge text-bg-info">@((dashboard?.SuspiciousFilesDetected ?? 0).ToString())</span>
+                                    </li>
+                                </ul>
+                            </div>
 
                             @if (alertSummary?.SeverityCounts?.Any() == true)
                             {
-                                <div class="mt-4">
+                                <div>
                                     <h6 class="text-muted text-uppercase small">Distribución por severidad</h6>
                                     <div class="d-flex flex-column gap-2">
                                         @foreach (var severity in alertSummary.SeverityCounts.OrderByDescending(pair => pair.Value))
@@ -288,57 +289,144 @@
                                     </div>
                                 </div>
                             }
+
+                            <div>
+                                <h6 class="text-muted text-uppercase small">Acciones recomendadas</h6>
+                                @if (dashboard?.ActionRecommendations?.Any() == true)
+                                {
+                                    <ul class="list-group list-group-flush small">
+                                        @foreach (var recommendation in dashboard.ActionRecommendations)
+                                        {
+                                            <li class="list-group-item px-0">
+                                                <i class="fas fa-check-circle text-success me-2"></i>@recommendation
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small mb-0">Sin acciones urgentes. El monitoreo continúa estable.</p>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-8">
+                <div class="col-xl-8">
                     <div class="card shadow-sm border-0 h-100">
-                        <div class="card-header bg-white d-flex flex-wrap align-items-center gap-2 justify-content-between">
+                        <div class="card-header bg-white d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
                             <div>
-                                <h5 class="mb-0">Alertas recientes</h5>
-                                <small class="text-muted">Actividad priorizada por la IA</small>
+                                <h5 class="mb-0">Centro de alertas</h5>
+                                <small class="text-muted">Eventos priorizados por la IA</small>
                             </div>
-                            <a class="btn btn-sm btn-outline-secondary" href="/security-alerts">
-                                Ver panel completo
-                            </a>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body p-0">
                             @if (dashboard?.RecentAlerts is null || !dashboard.RecentAlerts.Any())
                             {
-                                <div class="alert alert-success mb-0">
+                                <div class="alert alert-success m-3">
                                     <i class="fas fa-check-circle me-1"></i>No hay eventos sospechosos en este momento.
                                 </div>
                             }
                             else
                             {
-                                <div class="list-group list-group-flush">
-                                    @foreach (var alert in dashboard.RecentAlerts.Take(12))
-                                    {
-                                        <div class="list-group-item px-0 d-flex gap-3 align-items-start">
-                                            <div class="alert-severity alert-severity--@GetSeverityColor(alert.Severity)">
-                                                <span>@GetSeverityInitial(alert.Severity)</span>
-                                            </div>
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex justify-content-between align-items-start">
-                                                    <div>
-                                                        <h6 class="mb-1">@alert.AlertType</h6>
-                                                        <p class="mb-1 small text-muted">@alert.Description</p>
-                                                    </div>
-                                                    <span class="badge bg-light text-dark">@alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
-                                                </div>
-                                                <div class="d-flex flex-wrap gap-2 small text-muted">
-                                                    <span><i class="fas fa-user me-1"></i>@(string.IsNullOrWhiteSpace(alert.UserName) ? "Usuario desconocido" : alert.UserName)</span>
-                                                    @if (!string.IsNullOrWhiteSpace(alert.FileName))
-                                                    {
-                                                        <span><i class="fas fa-file me-1"></i>@alert.FileName</span>
-                                                    }
-                                                    <span><i class="fas fa-bolt me-1"></i>@($"Confianza {alert.ConfidenceScore * 100:F0}%")</span>
-                                                    <span class="badge bg-@(alert.IsReviewed ? "success" : "warning text-dark")">@(alert.IsReviewed ? "Revisada" : "Pendiente")</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    }
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Tipo</th>
+                                                <th>Severidad</th>
+                                                <th>Usuario</th>
+                                                <th>Archivo</th>
+                                                <th>Confianza</th>
+                                                <th>Detectada</th>
+                                                <th>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var alert in dashboard.RecentAlerts.Take(12))
+                                            {
+                                                <tr>
+                                                    <td>@alert.AlertType</td>
+                                                    <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
+                                                    <td>@(string.IsNullOrWhiteSpace(alert.UserName) ? "Usuario desconocido" : alert.UserName)</td>
+                                                    <td>@(string.IsNullOrWhiteSpace(alert.FileName) ? "-" : alert.FileName)</td>
+                                                    <td>@($"{alert.ConfidenceScore * 100:F0}%")</td>
+                                                    <td>@alert.DetectedAt.ToString("dd/MM HH:mm")</td>
+                                                    <td>
+                                                        <span class="badge bg-@(alert.IsReviewed ? "success" : "warning text-dark")">
+                                                            @(alert.IsReviewed ? "Revisada" : "Pendiente")
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">Perfiles de mayor riesgo</h5>
+                                <small class="text-muted">Usuarios que requieren seguimiento inmediato</small>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            @if (dashboard?.HighRiskUsersDetails?.Any() == true)
+                            {
+                                <div class="table-responsive">
+                                    <table class="table align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Usuario</th>
+                                                <th>Riesgo</th>
+                                                <th>Promedio diarios</th>
+                                                <th>Hoy</th>
+                                                <th>Hallazgos</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var user in dashboard.HighRiskUsersDetails)
+                                            {
+                                                <tr>
+                                                    <td>@user.UserName</td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="badge bg-@GetThreatLevelColor(user.RiskScore)">@GetThreatLevelText(user.RiskScore)</span>
+                                                            <span class="small text-muted">@($"{user.RiskScore * 100:F0}%")</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>@user.AverageFilesPerDay:F1</td>
+                                                    <td>@user.CurrentFilesPerDay</td>
+                                                    <td>
+                                                        @if (user.AnomaliesDetected?.Any() == true)
+                                                        {
+                                                            <ul class="list-unstyled mb-0 small">
+                                                                @foreach (var insight in user.AnomaliesDetected)
+                                                                {
+                                                                    <li><i class="fas fa-exclamation-triangle text-warning me-1"></i>@insight</li>
+                                                                }
+                                                            </ul>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted small">Sin hallazgos recientes.</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-info mb-0">
+                                    <i class="fas fa-info-circle me-1"></i>No hay usuarios catalogados como alto riesgo.
                                 </div>
                             }
                         </div>

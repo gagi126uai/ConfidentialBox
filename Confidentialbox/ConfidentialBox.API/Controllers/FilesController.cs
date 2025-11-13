@@ -571,6 +571,8 @@ public class FilesController : ControllerBase
         file.UploadedByUser = newOwner;
         await _fileRepository.UpdateAsync(file);
 
+        var transferredAlerts = await _aiSecurityService.TransferAlertsToNewOwnerAsync(file.Id, newOwner.Id, userId);
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
         var clientContext = _clientContextResolver.Resolve(HttpContext);
 
@@ -581,7 +583,7 @@ public class FilesController : ControllerBase
             EntityType = "SharedFile",
             EntityId = id.ToString(),
             OldValues = previousOwnerId,
-            NewValues = newOwner.Id,
+            NewValues = $"NewOwner={newOwner.Id};TransferredAlerts={transferredAlerts}",
             Timestamp = DateTime.UtcNow,
             IpAddress = clientContext.IpAddress,
             UserAgent = clientContext.UserAgent,

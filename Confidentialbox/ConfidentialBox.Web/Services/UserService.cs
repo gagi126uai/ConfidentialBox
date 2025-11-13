@@ -118,6 +118,16 @@ public class UserService : IUserService
         await _httpClient.PostAsync($"api/users/me/messages/{messageId}/read", null);
     }
 
+    public async Task<OperationResultDto> ReplyToMessageAsync(int messageId, string body)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/users/me/messages/{messageId}/reply",
+            new UserMessageReplyRequest { Body = body });
+
+        return await response.Content.ReadFromJsonAsync<OperationResultDto>()
+            ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
+
     public async Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync($"api/users/{userId}/messages", request);

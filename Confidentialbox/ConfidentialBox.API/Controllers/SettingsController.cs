@@ -239,7 +239,8 @@ public class SettingsController : ControllerBase
             RecommendationMonitorThreshold = request.RecommendationMonitorThreshold,
             RiskLevelHighThreshold = request.RiskLevelHighThreshold,
             RiskLevelMediumThreshold = request.RiskLevelMediumThreshold,
-            SuspiciousExtensions = ParseExtensions(request.SuspiciousExtensions)
+            SuspiciousExtensions = ParseExtensions(request.SuspiciousExtensions),
+            PlatformTimeZone = request.PlatformTimeZone
         };
 
         await _systemSettingsService.UpdateAIScoringSettingsAsync(settings, GetUserId(), cancellationToken);
@@ -320,7 +321,8 @@ public class SettingsController : ControllerBase
             RecommendationMonitorThreshold = settings.RecommendationMonitorThreshold,
             RiskLevelHighThreshold = settings.RiskLevelHighThreshold,
             RiskLevelMediumThreshold = settings.RiskLevelMediumThreshold,
-            SuspiciousExtensions = string.Join(", ", settings.SuspiciousExtensions)
+            SuspiciousExtensions = string.Join(", ", settings.SuspiciousExtensions),
+            PlatformTimeZone = settings.PlatformTimeZone
         };
     }
 
