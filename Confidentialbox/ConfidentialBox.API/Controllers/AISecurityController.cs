@@ -23,6 +23,7 @@ public class AISecurityController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IFileRepository _fileRepository;
+    private readonly IFileAccessRepository _fileAccessRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IClientContextResolver _clientContextResolver;
 
@@ -31,6 +32,7 @@ public class AISecurityController : ControllerBase
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         IFileRepository fileRepository,
+        IFileAccessRepository fileAccessRepository,
         IAuditLogRepository auditLogRepository,
         IClientContextResolver clientContextResolver)
     {
@@ -38,6 +40,7 @@ public class AISecurityController : ControllerBase
         _context = context;
         _userManager = userManager;
         _fileRepository = fileRepository;
+        _fileAccessRepository = fileAccessRepository;
         _auditLogRepository = auditLogRepository;
         _clientContextResolver = clientContextResolver;
     }
@@ -291,7 +294,6 @@ public class AISecurityController : ControllerBase
                     Latitude = latestAccess.Latitude,
                     Longitude = latestAccess.Longitude
                 }
-                CanEscalateMonitoring = true
             };
 
             return Ok(dto);
