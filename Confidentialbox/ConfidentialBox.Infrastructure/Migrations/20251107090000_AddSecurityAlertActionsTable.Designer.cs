@@ -4,6 +4,7 @@ using ConfidentialBox.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ConfidentialBox.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251107090000_AddSecurityAlertActionsTable")]
+    partial class AddSecurityAlertActionsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -505,9 +508,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<DateTime?>("BlockedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ClipboardEvents")
-                        .HasColumnType("int");
-
                     b.Property<int>("CopyAttempts")
                         .HasColumnType("int");
 
@@ -516,9 +516,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
 
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("FullscreenExitEvents")
-                        .HasColumnType("int");
 
                     b.Property<bool>("IsSuspicious")
                         .HasColumnType("bit");
@@ -570,14 +567,8 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<string>("ViewerUserId")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int>("VisibilityLossEvents")
-                        .HasColumnType("int");
-
                     b.Property<bool>("WasBlocked")
                         .HasColumnType("bit");
-
-                    b.Property<int>("WindowBlurEvents")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -696,9 +687,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("EscalationLevel")
-                        .HasColumnType("int");
-
                     b.Property<int?>("FileId")
                         .HasColumnType("int");
 
@@ -726,18 +714,9 @@ namespace ConfidentialBox.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Verdict")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
 
                     b.HasKey("Id");
 
@@ -987,18 +966,6 @@ namespace ConfidentialBox.Infrastructure.Migrations
 
                     b.Property<DateTime>("LastUpdated")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("MonitoringLevel")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
-
-                    b.Property<DateTime?>("MonitoringLevelUpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("MonitoringNotes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<DateTime>("ProfileCreatedAt")
                         .HasColumnType("datetime2");
