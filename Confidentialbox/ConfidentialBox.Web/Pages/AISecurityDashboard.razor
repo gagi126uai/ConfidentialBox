@@ -50,7 +50,7 @@
 
 <div class="card shadow-sm">
     <div class="card-header bg-white border-bottom">
-        <ul class="nav nav-tabs card-header-tabs">
+        <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-auto pb-1">
             <li class="nav-item">
                 <button type="button"
                         class="nav-link @(activeTab == "overview" ? "active" : string.Empty)"
@@ -60,20 +60,21 @@
             </li>
             <li class="nav-item">
                 <button type="button"
+                        class="nav-link @(activeTab == "alerts" ? "active" : string.Empty)"
+                        @onclick='() => SetActiveTab("alerts")'>
+                    <i class="fas fa-bell"></i> Centro de alertas
+                    @if ((alertSummary?.NewAlerts ?? 0) > 0)
+                    {
+                        <span class="badge rounded-pill text-bg-danger ms-2">@alertSummary!.NewAlerts</span>
+                    }
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button"
                         class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
                         @onclick='() => SetActiveTab("settings")'>
                     <i class="fas fa-sliders-h"></i> Configuración de IA
                 </button>
-            </li>
-            <li class="nav-item ms-auto">
-                <a class="nav-link d-flex align-items-center gap-2"
-                   href="/security-alerts">
-                    <span><i class="fas fa-bell"></i> Alertas</span>
-                    @if ((alertSummary?.NewAlerts ?? 0) > 0)
-                    {
-                        <span class="badge rounded-pill text-bg-danger">@alertSummary!.NewAlerts</span>
-                    }
-                </a>
             </li>
         </ul>
     </div>
@@ -228,71 +229,123 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-bell"></i> Alertas Recientes</h5>
-                        <a href="/security-alerts" class="btn btn-sm btn-outline-primary">Ver todas</a>
-                    </div>
-                    <div class="card-body">
-                        @if (dashboard.RecentAlerts is null || !dashboard.RecentAlerts.Any())
-                        {
-                            <div class="alert alert-success mb-0">
-                                <i class="fas fa-check-circle"></i>
-                                No hay alertas recientes. El sistema está seguro.
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Tipo</th>
-                                            <th>Severidad</th>
-                                            <th>Usuario</th>
-                                            <th>Archivo</th>
-                                            <th>Descripción</th>
-                                            <th>Confianza</th>
-                                            <th>Fecha</th>
-                                            <th>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var alert in dashboard.RecentAlerts)
-                                        {
-                                            var confidencePercent = alert.ConfidenceScore * 100;
-                                            <tr>
-                                                <td><span class="badge bg-secondary">@alert.AlertType</span></td>
-                                                <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
-                                                <td>@alert.UserName</td>
-                                                <td>@(alert.FileName ?? "-")</td>
-                                                <td><small>@alert.Description</small></td>
-                                                <td>
-                                                    <div class="progress" style="width: 100px; height: 20px;">
-                                                        <div class="progress-bar" style="@($"width: {confidencePercent:F0}%")">
-                                                            @($"{confidencePercent:F0}%")
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td><small>@alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</small></td>
-                                                <td>
-                                                    @if (alert.IsReviewed)
-                                                    {
-                                                        <span class="badge bg-success">Revisada</span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="badge bg-warning text-dark">Pendiente</span>
-                                                    }
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        }
+                    <div class="card-body text-center py-5 text-muted">
+                        <i class="fas fa-chart-pie fa-2x mb-3"></i>
+                        <p class="mb-0">Explora el centro de alertas para obtener detalles accionables y priorizar la respuesta.</p>
+                        <button class="btn btn-outline-primary btn-sm mt-3" @onclick="() => SetActiveTab("alerts")">
+                            Ir al centro de alertas
+                        </button>
                     </div>
                 </div>
             }
+        }
+        else if (activeTab == "alerts")
+        {
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body">
+                            <h5 class="card-title d-flex align-items-center gap-2">
+                                <i class="fas fa-signal"></i>
+                                Salud del sistema
+                            </h5>
+
+                            <ul class="list-unstyled mb-0 small mt-3">
+                                <li class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Alertas nuevas hoy</span>
+                                    <span class="badge text-bg-primary">@((alertSummary?.NewAlerts ?? 0).ToString())</span>
+                                </li>
+                                <li class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Críticas sin revisar</span>
+                                    <span class="badge text-bg-danger">@((dashboard?.CriticalAlertsUnreviewed ?? 0).ToString())</span>
+                                </li>
+                                <li class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Usuarios de alto riesgo</span>
+                                    <span class="badge text-bg-warning text-dark">@((dashboard?.HighRiskUsers ?? 0).ToString())</span>
+                                </li>
+                                <li class="d-flex justify-content-between align-items-center">
+                                    <span>Archivos sospechosos</span>
+                                    <span class="badge text-bg-info">@((dashboard?.SuspiciousFilesDetected ?? 0).ToString())</span>
+                                </li>
+                            </ul>
+
+                            @if (alertSummary?.SeverityCounts?.Any() == true)
+                            {
+                                <div class="mt-4">
+                                    <h6 class="text-muted text-uppercase small">Distribución por severidad</h6>
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var severity in alertSummary.SeverityCounts.OrderByDescending(pair => pair.Value))
+                                        {
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-@GetSeverityColor(severity.Key)">@severity.Key</span>
+                                                <div class="flex-grow-1">
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar bg-@GetSeverityColor(severity.Key)" style="@($"width: {GetSeverityPercentage(severity.Value, alertSummary.SeverityCounts.Values.Sum()):F0}%")"></div>
+                                                    </div>
+                                                </div>
+                                                <span class="fw-semibold">@severity.Value</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-white d-flex flex-wrap align-items-center gap-2 justify-content-between">
+                            <div>
+                                <h5 class="mb-0">Alertas recientes</h5>
+                                <small class="text-muted">Actividad priorizada por la IA</small>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary" href="/security-alerts">
+                                Ver panel completo
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            @if (dashboard?.RecentAlerts is null || !dashboard.RecentAlerts.Any())
+                            {
+                                <div class="alert alert-success mb-0">
+                                    <i class="fas fa-check-circle me-1"></i>No hay eventos sospechosos en este momento.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="list-group list-group-flush">
+                                    @foreach (var alert in dashboard.RecentAlerts.Take(12))
+                                    {
+                                        <div class="list-group-item px-0 d-flex gap-3 align-items-start">
+                                            <div class="alert-severity alert-severity--@GetSeverityColor(alert.Severity)">
+                                                <span>@GetSeverityInitial(alert.Severity)</span>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <h6 class="mb-1">@alert.AlertType</h6>
+                                                        <p class="mb-1 small text-muted">@alert.Description</p>
+                                                    </div>
+                                                    <span class="badge bg-light text-dark">@alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                                </div>
+                                                <div class="d-flex flex-wrap gap-2 small text-muted">
+                                                    <span><i class="fas fa-user me-1"></i>@(string.IsNullOrWhiteSpace(alert.UserName) ? "Usuario desconocido" : alert.UserName)</span>
+                                                    @if (!string.IsNullOrWhiteSpace(alert.FileName))
+                                                    {
+                                                        <span><i class="fas fa-file me-1"></i>@alert.FileName</span>
+                                                    }
+                                                    <span><i class="fas fa-bolt me-1"></i>@($"Confianza {alert.ConfidenceScore * 100:F0}%")</span>
+                                                    <span class="badge bg-@(alert.IsReviewed ? "success" : "warning text-dark")">@(alert.IsReviewed ? "Revisada" : "Pendiente")</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
         }
         else
         {
@@ -528,6 +581,19 @@
         "Low" => "secondary",
         _ => "secondary"
     };
+
+    private double GetSeverityPercentage(int value, int total)
+        => total == 0 ? 0 : (value / (double)total) * 100;
+
+    private static string GetSeverityInitial(string? severity)
+    {
+        if (string.IsNullOrWhiteSpace(severity))
+        {
+            return "?";
+        }
+
+        return char.ToUpperInvariant(severity[0]).ToString();
+    }
 
     private double GetPercentage(int value, int max)
         => max == 0 ? 0 : (value / (double)max) * 100;

@@ -1,169 +1,119 @@
-.page {
-    position: relative;
+.layout-shell {
+    display: flex;
+    min-height: 100vh;
+    background: #f3f4f6;
+}
+
+.layout-sidebar {
+    width: 260px;
+    background: linear-gradient(180deg, #0f172a 0%, #1f2937 60%, #111827 100%);
+    color: #e5e7eb;
+}
+
+.layout-main {
+    flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-.main {
-    flex: 1;
-}
-
-.sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
-}
-
-.top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
+.layout-header {
+    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 60%, #8b5cf6 100%);
+    color: #fff;
+    padding: 1.5rem 2rem;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.top-actions {
+.layout-header__title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.app-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+.app-subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.85;
+}
+
+.layout-header__actions {
     display: flex;
     align-items: center;
     gap: 1.25rem;
-    margin-left: auto;
+    align-self: flex-end;
 }
 
-.notification-bell {
-    position: relative;
-}
-
-.user-greeting {
-    text-align: right;
+.layout-header__profile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     line-height: 1.1;
 }
 
-.user-greeting .hello {
-    display: block;
+.layout-header__profile .greeting {
     font-size: 0.75rem;
-    color: #6c757d;
-    letter-spacing: 0.03em;
     text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.75;
 }
 
-.user-greeting .name {
+.layout-header__profile .username {
     font-weight: 600;
-    color: #212529;
+    font-size: 1rem;
 }
 
-.logout-button {
-    white-space: nowrap;
+.layout-header__actions .btn {
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #fff;
 }
 
-.notification-button {
-    position: relative;
-    color: #495057;
-}
-
-.notification-button .notification-count {
-    position: absolute;
-    top: -0.4rem;
-    right: -0.25rem;
-    font-size: 0.7rem;
-    border-radius: 999px;
-    padding: 0.1rem 0.35rem;
-}
-
-.notification-dropdown {
-    position: absolute;
-    right: 0;
-    margin-top: 0.75rem;
-    width: 320px;
-    max-height: 360px;
-    overflow-y: auto;
-    background-color: #fff;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    z-index: 1050;
-}
-
-.notification-header {
-    border-bottom: 1px solid #ececec;
-    padding-bottom: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.notification-item {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f1f1f1;
-}
-
-.notification-item:last-child {
-    border-bottom: none;
-}
-
-.notification-item.unread {
-    background-color: #f0f6ff;
-    border-radius: 0.35rem;
-    padding: 0.6rem;
-}
-
-.notification-danger {
-    border-left: 4px solid #dc3545;
-}
-
-.notification-warning {
-    border-left: 4px solid #ffc107;
-}
-
-.notification-success {
-    border-left: 4px solid #28a745;
-}
-
-.notification-info {
-    border-left: 4px solid #0d6efd;
-}
-
-.notification-content {
+.layout-content {
     flex: 1;
-    padding-right: 0.5rem;
+    padding: 2rem;
 }
 
-.tiny-text {
-    font-size: 0.75rem;
-}
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-        padding: 0 1rem;
+@media (max-width: 991.98px) {
+    .layout-shell {
+        flex-direction: column;
     }
 
-    .top-actions {
+    .layout-sidebar {
+        width: 100%;
+        position: relative;
+    }
+
+    .layout-header {
+        padding: 1.5rem;
+    }
+
+    .layout-header__actions {
         width: 100%;
         justify-content: space-between;
-        gap: 0.75rem;
     }
 
-    .user-greeting {
-        text-align: left;
+    .layout-header__profile {
+        align-items: flex-start;
     }
 }
 
-@media (min-width: 641px) {
-    .page {
+@media (min-width: 992px) {
+    .layout-header {
         flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
     }
 
-    .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .main > div {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
+    .layout-header__actions {
+        align-self: center;
+        margin-left: auto;
     }
 }
