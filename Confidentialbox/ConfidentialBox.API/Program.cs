@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddMemoryCache();
 
 // Configurar Swagger con autenticación JWT
 builder.Services.AddSwaggerGen(c =>
@@ -117,6 +118,7 @@ builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<IUserMessageRepository, UserMessageRepository>();
 builder.Services.AddScoped<IUserMessageService, UserMessageService>();
 builder.Services.AddSingleton<IClientContextResolver, ClientContextResolver>();
+builder.Services.AddSingleton<ISecurePdfSessionPolicyStore, SecurePdfSessionPolicyStore>();
 
 // Configurar CORS
 builder.Services.AddCors(options =>
