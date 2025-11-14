@@ -4195,6 +4195,12 @@
           "validateCertificates": {
             "type": "boolean"
           },
+          "allowSelfSignedCertificates": {
+            "type": "boolean"
+          },
+          "requireTls12": {
+            "type": "boolean"
+          },
           "username": {
             "maxLength": 256,
             "minLength": 0,
@@ -4233,6 +4239,50 @@
             "minLength": 0,
             "pattern": "^(Auto|Plain|Login|CramMd5)$",
             "type": "string",
+            "nullable": true
+          },
+          "secondaryHost": {
+            "maxLength": 256,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "secondaryPort": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxRetryAttempts": {
+            "maximum": 10,
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryBackoffSeconds": {
+            "maximum": 600,
+            "minimum": 5,
+            "type": "integer",
+            "format": "int32"
+          },
+          "enableDeliveryStatusNotifications": {
+            "type": "boolean"
+          },
+          "trackBounceReasons": {
+            "type": "boolean"
+          },
+          "useClientCertificate": {
+            "type": "boolean"
+          },
+          "clientCertificateThumbprint": {
+            "maxLength": 96,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "operationalContactEmail": {
+            "type": "string",
+            "format": "email",
             "nullable": true
           },
           "hasPassword": {
