@@ -29,25 +29,11 @@ public class ClientContextService
 
             try
             {
-                var module = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/confidentialbox.js");
-                try
+                await jsRuntime.InvokeVoidAsync("ConfidentialBox.ensureSecureViewerReady");
+                var payload = await jsRuntime.InvokeAsync<ClientContextPayload?>("ConfidentialBox.collectClientContext");
+                if (payload != null)
                 {
-                    var payload = await module.InvokeAsync<ClientContextPayload?>("collectClientContext");
-                    if (payload != null)
-                    {
-                        _context = payload;
-                    }
-                }
-                finally
-                {
-                    try
-                    {
-                        await module.DisposeAsync();
-                    }
-                    catch
-                    {
-                        // ignore dispose issues
-                    }
+                    _context = payload;
                 }
             }
             catch (JSException)

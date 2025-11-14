@@ -161,11 +161,11 @@
     private bool blockedByAi;
     private string? blockedReason;
     private DotNetObjectReference<ViewPdf>? dotNetReference;
-    private IJSObjectReference? confidentialBoxModule;
     private const string PdfFrameElementId = "securePdfFrame";
     private const string ViewerContainerElementId = "secureViewerContainer";
     private const string ToolbarElementId = "securePdfToolbar";
     private bool shouldAutoStartViewer;
+    private bool secureViewerScriptReady;
 
     protected override async Task OnInitializedAsync()
     {
@@ -260,16 +260,16 @@
             infoMessage = null;
             pdfLoaded = false;
 
-            var module = await GetConfidentialBoxModuleAsync();
+            await EnsureSecureViewerScriptAsync();
 
             if (sessionId != null)
             {
                 await PdfViewerService.EndSessionAsync(sessionId);
-                await module.InvokeVoidAsync("disposeSecurePdfViewer", sessionId);
+                await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", sessionId);
                 sessionId = null;
             }
 
-            await module.InvokeVoidAsync("disposePdfFrame", PdfFrameElementId);
+            await JS.InvokeVoidAsync("ConfidentialBox.disposePdfFrame", PdfFrameElementId);
 
             var startResponse = await PdfViewerService.StartSessionAsync(new StartViewerSessionRequest
             {
@@ -312,14 +312,14 @@
             pdfLoaded = true;
             await InvokeAsync(StateHasChanged);
 
-            await module.InvokeVoidAsync(
-                "renderPdf",
+            await JS.InvokeVoidAsync(
+                "ConfidentialBox.renderPdf",
                 PdfFrameElementId,
                 base64Content,
                 viewerConfig.FileName);
 
-            await module.InvokeVoidAsync(
-                "initSecurePdfViewer",
+            await JS.InvokeVoidAsync(
+                "ConfidentialBox.initSecurePdfViewer",
                 ViewerContainerElementId,
                 new
                 {
@@ -342,7 +342,7 @@
                     fileName = viewerConfig.FileName
                 });
 
-            await module.InvokeVoidAsync("notifyPdfPage", sessionId, 1);
+            await JS.InvokeVoidAsync("ConfidentialBox.notifyPdfPage", sessionId, 1);
             infoMessage = "Visor seguro inicializado. La IA monitorea en tiempo real.";
         }
         catch (Exception ex)
@@ -401,16 +401,27 @@
             infoMessage = null;
             pdfLoaded = false;
 
-            var module = await GetConfidentialBoxModuleAsync();
-            await module.InvokeVoidAsync("disposePdfFrame", PdfFrameElementId);
+            await EnsureSecureViewerScriptAsync();
+            await JS.InvokeVoidAsync("ConfidentialBox.disposePdfFrame", PdfFrameElementId);
 
             if (sessionId != null)
             {
                 await PdfViewerService.EndSessionAsync(sessionId);
-                await module.InvokeVoidAsync("disposeSecurePdfViewer", sessionId);
+                await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", sessionId);
                 sessionId = null;
             }
         }
+    }
+
+    private async Task EnsureSecureViewerScriptAsync()
+    {
+        if (secureViewerScriptReady)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("ConfidentialBox.ensureSecureViewerReady");
+        secureViewerScriptReady = true;
     }
 
     private static byte[] DecryptContent(string encryptedContent, string encryptionKey)
@@ -484,43 +495,35 @@
 
     public async ValueTask DisposeAsync()
     {
-        var module = confidentialBoxModule;
         var currentSession = sessionId;
-
-        if (module is null && currentSession != null)
-        {
-            module = await GetConfidentialBoxModuleAsync();
-        }
 
         if (currentSession != null)
         {
             await PdfViewerService.EndSessionAsync(currentSession);
         }
 
-        if (module is not null)
+        if (currentSession != null || pdfLoaded)
         {
-            if (currentSession != null)
+            try
             {
-                await module.InvokeVoidAsync("disposeSecurePdfViewer", currentSession);
-            }
+                await EnsureSecureViewerScriptAsync();
 
-            await module.InvokeVoidAsync("disposePdfFrame", PdfFrameElementId);
-            await module.DisposeAsync();
+                if (currentSession != null)
+                {
+                    await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", currentSession);
+                }
+
+                await JS.InvokeVoidAsync("ConfidentialBox.disposePdfFrame", PdfFrameElementId);
+            }
+            catch (Microsoft.JSInterop.JSException)
+            {
+                // Ignore errors thrown while tearing down the browser viewer during prerendering.
+            }
         }
 
-        confidentialBoxModule = null;
         sessionId = null;
         dotNetReference?.Dispose();
-    }
-
-    private async Task<IJSObjectReference> GetConfidentialBoxModuleAsync()
-    {
-        if (confidentialBoxModule is null)
-        {
-            confidentialBoxModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/confidentialbox.js");
-        }
-
-        return confidentialBoxModule;
+        dotNetReference = null;
     }
 
     private sealed class SecureViewerForm

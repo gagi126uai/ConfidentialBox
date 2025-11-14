@@ -130,17 +130,6 @@
     private bool fileBlocked;
     private string? blockReason;
     private bool blockedByAi;
-    private IJSObjectReference? confidentialBoxModule;
-
-    private async Task<IJSObjectReference> GetConfidentialBoxModuleAsync()
-    {
-        if (confidentialBoxModule is null)
-        {
-            confidentialBoxModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/confidentialbox.js");
-        }
-
-        return confidentialBoxModule;
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -312,8 +301,7 @@
 
             var decryptedBytes = DecryptContent(contentResponse.EncryptedContent, contentResponse.EncryptionKey);
             var base64 = Convert.ToBase64String(decryptedBytes);
-            var module = await GetConfidentialBoxModuleAsync();
-            await module.InvokeVoidAsync("downloadFile", fileMetadata.OriginalFileName, base64);
+            await JS.InvokeVoidAsync("ConfidentialBox.downloadFile", fileMetadata.OriginalFileName, base64);
             successMessage = "Descarga iniciada.";
         }
         catch (Exception ex)
@@ -358,11 +346,5 @@
         }
         return $"{len:0.##} {sizes[order]}";
     }
-    public async ValueTask DisposeAsync()
-    {
-        if (confidentialBoxModule is not null)
-        {
-            await confidentialBoxModule.DisposeAsync();
-        }
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
