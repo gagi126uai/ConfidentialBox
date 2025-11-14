@@ -109,25 +109,6 @@ function frameRequiresContextMenuBlock(frameId) {
     return false;
 }
 
-function frameAllowsTextSelection(frameId) {
-    if (!frameId) {
-        return false;
-    }
-
-    let allow = false;
-    forEachSessionByFrame(frameId, (state) => {
-        if (!state?.settings) {
-            return;
-        }
-
-        if (state.settings.allowCopy && !state.settings.disableTextSelection) {
-            allow = true;
-        }
-    });
-
-    return allow;
-}
-
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -1412,8 +1393,6 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
-        clearFrameTextLayers(frameState);
-
         if (Array.isArray(frameState.cleanupCallbacks)) {
             for (const cleanup of frameState.cleanupCallbacks) {
                 try {
@@ -1588,8 +1567,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             watermarkLayer,
             objectUrl,
             renderScheduled: false,
-            cleanupCallbacks,
-            allowTextSelection: frameAllowsTextSelection(frameId)
+            cleanupCallbacks
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
