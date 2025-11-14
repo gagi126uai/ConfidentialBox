@@ -5,6 +5,7 @@
 @using ConfidentialBox.Core.DTOs
 @using System.Linq
 @inject ISettingsService SettingsService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Configuración avanzada - ConfidentialBox</PageTitle>
 
@@ -114,7 +115,7 @@ else
                                     </div>
                                 </div>
 
-                                <button class="btn btn-primary" disabled="@storageSaving">
+                                <button type="submit" class="btn btn-primary" disabled="@storageSaving">
                                     @if (storageSaving)
                                     {
                                         <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
@@ -165,6 +166,16 @@ else
                             <label class="form-check-label" for="useSsl">Usar conexión cifrada (SSL/TLS)</label>
                         </div>
 
+                        <div class="form-check form-switch my-3">
+                            <InputCheckbox @bind-Value="emailServer.UseStartTls" class="form-check-input" id="useStartTls" />
+                            <label class="form-check-label" for="useStartTls">Intentar STARTTLS si el servidor lo soporta</label>
+                        </div>
+
+                        <div class="form-check form-switch my-3">
+                            <InputCheckbox @bind-Value="emailServer.ValidateCertificates" class="form-check-input" id="validateCerts" />
+                            <label class="form-check-label" for="validateCerts">Validar certificados del servidor</label>
+                        </div>
+
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Usuario</label>
@@ -191,7 +202,35 @@ else
                             </div>
                         </div>
 
-                        <button class="btn btn-primary mt-4" disabled="@emailSaving">
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label">Responder a (correo)</label>
+                                <InputText @bind-Value="emailServer.ReplyToEmail" class="form-control" placeholder="opcional" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Responder a (nombre)</label>
+                                <InputText @bind-Value="emailServer.ReplyToName" class="form-control" placeholder="opcional" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label">Timeout de conexión (segundos)</label>
+                                <InputNumber @bind-Value="emailServer.ConnectionTimeoutSeconds" class="form-control" min="5" max="300" />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Autenticación</label>
+                                <InputSelect @bind-Value="emailServer.AuthenticationMechanism" class="form-select">
+                                    <option value="Auto">Automático</option>
+                                    <option value="Plain">PLAIN</option>
+                                    <option value="Login">LOGIN</option>
+                                    <option value="CramMd5">CRAM-MD5</option>
+                                </InputSelect>
+                                <div class="form-text">Selecciona "Automático" para que ConfidentialBox negocie el mejor mecanismo disponible.</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-4" disabled="@emailSaving">
                             @if (emailSaving)
                             {
                                 <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
@@ -242,7 +281,7 @@ else
                             <InputText @bind-Value="notifications.UserInvitationRecipients" class="form-control" />
                         </div>
 
-                        <button class="btn btn-primary" disabled="@notificationsSaving">
+                        <button type="submit" class="btn btn-primary" disabled="@notificationsSaving">
                             @if (notificationsSaving)
                             {
                                 <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
@@ -469,7 +508,7 @@ else
                                             </div>
                                         </div>
 
-                                        <button class="btn btn-danger mt-4" disabled="@pdfViewerSaving">
+                                        <button type="submit" class="btn btn-danger mt-4" disabled="@pdfViewerSaving">
                                             @if (pdfViewerSaving)
                                             {
                                                 <span class="spinner-border spinner-border-sm me-2"></span>
@@ -499,88 +538,62 @@ else
                     </EditForm>
                     break;
                 case "ai":
-                    <EditForm Model="aiSettings" OnValidSubmit="SaveAiSettingsAsync">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-
-                        @if (!string.IsNullOrEmpty(aiMessage))
-                        {
-                            <div class="alert @(aiSuccess ? "alert-success" : "alert-danger")">@aiMessage</div>
-                        }
-
-                        <div class="row g-4">
-                            <div class="col-xl-5">
+                    @if (aiSettings is null)
+                    {
+                        <div class="alert alert-warning">No pudimos cargar la configuración de IA. Intenta nuevamente desde el AI Security Dashboard.</div>
+                    }
+                    else
+                    {
+                        <div class="row g-4 align-items-stretch">
+                            <div class="col-xl-4">
                                 <div class="card border-0 shadow-sm h-100">
-                                    <div class="card-body">
-                                        <h5 class="card-title text-primary"><i class="fas fa-clock me-2"></i> Zona horaria y jornada</h5>
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Zona horaria de la plataforma</label>
-                                            <InputSelect @bind-Value="aiSettings.PlatformTimeZone" class="form-select">
-                                                @foreach (var zone in availableTimeZones)
-                                                {
-                                                    <option value="@zone.Id">@zone.Label</option>
-                                                }
-                                            </InputSelect>
-                                            <div class="form-text">La IA interpreta todos los eventos según esta zona horaria.</div>
+                                    <div class="card-body d-flex flex-column gap-3">
+                                        <div>
+                                            <h5 class="card-title text-primary"><i class="fas fa-clock me-2"></i> Reloj operativo</h5>
+                                            <p class="mb-1"><strong>Zona horaria:</strong> @GetTimeZoneLabel(aiSettings.PlatformTimeZone)</p>
+                                            <p class="mb-0"><strong>Horario protegido:</strong> @FormatBusinessHours(aiSettings.BusinessHoursStart, aiSettings.BusinessHoursEnd)</p>
                                         </div>
-
-                                        <div class="row g-3">
-                                            <div class="col">
-                                                <label class="form-label">Inicio jornada (hora)</label>
-                                                <InputNumber @bind-Value="aiSettings.BusinessHoursStart" class="form-control" min="0" max="23" TValue="int" />
-                                            </div>
-                                            <div class="col">
-                                                <label class="form-label">Fin jornada (hora)</label>
-                                                <InputNumber @bind-Value="aiSettings.BusinessHoursEnd" class="form-control" min="0" max="23" TValue="int" />
-                                            </div>
+                                        <div>
+                                            <h6 class="text-muted text-uppercase small">Acciones sugeridas</h6>
+                                            <ul class="small mb-0 ps-3">
+                                                <li>Verifica que los responsables conozcan el horario de mayor sensibilidad.</li>
+                                                <li>Utiliza la IA para escalado automático ante accesos fuera de jornada.</li>
+                                            </ul>
                                         </div>
-
-                                        <p class="small text-muted mt-3">Los accesos fuera de este rango incrementan el puntaje de riesgo.</p>
+                                        <button class="btn btn-outline-primary mt-auto" @onclick="() => NavigationManager.NavigateTo(\"/ai-security#settings\")">
+                                            <i class="fas fa-sliders-h"></i> Gestionar en AI Security
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-xl-7">
+                            <div class="col-xl-8">
                                 <div class="card border-0 shadow-sm mb-4">
                                     <div class="card-body">
-                                        <h5 class="card-title text-primary"><i class="fas fa-signal me-2"></i> Umbrales de riesgo</h5>
-
+                                        <h5 class="card-title text-primary"><i class="fas fa-fire-alt me-2"></i> Sensibilidad de amenazas</h5>
                                         <div class="row g-3">
                                             <div class="col-md-4">
-                                                <label class="form-label">Riesgo alto</label>
-                                                <InputNumber @bind-Value="aiSettings.HighRiskThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Riesgo alto</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.HighRiskThreshold)</div>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Riesgo sospechoso</label>
-                                                <InputNumber @bind-Value="aiSettings.SuspiciousThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Sospechoso</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.SuspiciousThreshold)</div>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Riesgo medio</label>
-                                                <InputNumber @bind-Value="aiSettings.RiskLevelMediumThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Bloqueo recomendado</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.RecommendationBlockThreshold)</div>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Riesgo alto operativo</label>
-                                                <InputNumber @bind-Value="aiSettings.RiskLevelHighThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Fuera de horario</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.OutsideBusinessHoursScore)</div>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Recomendar bloqueo</label>
-                                                <InputNumber @bind-Value="aiSettings.RecommendationBlockThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Actividad inusual</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.UnusualActivityIncrement)</div>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Recomendar revisión</label>
-                                                <InputNumber @bind-Value="aiSettings.RecommendationReviewThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Recomendar monitoreo</label>
-                                                <InputNumber @bind-Value="aiSettings.RecommendationMonitorThreshold" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Incremento actividad inusual</label>
-                                                <InputNumber @bind-Value="aiSettings.UnusualActivityIncrement" class="form-control" step="0.01" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Puntaje fuera de horario</label>
-                                                <InputNumber @bind-Value="aiSettings.OutsideBusinessHoursScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                                <span class="text-muted small text-uppercase">Archivos sospechosos</span>
+                                                <div class="fs-5 fw-semibold">@FormatPercentage(aiSettings.SuspiciousExtensionScore)</div>
                                             </div>
                                         </div>
                                     </div>
@@ -588,115 +601,58 @@ else
 
                                 <div class="card border-0 shadow-sm">
                                     <div class="card-body">
-                                        <h5 class="card-title text-primary"><i class="fas fa-sliders-h me-2"></i> Sensibilidad y patrones</h5>
-
-                                        <div class="row g-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label">Puntaje extensiones sospechosas</label>
-                                                <InputNumber @bind-Value="aiSettings.SuspiciousExtensionScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                        <h5 class="card-title text-primary"><i class="fas fa-robot me-2"></i> Automatizaciones activas</h5>
+                                        <div class="row g-3 small">
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="badge bg-@(aiSettings.EnableAutoBlocking ? "danger" : "secondary")">
+                                                        <i class="fas fa-bolt"></i>
+                                                    </span>
+                                                    <div>
+                                                        <strong>Bloqueo automático</strong>
+                                                        <div class="text-muted">@(aiSettings.EnableAutoBlocking ? "Activo para amenazas críticas" : "Acción manual requerida")</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Archivos grandes</label>
-                                                <InputNumber @bind-Value="aiSettings.LargeFileScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="badge bg-@(aiSettings.EnableAutoReview ? "warning text-dark" : "secondary")">
+                                                        <i class="fas fa-magnifying-glass"></i>
+                                                    </span>
+                                                    <div>
+                                                        <strong>Revisión guiada</strong>
+                                                        <div class="text-muted">@(aiSettings.EnableAutoReview ? "La IA prioriza y asigna revisiones" : "Pendiente de activación")</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Tamaño inusual</label>
-                                                <InputNumber @bind-Value="aiSettings.UnusualFileSizeScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="badge bg-info">
+                                                        <i class="fas fa-file-signature"></i>
+                                                    </span>
+                                                    <div>
+                                                        <strong>Extensiones vigiladas</strong>
+                                                        <div class="text-muted">@FormatExtensions(aiSettings.SuspiciousExtensions)</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Conducta fuera de hora</label>
-                                                <InputNumber @bind-Value="aiSettings.OutsideHoursBehaviorScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-network-wired"></i>
+                                                    </span>
+                                                    <div>
+                                                        <strong>Exfiltración</strong>
+                                                        <div class="text-muted">Umbral archivo grande: @aiSettings.DataExfiltrationLargeFileMB MB</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Subidas inusuales</label>
-                                                <InputNumber @bind-Value="aiSettings.UnusualUploadsScore" class="form-control" step="0.01" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Multiplicador subidas anómalas</label>
-                                                <InputNumber @bind-Value="aiSettings.UploadAnomalyMultiplier" class="form-control" step="0.1" min="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Multiplicador tamaño anómalo</label>
-                                                <InputNumber @bind-Value="aiSettings.FileSizeAnomalyMultiplier" class="form-control" step="0.1" min="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Tamaño máximo analizado (MB)</label>
-                                                <InputNumber @bind-Value="aiSettings.MaxFileSizeMB" class="form-control" min="1" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Archivo grande (MB)</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileMB" class="form-control" min="1" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Archivo muy grande (MB)</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileMB" class="form-control" min="1" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso malware</label>
-                                                <InputNumber @bind-Value="aiSettings.MalwareProbabilityWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso exfiltración</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso archivo grande</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationLargeFileWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso archivo muy grande</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationHugeFileWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso archivos comprimidos</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationArchiveWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso fuera de horario</label>
-                                                <InputNumber @bind-Value="aiSettings.DataExfiltrationOffHoursWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso extensión (malware)</label>
-                                                <InputNumber @bind-Value="aiSettings.MalwareSuspiciousExtensionWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso keyword "crack"</label>
-                                                <InputNumber @bind-Value="aiSettings.MalwareCrackKeywordWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso keyword "keygen"</label>
-                                                <InputNumber @bind-Value="aiSettings.MalwareKeygenKeywordWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Peso ejecutables</label>
-                                                <InputNumber @bind-Value="aiSettings.MalwareExecutableWeight" class="form-control" step="0.05" min="0" max="1" TValue="double" />
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-3 mt-3">
-                                            <label class="form-label">Lista de extensiones sospechosas</label>
-                                            <InputTextArea @bind-Value="aiSettings.SuspiciousExtensions" class="form-control" rows="3" />
-                                            <div class="form-text">Separar por comas o saltos de línea. Se normalizan automáticamente.</div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="d-flex justify-content-end mt-4">
-                            <button class="btn btn-primary" disabled="@aiSaving">
-                                @if (aiSaving)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                    <span>Guardando…</span>
-                                }
-                                else
-                                {
-                                    <span><i class="fas fa-robot me-2"></i>Guardar configuración IA</span>
-                                }
-                            </button>
-                        </div>
-                    </EditForm>
+                    }
                     break;
                 case "security":
                     <div class="row g-4">
@@ -716,7 +672,7 @@ else
                                     <div class="form-text">Tiempo máximo antes de requerir un nuevo inicio de sesión.</div>
                                 </div>
 
-                                <button class="btn btn-primary" disabled="@tokenSaving">
+                                <button type="submit" class="btn btn-primary" disabled="@tokenSaving">
                                     @if (tokenSaving)
                                     {
                                         <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
@@ -786,7 +742,6 @@ else
     private bool registrationSaving;
     private bool tokenSaving;
     private bool pdfViewerSaving;
-    private bool aiSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -800,8 +755,6 @@ else
     private bool tokenSuccess;
     private string? pdfViewerMessage;
     private bool pdfViewerSuccess;
-    private string? aiMessage;
-    private bool aiSuccess;
 
     private string activeTab = "storage";
 
@@ -859,6 +812,67 @@ else
         {
             aiSettings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
         }
+    }
+
+    private string GetTimeZoneLabel(string? zoneId)
+    {
+        if (string.IsNullOrWhiteSpace(zoneId))
+        {
+            return "Sin definir";
+        }
+
+        var zone = availableTimeZones.FirstOrDefault(z => z.Id == zoneId);
+        return zone?.Label ?? zoneId;
+    }
+
+    private static string FormatBusinessHours(int startHour, int endHour)
+    {
+        static string Format(int hour) => $"{Math.Clamp(hour, 0, 23):00}:00";
+        return $"{Format(startHour)} - {Format(endHour)}";
+    }
+
+    private static string FormatPercentage(double value)
+    {
+        if (double.IsNaN(value))
+        {
+            return "0%";
+        }
+
+        var normalized = value <= 1
+            ? Math.Clamp(value, 0d, 1d) * 100d
+            : value;
+
+        return $"{Math.Round(normalized):0}%";
+    }
+
+    private static string FormatExtensions(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "Sin definir";
+        }
+
+        var items = raw
+            .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.StartsWith('.') ? value : $".{value}")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (items.Count == 0)
+        {
+            return "Sin definir";
+        }
+
+        var preview = items.Take(4).ToList();
+        var summary = string.Join(", ", preview);
+        if (items.Count > preview.Count)
+        {
+            summary += "…";
+        }
+
+        return summary;
     }
 
     private async Task UpdateStorageSettingsAsync()
@@ -978,32 +992,6 @@ else
         finally
         {
             pdfViewerSaving = false;
-        }
-    }
-
-    private async Task SaveAiSettingsAsync()
-    {
-        aiMessage = null;
-        aiSaving = true;
-
-        try
-        {
-            aiSuccess = await SettingsService.UpdateAIScoringSettingsAsync(aiSettings);
-            aiMessage = aiSuccess ? "Configuración de IA actualizada." : "No fue posible guardar los parámetros de IA.";
-
-            if (aiSuccess)
-            {
-                var refreshed = await SettingsService.GetAIScoringSettingsAsync();
-                if (refreshed is not null)
-                {
-                    aiSettings = refreshed;
-                    EnsureValidTimeZoneSelection();
-                }
-            }
-        }
-        finally
-        {
-            aiSaving = false;
         }
     }
 

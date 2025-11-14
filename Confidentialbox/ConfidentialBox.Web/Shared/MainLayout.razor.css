@@ -78,7 +78,9 @@
 
 .layout-content {
     flex: 1;
-    padding: 2rem;
+    padding: clamp(1.25rem, 2vw + 1.25rem, 2.5rem);
+    width: 100%;
+    margin: 0;
 }
 
 @media (max-width: 991.98px) {

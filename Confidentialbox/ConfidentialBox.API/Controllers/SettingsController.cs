@@ -64,9 +64,15 @@ public class SettingsController : ControllerBase
             SmtpHost = settings.SmtpHost ?? string.Empty,
             Port = settings.Port,
             UseSsl = settings.UseSsl,
+            UseStartTls = settings.UseStartTls,
+            ValidateCertificates = settings.ValidateCertificates,
             Username = settings.Username ?? string.Empty,
             FromEmail = settings.FromEmail,
             FromName = settings.FromName,
+            ReplyToEmail = settings.ReplyToEmail,
+            ReplyToName = settings.ReplyToName,
+            ConnectionTimeoutSeconds = settings.ConnectionTimeoutSeconds,
+            AuthenticationMechanism = settings.AuthenticationMechanism ?? "Auto",
             HasPassword = !string.IsNullOrWhiteSpace(settings.Password)
         };
 
@@ -81,15 +87,25 @@ public class SettingsController : ControllerBase
             return BadRequest(ModelState);
         }
 
+        var sanitizedMechanism = string.IsNullOrWhiteSpace(request.AuthenticationMechanism)
+            ? "Auto"
+            : request.AuthenticationMechanism.Trim();
+
         var settings = new EmailServerSettings
         {
             SmtpHost = request.SmtpHost,
             Port = request.Port,
             UseSsl = request.UseSsl,
+            UseStartTls = request.UseStartTls,
+            ValidateCertificates = request.ValidateCertificates,
             Username = request.Username,
             Password = string.IsNullOrWhiteSpace(request.NewPassword) ? null : request.NewPassword,
             FromEmail = request.FromEmail,
-            FromName = request.FromName
+            FromName = request.FromName,
+            ReplyToEmail = request.ReplyToEmail,
+            ReplyToName = request.ReplyToName,
+            ConnectionTimeoutSeconds = request.ConnectionTimeoutSeconds,
+            AuthenticationMechanism = sanitizedMechanism
         };
 
         await _systemSettingsService.UpdateEmailServerSettingsAsync(settings, GetUserId(), cancellationToken);

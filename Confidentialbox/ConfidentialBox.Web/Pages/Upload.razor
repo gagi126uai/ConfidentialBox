@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
-@using Microsoft.AspNetCore.Components.Forms;
+@using System.IO;
 @using System.Linq;
 @attribute [Authorize]
 @inject IFileService FileService
@@ -53,6 +53,7 @@
                 <!-- Drag and Drop Area -->
                 <div class="drop-zone @(isDragging ? "dragging" : "")"
                      @ondragenter="HandleDragEnter"
+                     @ondragenter:preventDefault
                      @ondragleave="HandleDragLeave"
                      @ondragover:preventDefault
                      @ondrop="HandleDrop"
@@ -229,11 +230,36 @@
     {
         isDragging = false;
 
-        // var browserFile = e.DataTransfer?.Files?.FirstOrDefault();
-        // if (browserFile != null)
-        // {
-        //     await SelectFileAsync(browserFile);
-        // }
+        if (e.DataTransfer is null)
+        {
+            return;
+        }
+
+        IBrowserFile? browserFile = null;
+
+        if (e.DataTransfer.Files?.Count > 0)
+        {
+            browserFile = e.DataTransfer.Files[0];
+        }
+        else if (e.DataTransfer.Items?.Count > 0)
+        {
+            foreach (var item in e.DataTransfer.Items)
+            {
+                if (string.Equals(item.Kind, "file", StringComparison.OrdinalIgnoreCase))
+                {
+                    browserFile = await item.GetFileAsync();
+                    if (browserFile != null)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (browserFile != null)
+        {
+            await SelectFileAsync(browserFile);
+        }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
