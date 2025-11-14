@@ -223,12 +223,7 @@
     // Para construir el link correcto luego de la subida
     private bool lastUploadedWasPdf = false;
 
-    private void HandleDragEnter() => isDragging = true;
-    private void HandleDragLeave() => isDragging = false;
-
-    private async Task HandleDrop(DragEventArgs e)
-    {
-        isDragging = false;
+    private bool _isDragging;
 
         if (e.DataTransfer is null)
         {
@@ -265,9 +260,7 @@
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
         if (e.FileCount > 0)
-        {
             await SelectFileAsync(e.File);
-        }
     }
 
     private Task SelectFileAsync(IBrowserFile file)

@@ -571,9 +571,8 @@ public class FilesController : ControllerBase
         file.UploadedByUser = newOwner;
         await _fileRepository.UpdateAsync(file);
 
-        var transferredAlerts = await _aiSecurityService.TransferAlertsToNewOwnerAsync(file.Id, newOwner.Id, userId);
-
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var transferredAlerts = await _aiSecurityService.TransferAlertsToNewOwnerAsync(file.Id, newOwner.Id, userId);
         var clientContext = _clientContextResolver.Resolve(HttpContext);
 
         await _auditLogRepository.AddAsync(new AuditLog

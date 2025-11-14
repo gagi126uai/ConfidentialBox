@@ -3013,6 +3013,65 @@
         }
       }
     },
+    "/api/Users/me/messages/{messageId}/reply": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Users/{id}/messages": {
       "post": {
         "tags": [
@@ -3194,6 +3253,7 @@
       },
       "AIScoringSettingsDto": {
         "required": [
+          "platformTimeZone",
           "suspiciousExtensions"
         ],
         "type": "object",
@@ -3384,7 +3444,17 @@
             "type": "number",
             "format": "double"
           },
+          "enableAutoBlocking": {
+            "type": "boolean"
+          },
+          "enableAutoReview": {
+            "type": "boolean"
+          },
           "suspiciousExtensions": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "platformTimeZone": {
             "minLength": 1,
             "type": "string"
           }
@@ -3443,6 +3513,13 @@
             "additionalProperties": {
               "type": "integer",
               "format": "int32"
+            },
+            "nullable": true
+          },
+          "actionRecommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
             },
             "nullable": true
           }
@@ -4112,6 +4189,12 @@
           "useSsl": {
             "type": "boolean"
           },
+          "useStartTls": {
+            "type": "boolean"
+          },
+          "validateCertificates": {
+            "type": "boolean"
+          },
           "username": {
             "maxLength": 256,
             "minLength": 0,
@@ -4125,6 +4208,30 @@
           "fromName": {
             "maxLength": 128,
             "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "replyToEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "replyToName": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "connectionTimeoutSeconds": {
+            "maximum": 300,
+            "minimum": 5,
+            "type": "integer",
+            "format": "int32"
+          },
+          "authenticationMechanism": {
+            "maxLength": 64,
+            "minLength": 0,
+            "pattern": "^(Auto|Plain|Login|CramMd5)$",
             "type": "string",
             "nullable": true
           },
@@ -5298,6 +5405,10 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -6047,6 +6158,19 @@
           },
           "requiresResponse": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserMessageReplyRequest": {
+        "required": [
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "body": {
+            "minLength": 3,
+            "type": "string"
           }
         },
         "additionalProperties": false

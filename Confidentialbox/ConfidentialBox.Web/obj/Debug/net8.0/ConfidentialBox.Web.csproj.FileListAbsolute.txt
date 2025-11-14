@@ -34,6 +34,7 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\Shared\MainLayout.razor.rz.scp.css
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\Shared\NavMenu.razor.rz.scp.css
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\Shared\NotificationBell.razor.rz.scp.css
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\bundle\ConfidentialBox.Web.styles.css
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\projectbundle\ConfidentialBox.Web.bundle.scp.css
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\staticwebassets.build.json
@@ -47,4 +48,3 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ConfidentialBox.Web.pdb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ConfidentialBox.Web.genruntimeconfig.cache
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\ref\ConfidentialBox.Web.dll
-D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.Web\obj\Debug\net8.0\scopedcss\Shared\NotificationBell.razor.rz.scp.css
