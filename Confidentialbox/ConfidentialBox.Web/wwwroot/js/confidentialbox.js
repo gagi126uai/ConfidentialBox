@@ -95,6 +95,39 @@ function forEachSessionByFrame(frameId, callback) {
     }
 }
 
+function frameRequiresContextMenuBlock(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId && state.disableContextMenu) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function frameAllowsTextSelection(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    let allow = false;
+    forEachSessionByFrame(frameId, (state) => {
+        if (!state?.settings) {
+            return;
+        }
+
+        if (state.settings.allowCopy && !state.settings.disableTextSelection) {
+            allow = true;
+        }
+    });
+
+    return allow;
+}
+
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -196,6 +229,26 @@ function sendEvent(state, type, pageNumber, data) {
     } catch (err) {
         console.error('Error enviando evento al servidor', err);
     }
+}
+
+function ensureDocumentReady(state, frameState) {
+    if (!state || state.documentReadyReported) {
+        return;
+    }
+
+    if (!frameState || !frameState.pdfDoc) {
+        state.awaitingFrame = true;
+        return;
+    }
+
+    const pageCount = typeof frameState.pdfDoc.numPages === 'number'
+        ? frameState.pdfDoc.numPages
+        : undefined;
+
+    state.awaitingFrame = false;
+    state.documentReadyReported = true;
+    const payload = pageCount != null ? { pageCount } : undefined;
+    sendEvent(state, 'DocumentReady', null, payload);
 }
 
 function registerHandler(state, target, eventName, handler, options) {
@@ -374,19 +427,114 @@ function ensureTrackingForFrame(frameId) {
     }
 }
 
+function toCamelCaseKey(key) {
+    if (!key || typeof key !== 'string') {
+        return key;
+    }
+
+    return key.length === 1 ? key.toLowerCase() : key.charAt(0).toLowerCase() + key.slice(1);
+}
+
+function coerceBoolean(value, fallback) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const lowered = value.trim().toLowerCase();
+        if (lowered === 'true') {
+            return true;
+        }
+        if (lowered === 'false') {
+            return false;
+        }
+    }
+
+    return fallback;
+}
+
+function coerceNumber(value, fallback) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return fallback;
+}
+
+function coerceString(value, fallback) {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+            return trimmed;
+        }
+    }
+
+    return fallback;
+}
+
 function normalizeViewerSettings(raw) {
-    const normalized = { ...defaultViewerSettings, ...(raw || {}) };
-    normalized.theme = (normalized.theme || 'dark').toLowerCase();
+    const normalized = { ...defaultViewerSettings };
+
+    if (raw && typeof raw === 'object') {
+        for (const [key, value] of Object.entries(raw)) {
+            if (value === undefined || value === null) {
+                continue;
+            }
+
+            const camelKey = toCamelCaseKey(key);
+            normalized[camelKey] = value;
+        }
+    }
+
+    normalized.theme = coerceString(normalized.theme, defaultViewerSettings.theme).toLowerCase();
     normalized.toolbarPosition = normalized.toolbarPosition === 'bottom' ? 'bottom' : 'top';
-    normalized.viewerPadding = normalized.viewerPadding || defaultViewerSettings.viewerPadding;
-    normalized.fontFamily = normalized.fontFamily || defaultViewerSettings.fontFamily;
-    normalized.customCss = normalized.customCss || '';
-    normalized.defaultZoomPercent = Math.min(Math.max(normalized.defaultZoomPercent || defaultViewerSettings.defaultZoomPercent, 25), 400);
-    normalized.zoomStepPercent = Math.min(Math.max(normalized.zoomStepPercent || defaultViewerSettings.zoomStepPercent, 5), 50);
-    normalized.watermarkFontSize = Math.min(Math.max(normalized.watermarkFontSize || defaultViewerSettings.watermarkFontSize, 16), 120);
-    normalized.watermarkOpacity = Math.min(Math.max(typeof normalized.watermarkOpacity === 'number' ? normalized.watermarkOpacity : defaultViewerSettings.watermarkOpacity, 0), 1);
-    normalized.maxViewTimeMinutes = Math.max(0, normalized.maxViewTimeMinutes || 0);
-    normalized.showPageIndicator = normalized.showPageIndicator !== false;
+    normalized.viewerPadding = coerceString(normalized.viewerPadding, defaultViewerSettings.viewerPadding);
+    normalized.fontFamily = coerceString(normalized.fontFamily, defaultViewerSettings.fontFamily);
+    normalized.customCss = coerceString(normalized.customCss, defaultViewerSettings.customCss);
+    normalized.accentColor = coerceString(normalized.accentColor, defaultViewerSettings.accentColor);
+    normalized.backgroundColor = coerceString(normalized.backgroundColor, defaultViewerSettings.backgroundColor);
+    normalized.toolbarBackgroundColor = coerceString(normalized.toolbarBackgroundColor, defaultViewerSettings.toolbarBackgroundColor);
+    normalized.toolbarTextColor = coerceString(normalized.toolbarTextColor, defaultViewerSettings.toolbarTextColor);
+    normalized.globalWatermarkText = coerceString(normalized.globalWatermarkText, defaultViewerSettings.globalWatermarkText);
+    normalized.watermarkColor = coerceString(normalized.watermarkColor, defaultViewerSettings.watermarkColor);
+
+    normalized.showToolbar = coerceBoolean(normalized.showToolbar, defaultViewerSettings.showToolbar);
+    normalized.showSearch = coerceBoolean(normalized.showSearch, defaultViewerSettings.showSearch);
+    normalized.showPageControls = coerceBoolean(normalized.showPageControls, defaultViewerSettings.showPageControls);
+    normalized.showPageIndicator = coerceBoolean(normalized.showPageIndicator, defaultViewerSettings.showPageIndicator);
+    normalized.showDownloadButton = coerceBoolean(normalized.showDownloadButton, defaultViewerSettings.showDownloadButton);
+    normalized.showPrintButton = coerceBoolean(normalized.showPrintButton, defaultViewerSettings.showPrintButton);
+    normalized.showFullscreenButton = coerceBoolean(normalized.showFullscreenButton, defaultViewerSettings.showFullscreenButton);
+    normalized.allowDownload = coerceBoolean(normalized.allowDownload, defaultViewerSettings.allowDownload);
+    normalized.allowPrint = coerceBoolean(normalized.allowPrint, defaultViewerSettings.allowPrint);
+    normalized.allowCopy = coerceBoolean(normalized.allowCopy, defaultViewerSettings.allowCopy);
+    normalized.disableTextSelection = coerceBoolean(normalized.disableTextSelection, defaultViewerSettings.disableTextSelection);
+    normalized.disableContextMenu = coerceBoolean(normalized.disableContextMenu, defaultViewerSettings.disableContextMenu);
+    normalized.forceGlobalWatermark = coerceBoolean(normalized.forceGlobalWatermark, defaultViewerSettings.forceGlobalWatermark);
+    normalized.showFileDetails = coerceBoolean(normalized.showFileDetails, defaultViewerSettings.showFileDetails);
+
+    const defaultZoom = coerceNumber(normalized.defaultZoomPercent, defaultViewerSettings.defaultZoomPercent);
+    normalized.defaultZoomPercent = Math.min(Math.max(defaultZoom, 25), 400);
+
+    const zoomStep = coerceNumber(normalized.zoomStepPercent, defaultViewerSettings.zoomStepPercent);
+    normalized.zoomStepPercent = Math.min(Math.max(zoomStep, 5), 50);
+
+    const watermarkFontSize = coerceNumber(normalized.watermarkFontSize, defaultViewerSettings.watermarkFontSize);
+    normalized.watermarkFontSize = Math.min(Math.max(watermarkFontSize, 16), 120);
+
+    const watermarkOpacity = coerceNumber(normalized.watermarkOpacity, defaultViewerSettings.watermarkOpacity);
+    normalized.watermarkOpacity = Math.min(Math.max(watermarkOpacity, 0), 1);
+
+    const maxViewTime = coerceNumber(normalized.maxViewTimeMinutes, defaultViewerSettings.maxViewTimeMinutes);
+    normalized.maxViewTimeMinutes = Math.max(0, Math.round(maxViewTime));
+
     return normalized;
 }
 
@@ -430,6 +578,54 @@ function toggleSelection(container, disabled) {
     } else {
         container.classList.remove('secure-pdf-no-select');
     }
+}
+
+function clearFrameTextLayers(frameState) {
+    if (!frameState?.pages) {
+        return;
+    }
+
+    for (const pageView of frameState.pages) {
+        if (pageView.renderTask && typeof pageView.renderTask.cancel === 'function') {
+            try { pageView.renderTask.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+            try { pageView.textLayerRender.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerDiv) {
+            try { pageView.textLayerDiv.remove(); } catch { /* noop */ }
+            pageView.textLayerDiv = null;
+        }
+
+        pageView.textLayerRender = null;
+        pageView.textDivs = null;
+        pageView.textContentPromise = null;
+        pageView.searchTextPromise = null;
+    }
+}
+
+function applySelectionState(state) {
+    if (!state) {
+        return;
+    }
+
+    const frameState = pdfFrames.get(state.frameId);
+    if (!frameState) {
+        return;
+    }
+
+    const allowSelection = state.settings?.allowCopy && !state.settings?.disableTextSelection;
+    frameState.allowTextSelection = allowSelection;
+
+    if (!allowSelection) {
+        clearFrameTextLayers(frameState);
+        clearSelectionWithin(state.container || frameState.container);
+        return;
+    }
+
+    scheduleRenderAllPages(frameState);
 }
 
 function clearSelectionWithin(container, targetDocument = document) {
@@ -508,23 +704,30 @@ async function renderPageView(frameState, pageView, scale) {
         } catch { /* noop */ }
     }
 
+    if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+        try {
+            pageView.textLayerRender.cancel();
+        } catch { /* noop */ }
+    }
+
     try {
         const pdfPage = await frameState.pdfDoc.getPage(pageView.pageNumber);
         const viewport = pdfPage.getViewport({ scale });
+        const outputScale = window.devicePixelRatio || 1;
+        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
+
         const canvas = pageView.canvas;
         const context = canvas.getContext('2d', { alpha: false });
         if (!context) {
             console.warn('No se pudo obtener el contexto del lienzo del visor seguro');
             return;
         }
-        const outputScale = window.devicePixelRatio || 1;
-        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
 
         canvas.width = Math.floor(renderViewport.width);
         canvas.height = Math.floor(renderViewport.height);
         canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
         canvas.style.maxWidth = '100%';
-        canvas.style.height = 'auto';
         pageView.element.style.width = '100%';
         pageView.element.style.height = 'auto';
 
@@ -537,8 +740,62 @@ async function renderPageView(frameState, pageView, scale) {
         await renderTask.promise;
         pageView.viewport = viewport;
 
-        if (!pageView.textPromise) {
-            pageView.textPromise = pdfPage.getTextContent({ normalizeWhitespace: true })
+        const allowTextSelection = frameState.allowTextSelection === true;
+
+        if (allowTextSelection) {
+            if (!pageView.textLayerDiv) {
+                const layer = document.createElement('div');
+                layer.className = 'secure-pdf-text-layer';
+                pageView.element.appendChild(layer);
+                pageView.textLayerDiv = layer;
+            }
+
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            const textContent = await textContentPromise.catch((err) => {
+                console.warn('No se pudo obtener el contenido de texto seguro', err);
+                return null;
+            });
+
+            if (textContent && frameState.pdfjsLib?.renderTextLayer) {
+                pageView.textLayerDiv.innerHTML = '';
+                const textDivs = [];
+                const textLayerRender = frameState.pdfjsLib.renderTextLayer({
+                    textContent,
+                    container: pageView.textLayerDiv,
+                    viewport,
+                    textDivs,
+                    enhanceTextSelection: true
+                });
+
+                pageView.textDivs = textDivs;
+                pageView.textLayerRender = textLayerRender;
+
+                try {
+                    await textLayerRender.promise;
+                } catch (err) {
+                    if (err?.name !== 'RenderingCancelledException') {
+                        console.warn('No se pudo renderizar la capa de texto segura', err);
+                    }
+                }
+            }
+        } else {
+            if (pageView.textLayerDiv) {
+                pageView.textLayerDiv.remove();
+                pageView.textLayerDiv = null;
+            }
+            pageView.textDivs = null;
+            pageView.textLayerRender = null;
+        }
+
+        if (!pageView.searchTextPromise) {
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            pageView.searchTextPromise = textContentPromise
                 .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
                 .catch((err) => {
                     console.warn('No se pudo obtener el texto de la página segura', err);
@@ -591,9 +848,14 @@ async function resolvePageText(frameState, pageView) {
         return '';
     }
 
-    if (!pageView.textPromise) {
-        pageView.textPromise = frameState.pdfDoc.getPage(pageView.pageNumber)
-            .then((page) => page.getTextContent({ normalizeWhitespace: true }))
+    if (!pageView.searchTextPromise) {
+        const textContentPromise = pageView.textContentPromise
+            ?? frameState.pdfDoc.getPage(pageView.pageNumber)
+                .then((page) => page.getTextContent({ normalizeWhitespace: true }));
+
+        pageView.textContentPromise = textContentPromise;
+
+        pageView.searchTextPromise = textContentPromise
             .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
             .catch((err) => {
                 console.warn('No se pudo obtener el texto de la página segura', err);
@@ -602,7 +864,7 @@ async function resolvePageText(frameState, pageView) {
     }
 
     try {
-        return await pageView.textPromise;
+        return await pageView.searchTextPromise;
     } catch (err) {
         console.warn('Error recuperando texto de página segura', err);
         return '';
@@ -901,6 +1163,7 @@ function createState(sessionId, options, container) {
         watermarkOptions: { text: null, style: null },
         lastReportedPage: null,
         hasInitialPageReport: false,
+        documentReadyReported: false,
         awaitingFrame: false,
         container,
         toolbarElement: options.toolbarId ? document.getElementById(options.toolbarId) : null,
@@ -927,8 +1190,20 @@ function ensureWatermarkHost(frameState) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
         overlay.style.pointerEvents = 'none';
+        if (!Array.isArray(frameState.cleanupCallbacks)) {
+            frameState.cleanupCallbacks = [];
+        }
+
+        const contextGuard = (event) => {
+            const frameId = frameState.container?.id;
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        frameState.cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
         frameState.viewport.appendChild(overlay);
         frameState.overlay = overlay;
     }
@@ -964,6 +1239,7 @@ function initSecurePdfViewer(elementId, options) {
     container.setAttribute('data-secure-viewer', 'true');
     applyViewerTheme(container, settings);
     toggleSelection(container, settings.disableTextSelection);
+    applySelectionState(state);
 
     registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
 
@@ -996,6 +1272,7 @@ function initSecurePdfViewer(elementId, options) {
         if (state.watermarkElement && state.watermarkHost) {
             state.watermarkHost.appendChild(state.watermarkElement);
         }
+        ensureDocumentReady(state, frameState);
     }
 
     state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
@@ -1126,6 +1403,7 @@ function initSecurePdfViewer(elementId, options) {
         setupToolbar(state, container, state.toolbarElement, options);
     }
 
+    ensureTrackingForFrame(state.frameId);
     ensurePageTracking(state);
 }
 
@@ -1134,6 +1412,19 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
+        clearFrameTextLayers(frameState);
+
+        if (Array.isArray(frameState.cleanupCallbacks)) {
+            for (const cleanup of frameState.cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (err) {
+                    console.warn('No se pudo limpiar un manejador del marco seguro', err);
+                }
+            }
+            frameState.cleanupCallbacks.length = 0;
+        }
+
         try {
             if (frameState.pdfDoc && typeof frameState.pdfDoc.destroy === 'function') {
                 await frameState.pdfDoc.destroy();
@@ -1142,6 +1433,15 @@ async function disposePdfFrame(frameId) {
             }
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
+        }
+
+        if (frameState.objectUrl) {
+            try {
+                URL.revokeObjectURL(frameState.objectUrl);
+            } catch (err) {
+                console.warn('No se pudo liberar el blob del visor seguro', err);
+            }
+            frameState.objectUrl = null;
         }
     }
 
@@ -1178,9 +1478,15 @@ async function renderPdf(frameId, base64Data, fileName) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
+    let objectUrl = null;
+    let frameStateCreated = false;
+    const cleanupCallbacks = [];
+
     try {
         const pdfjsLib = await ensurePdfJsLibrary();
         const pdfBytes = base64ToUint8Array(base64Data);
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
         const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
         const pdfDoc = await loadingTask.promise;
 
@@ -1188,7 +1494,6 @@ async function renderPdf(frameId, base64Data, fileName) {
 
         const viewport = document.createElement('div');
         viewport.className = 'secure-pdf-viewport';
-        viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
 
         const iframe = document.createElement('iframe');
         let sandboxed = true;
@@ -1248,7 +1553,17 @@ async function renderPdf(frameId, base64Data, fileName) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+
+        const contextGuard = (event) => {
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        viewport.addEventListener('contextmenu', contextGuard, true);
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        cleanupCallbacks.push(() => viewport.removeEventListener('contextmenu', contextGuard, true));
+        cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
 
         const watermarkLayer = document.createElement('div');
         watermarkLayer.className = 'secure-pdf-watermark-layer';
@@ -1263,6 +1578,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             pagesHost,
             pages: [],
             pdfDoc,
+            pdfjsLib,
             loadingTask,
             scale: 1,
             base64: base64Data,
@@ -1270,7 +1586,10 @@ async function renderPdf(frameId, base64Data, fileName) {
             fileName,
             overlay,
             watermarkLayer,
-            renderScheduled: false
+            objectUrl,
+            renderScheduled: false,
+            cleanupCallbacks,
+            allowTextSelection: frameAllowsTextSelection(frameId)
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
@@ -1289,11 +1608,17 @@ async function renderPdf(frameId, base64Data, fileName) {
                 canvas,
                 viewport: null,
                 renderTask: null,
-                textPromise: null
+                textLayerDiv: null,
+                textLayerRender: null,
+                textDivs: null,
+                textContentPromise: null,
+                searchTextPromise: null
             });
         }
 
         pdfFrames.set(frameId, frameState);
+
+        frameStateCreated = true;
 
         let initialScale = 1;
         forEachSessionByFrame(frameId, (state) => {
@@ -1316,7 +1641,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);
 
             initialScale = state.currentZoom ?? state.defaultZoom ?? initialScale;
-            sendEvent(state, 'DocumentReady', null, { pageCount: pdfDoc.numPages });
+            ensureDocumentReady(state, currentFrameState);
         });
 
         frameState.scale = initialScale;
@@ -1332,6 +1657,23 @@ async function renderPdf(frameId, base64Data, fileName) {
         forEachSessionByFrame(frameId, (state) => {
             sendEvent(state, 'DocumentError', null, { message: err?.message || 'RenderFailed' });
         });
+        if (cleanupCallbacks.length) {
+            for (const cleanup of cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (cleanupErr) {
+                    console.warn('No se pudo limpiar un recurso del visor seguro tras un error', cleanupErr);
+                }
+            }
+            cleanupCallbacks.length = 0;
+        }
+        if (!frameStateCreated && objectUrl) {
+            try {
+                URL.revokeObjectURL(objectUrl);
+            } catch (revokeErr) {
+                console.warn('No se pudo liberar el blob del visor seguro', revokeErr);
+            }
+        }
         throw err;
     }
 }

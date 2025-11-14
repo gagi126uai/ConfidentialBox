@@ -24,6 +24,7 @@ public class PDFViewerController : ControllerBase
     private readonly IFileAccessRepository _fileAccessRepository;
     private readonly IPDFViewerAIService _pdfViewerAI;
     private readonly ISystemSettingsService _systemSettingsService;
+    private readonly ISecurePdfSessionPolicyStore _sessionPolicyStore;
 
     public PDFViewerController(
         ApplicationDbContext context,
@@ -31,7 +32,8 @@ public class PDFViewerController : ControllerBase
         IFileStorageService fileStorageService,
         IFileAccessRepository fileAccessRepository,
         IPDFViewerAIService pdfViewerAI,
-        ISystemSettingsService systemSettingsService)
+        ISystemSettingsService systemSettingsService,
+        ISecurePdfSessionPolicyStore sessionPolicyStore)
     {
         _context = context;
         _fileRepository = fileRepository;
@@ -39,6 +41,7 @@ public class PDFViewerController : ControllerBase
         _fileAccessRepository = fileAccessRepository;
         _pdfViewerAI = pdfViewerAI;
         _systemSettingsService = systemSettingsService;
+        _sessionPolicyStore = sessionPolicyStore;
     }
 
     [HttpPost("start-session")]
@@ -149,6 +152,7 @@ public class PDFViewerController : ControllerBase
             var viewerSettings = await _systemSettingsService.GetPdfViewerSettingsAsync(ct);
             var combinedMaxViewTime = CombineMaxViewTime(file.MaxViewTimeMinutes, viewerSettings.MaxViewTimeMinutes);
             var sessionViewerSettings = BuildViewerSettingsDto(viewerSettings, file, combinedMaxViewTime);
+            _sessionPolicyStore.Store(session.SessionId, sessionViewerSettings, combinedMaxViewTime);
 
             var hasWatermark = viewerSettings.ForceGlobalWatermark || file.HasWatermark;
             var watermarkText = viewerSettings.ForceGlobalWatermark
