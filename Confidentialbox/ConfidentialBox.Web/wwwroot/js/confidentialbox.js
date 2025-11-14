@@ -1188,7 +1188,58 @@ export async function renderPdf(frameId, base64Data, fileName) {
 
         const viewport = document.createElement('div');
         viewport.className = 'secure-pdf-viewport';
-        viewport.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+        viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
+
+        const iframe = document.createElement('iframe');
+        let sandboxed = true;
+        iframe.className = 'secure-pdf-iframe';
+        iframe.title = 'Documento PDF seguro';
+        iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('allow', 'fullscreen');
+        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation');
+
+        iframe.addEventListener('load', () => {
+            if (sandboxed) {
+                try {
+                    const fallbackText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
+                    if (fallbackText.includes('ha bloqueado esta página')
+                        || fallbackText.includes('chrome bloqueó esta página')
+                        || fallbackText.includes('chrome bloqueo esta pagina')
+                        || fallbackText.includes('blocked this page')) {
+                        sandboxed = false;
+                        iframe.removeAttribute('sandbox');
+                        iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+                        return;
+                    }
+                } catch (sandboxErr) {
+                    console.warn('No se pudo verificar el estado del sandbox del visor seguro', sandboxErr);
+                }
+            }
+            viewport.dispatchEvent(new Event('scroll'));
+            try {
+                const frameWindow = iframe.contentWindow;
+                const frameDoc = iframe.contentDocument || frameWindow?.document;
+                if (frameDoc) {
+                    try {
+                        const styleElement = frameDoc.createElement('style');
+                        styleElement.textContent = `* { user-select: none !important; }
+                        ::selection { background: transparent !important; color: inherit !important; }
+                        html, body { cursor: not-allowed; }
+                        body { -webkit-user-drag: none !important; }
+                        a, button { pointer-events: none !important; }`;
+                        if (frameDoc.head) {
+                            forEachSessionByFrame(frameId, (relatedState) => {
+                                if (relatedState.settings?.disableTextSelection) {
+                                    frameDoc.head.appendChild(styleElement.cloneNode(true));
+                                }
+                            });
+                        }
+                    } catch (styleErr) {
+                        console.warn('No se pudo inyectar estilos anti selección en el visor seguro', styleErr);
+                    }
 
         const pagesHost = document.createElement('div');
         pagesHost.className = 'secure-pdf-pages';
