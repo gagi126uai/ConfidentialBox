@@ -157,3 +157,40 @@ a:hover,
     background: linear-gradient(135deg, #6366f1, #0ea5e9);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
+
+.secure-file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--cb-text);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.secure-file-link i {
+    font-size: 1rem;
+}
+
+.secure-file-link:hover {
+    color: var(--cb-primary);
+    text-decoration: underline;
+}
+
+.secure-file-link:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.35);
+    outline-offset: 2px;
+    text-decoration: underline;
+    color: var(--cb-primary);
+}
+
+.secure-file-link[disabled] {
+    color: var(--cb-muted);
+    cursor: not-allowed;
+    text-decoration: none;
+}
