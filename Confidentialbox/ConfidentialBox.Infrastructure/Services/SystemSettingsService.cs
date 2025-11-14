@@ -133,6 +133,12 @@ public class SystemSettingsService : ISystemSettingsService
                 case "ValidateCertificates" when bool.TryParse(setting.Value, out var validate):
                     result.ValidateCertificates = validate;
                     break;
+                case "AllowSelfSignedCertificates" when bool.TryParse(setting.Value, out var allowSelfSigned):
+                    result.AllowSelfSignedCertificates = allowSelfSigned;
+                    break;
+                case "RequireTls12" when bool.TryParse(setting.Value, out var requireTls12):
+                    result.RequireTls12 = requireTls12;
+                    break;
                 case "Username":
                     result.Username = setting.Value;
                     break;
@@ -157,6 +163,33 @@ public class SystemSettingsService : ISystemSettingsService
                 case "AuthenticationMechanism" when !string.IsNullOrWhiteSpace(setting.Value):
                     result.AuthenticationMechanism = setting.Value;
                     break;
+                case "SecondaryHost":
+                    result.SecondaryHost = string.IsNullOrWhiteSpace(setting.Value) ? null : setting.Value;
+                    break;
+                case "SecondaryPort" when int.TryParse(setting.Value, out var secondaryPort):
+                    result.SecondaryPort = secondaryPort;
+                    break;
+                case "MaxRetryAttempts" when int.TryParse(setting.Value, out var maxRetries):
+                    result.MaxRetryAttempts = Math.Clamp(maxRetries, 0, 10);
+                    break;
+                case "RetryBackoffSeconds" when int.TryParse(setting.Value, out var backoff):
+                    result.RetryBackoffSeconds = Math.Clamp(backoff, 5, 600);
+                    break;
+                case "EnableDeliveryStatusNotifications" when bool.TryParse(setting.Value, out var dsn):
+                    result.EnableDeliveryStatusNotifications = dsn;
+                    break;
+                case "TrackBounceReasons" when bool.TryParse(setting.Value, out var trackBounce):
+                    result.TrackBounceReasons = trackBounce;
+                    break;
+                case "UseClientCertificate" when bool.TryParse(setting.Value, out var useClientCert):
+                    result.UseClientCertificate = useClientCert;
+                    break;
+                case "ClientCertificateThumbprint":
+                    result.ClientCertificateThumbprint = string.IsNullOrWhiteSpace(setting.Value) ? null : setting.Value;
+                    break;
+                case "OperationalContactEmail":
+                    result.OperationalContactEmail = string.IsNullOrWhiteSpace(setting.Value) ? null : setting.Value;
+                    break;
             }
         }
 
@@ -178,6 +211,8 @@ public class SystemSettingsService : ISystemSettingsService
         await UpsertSettingAsync(EmailServerCategory, "UseSsl", settings.UseSsl.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "UseStartTls", settings.UseStartTls.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "ValidateCertificates", settings.ValidateCertificates.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "AllowSelfSignedCertificates", settings.AllowSelfSignedCertificates.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "RequireTls12", settings.RequireTls12.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "Username", settings.Username ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "FromEmail", settings.FromEmail ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "FromName", settings.FromName ?? string.Empty, false, updatedByUserId, cancellationToken);
@@ -185,6 +220,15 @@ public class SystemSettingsService : ISystemSettingsService
         await UpsertSettingAsync(EmailServerCategory, "ReplyToName", settings.ReplyToName ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "ConnectionTimeoutSeconds", Math.Clamp(settings.ConnectionTimeoutSeconds, 5, 300).ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "AuthenticationMechanism", settings.AuthenticationMechanism ?? "Auto", false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "SecondaryHost", settings.SecondaryHost ?? string.Empty, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "SecondaryPort", settings.SecondaryPort.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "MaxRetryAttempts", Math.Clamp(settings.MaxRetryAttempts, 0, 10).ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "RetryBackoffSeconds", Math.Clamp(settings.RetryBackoffSeconds, 5, 600).ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "EnableDeliveryStatusNotifications", settings.EnableDeliveryStatusNotifications.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "TrackBounceReasons", settings.TrackBounceReasons.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "UseClientCertificate", settings.UseClientCertificate.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "ClientCertificateThumbprint", settings.UseClientCertificate ? settings.ClientCertificateThumbprint ?? string.Empty : string.Empty, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "OperationalContactEmail", settings.OperationalContactEmail ?? string.Empty, false, updatedByUserId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(settings.Password))
         {

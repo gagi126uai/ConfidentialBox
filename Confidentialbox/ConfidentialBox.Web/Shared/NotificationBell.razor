@@ -1,5 +1,6 @@
 @inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthStateProvider
+@using System
 @using System.Linq
 
 <div class="notification-bell" @onclick:stopPropagation="true">
@@ -63,6 +64,8 @@
                                     <div class="notification-card__message">@notification.Message</div>
                                     <div class="notification-card__meta">
                                         <i class="fas fa-clock me-1"></i>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                        <span class="notification-card__dot" aria-hidden="true"></span>
+                                        <span class="notification-card__relative">@GetRelativeTime(notification.CreatedAt)</span>
                                     </div>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(notification.Link))
@@ -158,6 +161,33 @@
                 }
             }
         }
+    }
+
+    private static string GetRelativeTime(DateTime timestamp)
+    {
+        var delta = DateTime.UtcNow - timestamp.ToUniversalTime();
+
+        if (delta.TotalSeconds < 60)
+        {
+            return "Justo ahora";
+        }
+
+        if (delta.TotalMinutes < 60)
+        {
+            return $"{Math.Floor(delta.TotalMinutes)} min atras";
+        }
+
+        if (delta.TotalHours < 24)
+        {
+            return $"{Math.Floor(delta.TotalHours)} h atras";
+        }
+
+        if (delta.TotalDays < 7)
+        {
+            return $"{Math.Floor(delta.TotalDays)} d atras";
+        }
+
+        return timestamp.ToLocalTime().ToString("dd/MM/yyyy");
     }
 
     private static string GetSeverityClass(UserNotificationDto notification)

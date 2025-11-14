@@ -1,5 +1,6 @@
 @page "/ai-security"
 @using System
+@using System.Collections.Generic
 @using System.Globalization
 @using ConfidentialBox.Core.DTOs
 @using ConfidentialBox.Web.Services
@@ -96,29 +97,6 @@
             }
             else
             {
-                var threatPercent = dashboard.SystemThreatLevel * 100;
-
-                <div class="card mb-4 border-@GetThreatLevelColor(dashboard.SystemThreatLevel)">
-                    <div class="card-body">
-                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                            <div>
-                                <h5 class="text-muted">Nivel de Amenaza del Sistema</h5>
-                                <h2 class="text-@GetThreatLevelColor(dashboard.SystemThreatLevel) mb-0">
-                                    @GetThreatLevelText(dashboard.SystemThreatLevel)
-                                </h2>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="progress" style="height: 30px;">
-                                    <div class="progress-bar bg-@GetThreatLevelColor(dashboard.SystemThreatLevel)"
-                                         style="@($"width: {threatPercent:F0}%")">
-                                        @($"{threatPercent:F0}%")
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 var statCards = new[]
                 {
                 new { Color = "danger",  Title = "Alertas Críticas",     Value = dashboard.CriticalAlertsUnreviewed.ToString(),  Subtitle = "Sin revisar",        Icon = "fas fa-exclamation-triangle" },
@@ -145,6 +123,78 @@
                             </div>
                         </div>
                     }
+                </div>
+
+                var statusSource = alertSummary?.StatusCounts ?? new Dictionary<string, int>();
+                var statusTotal = statusSource.Values.Sum();
+                var orderedStatus = statusSource
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key)
+                    .ToList();
+
+                <div class="row g-4 mb-4">
+                    <div class="col-xl-5">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Embudo de respuesta</h5>
+                                <span class="badge text-bg-secondary">@statusTotal casos</span>
+                            </div>
+                            <div class="card-body">
+                                @if (!orderedStatus.Any())
+                                {
+                                    <p class="text-muted mb-0">Sin incidentes pendientes. La IA mantiene la vigilancia.</p>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled mb-0 small d-flex flex-column gap-3">
+                                        @foreach (var status in orderedStatus)
+                                        {
+                                            var percentage = statusTotal == 0 ? 0 : (int)Math.Round((status.Value / (double)statusTotal) * 100);
+                                            <li>
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <strong>@status.Key</strong>
+                                                    <span class="badge text-bg-primary">@status.Value</span>
+                                                </div>
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-primary" style="@($"width: {percentage}%")"></div>
+                                                </div>
+                                                <span class="text-muted">@percentage% de los casos activos</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-7">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Prioridades inmediatas</h5>
+                                <span class="badge text-bg-info"><i class="fas fa-robot me-1"></i>IA</span>
+                            </div>
+                            <div class="card-body">
+                                @if (dashboard.ActionRecommendations?.Any() == true)
+                                {
+                                    <ol class="mb-0 small ps-3">
+                                        @foreach (var recommendation in dashboard.ActionRecommendations.Take(5))
+                                        {
+                                            <li class="mb-2">
+                                                <strong>@recommendation</strong>
+                                            </li>
+                                        }
+                                    </ol>
+                                    if (dashboard.ActionRecommendations.Count > 5)
+                                    {
+                                        <p class="text-muted small mb-0">La vista completa se encuentra en el centro de alertas.</p>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-muted mb-0">Sin acciones urgentes. Se mantiene monitoreo preventivo.</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -361,7 +411,7 @@
                                                         </span>
                                                     </td>
                                                     <td class="text-end">
-                                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenAlertDetail(alert)">
+                                                        <button class="btn btn-sm btn-outline-primary" @onclick="async () => await OpenAlertDetailAsync(alert)">
                                                             <i class="fas fa-eye"></i>
                                                         </button>
                                                     </td>
@@ -538,41 +588,119 @@
                     <button type="button" class="btn-close" @onclick="CloseAlertDetail"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <span class="badge bg-@GetSeverityColor(selectedAlert.Severity)">@selectedAlert.Severity</span>
-                        <span class="badge bg-secondary ms-2">@selectedAlert.AlertType</span>
-                    </div>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4">Usuario</dt>
-                        <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(selectedAlert.UserName) ? "Usuario desconocido" : selectedAlert.UserName)</dd>
-                        <dt class="col-sm-4">Archivo</dt>
-                        <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(selectedAlert.FileName) ? "-" : selectedAlert.FileName)</dd>
-                        <dt class="col-sm-4">Confianza</dt>
-                        <dd class="col-sm-8">@FormatConfidence(selectedAlert.ConfidenceScore)</dd>
-                        <dt class="col-sm-4">Detectada</dt>
-                        <dd class="col-sm-8">@FormatAlertDate(selectedAlert.DetectedAt)</dd>
-                        <dt class="col-sm-4">Estado actual</dt>
-                        <dd class="col-sm-8">@FormatAlertStatus(selectedAlert)</dd>
-                        <dt class="col-sm-4">Escalamiento</dt>
-                        <dd class="col-sm-8">@GetEscalationLabel(selectedAlert.EscalationLevel)</dd>
-                    </dl>
-                    <div class="mt-3">
-                        <h6>Descripción</h6>
-                        <p class="mb-0">@selectedAlert.Description</p>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(selectedAlert.ReviewNotes))
+                    @if (alertDetailLoading)
                     {
-                        <div class="mt-3">
-                            <h6>Notas de revisión</h6>
-                            <p class="mb-0">@selectedAlert.ReviewNotes</p>
+                        <div class="text-center py-4">
+                            <div class="spinner-border" role="status"></div>
+                            <p class="mt-3 text-muted">Recopilando evidencia del evento…</p>
                         </div>
                     }
-                    @if (!string.IsNullOrWhiteSpace(selectedAlert.ActionTaken))
+                    else
                     {
-                        <div class="mt-3">
-                            <h6>Acción aplicada</h6>
-                            <p class="mb-0">@selectedAlert.ActionTaken</p>
-                        </div>
+                        if (!string.IsNullOrEmpty(alertDetailError))
+                        {
+                            <div class="alert alert-danger">@alertDetailError</div>
+                        }
+
+                        var detailAlert = selectedAlertDetail?.Alert ?? selectedAlert;
+                        if (detailAlert is not null)
+                        {
+                            <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-@GetSeverityColor(detailAlert.Severity)">@detailAlert.Severity</span>
+                                <span class="badge bg-secondary">@detailAlert.AlertType</span>
+                                <span class="badge bg-light text-dark"><i class="fas fa-bolt me-1"></i>@FormatAlertStatus(detailAlert)</span>
+                            </div>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">Usuario</dt>
+                                <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(detailAlert.UserName) ? "Usuario desconocido" : detailAlert.UserName)</dd>
+                                <dt class="col-sm-4">Archivo</dt>
+                                <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(detailAlert.FileName) ? "-" : detailAlert.FileName)</dd>
+                                <dt class="col-sm-4">Confianza</dt>
+                                <dd class="col-sm-8">@FormatConfidence(detailAlert.ConfidenceScore)</dd>
+                                <dt class="col-sm-4">Detectada</dt>
+                                <dd class="col-sm-8">@FormatAlertDate(detailAlert.DetectedAt)</dd>
+                                <dt class="col-sm-4">Escalamiento</dt>
+                                <dd class="col-sm-8">@GetEscalationLabel(detailAlert.EscalationLevel)</dd>
+                            </dl>
+
+                            <div class="mt-3">
+                                <h6>Descripción</h6>
+                                <p class="mb-0">@detailAlert.Description</p>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(detailAlert.ReviewNotes))
+                            {
+                                <div class="mt-3">
+                                    <h6>Notas de revisión</h6>
+                                    <p class="mb-0">@detailAlert.ReviewNotes</p>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(detailAlert.ActionTaken))
+                            {
+                                <div class="mt-3">
+                                    <h6>Acción aplicada</h6>
+                                    <p class="mb-0">@detailAlert.ActionTaken</p>
+                                </div>
+                            }
+                        }
+
+                        if (selectedAlertDetail is not null)
+                        {
+                            <div class="mt-4">
+                                <h6 class="text-muted text-uppercase small">Capacidades disponibles</h6>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span class="badge text-bg-@(selectedAlertDetail.CanBlockFile ? "danger" : "secondary")"><i class="fas fa-file-shield me-1"></i>Bloquear archivo @(selectedAlertDetail.CanBlockFile ? "habilitado" : "no disponible")</span>
+                                    <span class="badge text-bg-@(selectedAlertDetail.CanBlockUser ? "warning text-dark" : "secondary")"><i class="fas fa-user-lock me-1"></i>Suspender usuario @(selectedAlertDetail.CanBlockUser ? "habilitado" : "no disponible")</span>
+                                    <span class="badge text-bg-@(selectedAlertDetail.CanEscalateMonitoring ? "info" : "secondary")"><i class="fas fa-satellite-dish me-1"></i>Escalar monitoreo @(selectedAlertDetail.CanEscalateMonitoring ? "habilitado" : "no disponible")</span>
+                                </div>
+                            </div>
+
+                            if (selectedAlertDetail.LatestAccess is not null)
+                            {
+                                var access = selectedAlertDetail.LatestAccess;
+                                <div class="mt-4">
+                                    <h6>Último intento registrado</h6>
+                                    <div class="border rounded p-3 small bg-light">
+                                        <div class="d-flex justify-content-between">
+                                            <span><i class="fas fa-clock me-1"></i>@access.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                            <span class="badge text-bg-@(access.WasAuthorized ? "success" : "danger")">@(access.WasAuthorized ? "Autorizado" : "Bloqueado")</span>
+                                        </div>
+                                        <div class="mt-2">Origen: <strong>@(string.IsNullOrWhiteSpace(access.AccessedByUserName) ? "-" : access.AccessedByUserName)</strong></div>
+                                        <div>IP / Ubicación: <strong>@access.AccessedByIp</strong> @(string.IsNullOrWhiteSpace(access.Location) ? string.Empty : $"· {access.Location}")</div>
+                                        <div class="text-muted">Dispositivo: @(string.IsNullOrWhiteSpace(access.DeviceType) ? "Desconocido" : access.DeviceType) @(string.IsNullOrWhiteSpace(access.OperatingSystem) ? string.Empty : $"· {access.OperatingSystem}")</div>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="mt-4">
+                                <h6>Registro de acciones</h6>
+                                @if (selectedAlertDetail.Actions?.Any() == true)
+                                {
+                                    <ul class="timeline list-unstyled mb-0">
+                                        @foreach (var action in selectedAlertDetail.Actions.OrderByDescending(a => a.CreatedAt))
+                                        {
+                                            <li class="mb-3">
+                                                <div class="fw-semibold">@action.ActionType <span class="text-muted">(@action.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</span></div>
+                                                <div class="small text-muted">Por: @(string.IsNullOrWhiteSpace(action.CreatedByUserName) ? "IA" : action.CreatedByUserName)</div>
+                                                @if (!string.IsNullOrWhiteSpace(action.Notes))
+                                                {
+                                                    <div class="small">@action.Notes</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(action.StatusAfterAction))
+                                                {
+                                                    <span class="badge bg-light text-dark mt-1">Estado: @action.StatusAfterAction</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="text-muted mb-0">Aún no se registraron acciones sobre esta alerta.</p>
+                                }
+                            </div>
+                        }
                     }
                 </div>
                 <div class="modal-footer">
@@ -600,6 +728,9 @@
     private string activeTab = "overview";
     private bool showAlertDetail;
     private SecurityAlertDto? selectedAlert;
+    private SecurityAlertDetailDto? selectedAlertDetail;
+    private string? alertDetailError;
+    private bool alertDetailLoading;
     private bool aiSaving;
     private string? aiMessage;
     private bool aiSuccess;
@@ -745,16 +876,41 @@
     private double GetSeverityPercentage(int value, int total)
         => total == 0 ? 0 : (value / (double)total) * 100;
 
-    private void OpenAlertDetail(SecurityAlertDto alert)
+    private async Task OpenAlertDetailAsync(SecurityAlertDto alert)
     {
         selectedAlert = alert;
+        selectedAlertDetail = null;
+        alertDetailError = null;
+        alertDetailLoading = true;
         showAlertDetail = true;
+
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var detail = await Http.GetFromJsonAsync<SecurityAlertDetailDto>($"api/aisecurity/alerts/{alert.Id}");
+            selectedAlertDetail = detail;
+        }
+        catch (Exception ex)
+        {
+            alertDetailError = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudo cargar el detalle de la alerta."
+                : ex.Message;
+        }
+        finally
+        {
+            alertDetailLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void CloseAlertDetail()
     {
         showAlertDetail = false;
         selectedAlert = null;
+        selectedAlertDetail = null;
+        alertDetailError = null;
+        alertDetailLoading = false;
     }
 
     private static string FormatConfidence(double score)

@@ -66,6 +66,8 @@ public class SettingsController : ControllerBase
             UseSsl = settings.UseSsl,
             UseStartTls = settings.UseStartTls,
             ValidateCertificates = settings.ValidateCertificates,
+            AllowSelfSignedCertificates = settings.AllowSelfSignedCertificates,
+            RequireTls12 = settings.RequireTls12,
             Username = settings.Username ?? string.Empty,
             FromEmail = settings.FromEmail,
             FromName = settings.FromName,
@@ -73,6 +75,15 @@ public class SettingsController : ControllerBase
             ReplyToName = settings.ReplyToName,
             ConnectionTimeoutSeconds = settings.ConnectionTimeoutSeconds,
             AuthenticationMechanism = settings.AuthenticationMechanism ?? "Auto",
+            SecondaryHost = settings.SecondaryHost,
+            SecondaryPort = settings.SecondaryPort,
+            MaxRetryAttempts = settings.MaxRetryAttempts,
+            RetryBackoffSeconds = settings.RetryBackoffSeconds,
+            EnableDeliveryStatusNotifications = settings.EnableDeliveryStatusNotifications,
+            TrackBounceReasons = settings.TrackBounceReasons,
+            UseClientCertificate = settings.UseClientCertificate,
+            ClientCertificateThumbprint = settings.ClientCertificateThumbprint,
+            OperationalContactEmail = settings.OperationalContactEmail,
             HasPassword = !string.IsNullOrWhiteSpace(settings.Password)
         };
 
@@ -98,6 +109,8 @@ public class SettingsController : ControllerBase
             UseSsl = request.UseSsl,
             UseStartTls = request.UseStartTls,
             ValidateCertificates = request.ValidateCertificates,
+            AllowSelfSignedCertificates = request.AllowSelfSignedCertificates,
+            RequireTls12 = request.RequireTls12,
             Username = request.Username,
             Password = string.IsNullOrWhiteSpace(request.NewPassword) ? null : request.NewPassword,
             FromEmail = request.FromEmail,
@@ -105,7 +118,18 @@ public class SettingsController : ControllerBase
             ReplyToEmail = request.ReplyToEmail,
             ReplyToName = request.ReplyToName,
             ConnectionTimeoutSeconds = request.ConnectionTimeoutSeconds,
-            AuthenticationMechanism = sanitizedMechanism
+            AuthenticationMechanism = sanitizedMechanism,
+            SecondaryHost = request.SecondaryHost,
+            SecondaryPort = request.SecondaryPort,
+            MaxRetryAttempts = request.MaxRetryAttempts,
+            RetryBackoffSeconds = request.RetryBackoffSeconds,
+            EnableDeliveryStatusNotifications = request.EnableDeliveryStatusNotifications,
+            TrackBounceReasons = request.TrackBounceReasons,
+            UseClientCertificate = request.UseClientCertificate,
+            ClientCertificateThumbprint = request.UseClientCertificate
+                ? request.ClientCertificateThumbprint
+                : null,
+            OperationalContactEmail = request.OperationalContactEmail
         };
 
         await _systemSettingsService.UpdateEmailServerSettingsAsync(settings, GetUserId(), cancellationToken);

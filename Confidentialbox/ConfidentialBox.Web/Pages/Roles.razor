@@ -62,6 +62,8 @@ else if (roles.Any())
                                     <ul class="list-unstyled mb-0">
                                         <li><span class="fw-semibold">MFA:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyRequiresMfa, true) ? "Obligatorio" : "Opcional")</li>
                                         <li><span class="fw-semibold">Caducidad de sesión:</span> @FormatMinutes(GetNumberPolicy(role, RolePolicyCatalog.PolicySessionTimeoutMinutes))</li>
+                                        <li><span class="fw-semibold">Sesiones simultáneas:</span> @FormatCount(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxConcurrentSessions))</li>
+                                        <li><span class="fw-semibold">Bloqueo automático:</span> @FormatMinutes(GetNumberPolicy(role, RolePolicyCatalog.PolicySessionLockoutMinutes))</li>
                                         <li><span class="fw-semibold">Acceso offline:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyAllowOfflineAccess) ? "Permitido" : "Bloqueado")</li>
                                     </ul>
                                 </div>
@@ -72,6 +74,14 @@ else if (roles.Any())
                                         <li><span class="fw-semibold">Cupo por rol:</span> @FormatGigabytes(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxStorageGb))</li>
                                         <li><span class="fw-semibold">Marca de agua:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyForceWatermark, true) ? "Siempre activa" : "Opcional")</li>
                                         <li><span class="fw-semibold">Descargas/día:</span> @FormatCount(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxDailyDownloads))</li>
+                                        <li><span class="fw-semibold">Justificación post-descarga:</span> @FormatMinutes(GetNumberPolicy(role, RolePolicyCatalog.PolicyDownloadJustificationWindowMinutes))</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Contexto operativo</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">IPs permitidas:</span> @FormatRangeList(GetPolicyValue(role, RolePolicyCatalog.PolicyAllowedIpRanges))</li>
+                                        <li><span class="fw-semibold">Países habilitados:</span> @FormatRangeList(GetPolicyValue(role, RolePolicyCatalog.PolicyGeoAllowedCountries))</li>
                                     </ul>
                                 </div>
                                 <div class="role-policy-section">
@@ -90,6 +100,21 @@ else if (roles.Any())
                                         <li><span class="fw-semibold">Escalamiento IA:</span> Nivel @FormatCount(GetNumberPolicy(role, RolePolicyCatalog.PolicyAiEscalationLevel))</li>
                                         <li><span class="fw-semibold">Auditoría:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyCanViewAuditTrail) ? "Puede revisar" : "Solo reporte")</li>
                                         <li><span class="fw-semibold">Retención logs:</span> @FormatDays(GetNumberPolicy(role, RolePolicyCatalog.PolicyAuditRetentionDays))</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Respuesta a incidentes</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">Escalar tras:</span> @FormatMinutes(GetNumberPolicy(role, RolePolicyCatalog.PolicyIncidentAutoEscalateMinutes))</li>
+                                        <li><span class="fw-semibold">Cuarentena automática:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyQuarantineOnBreach) ? "Sí" : "No")</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Gobernanza de datos</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">Alertar cambios de rol:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyNotifyOnRoleChanges) ? "Activo" : "Inactivo")</li>
+                                        <li><span class="fw-semibold">Retención legal:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyLegalHoldEnabled) ? "Aplicada" : "No aplica")</li>
+                                        <li><span class="fw-semibold">Residencia requerida:</span> @FormatResidency(GetPolicyValue(role, RolePolicyCatalog.PolicyDataResidencyRequirement))</li>
                                     </ul>
                                 </div>
                             </div>
@@ -175,22 +200,22 @@ else
                         </div>
                     }
 
-                    @foreach (var group in GetPolicySections())
+                    @foreach (var section in GetPolicySections())
                     {
                         <div class="mb-4">
                             <div class="d-flex align-items-center mb-2">
-                                <h6 class="text-uppercase text-muted small mb-0">@group.Key</h6>
+                                <h6 class="text-uppercase text-muted small mb-0">@section.Key</h6>
                                 <div class="flex-grow-1 ms-3 border-bottom"></div>
                             </div>
 
                             <div class="row g-4">
-                                @foreach (var policy in group)
+                                @foreach (var policy in section)
                                 {
                                     <div class="col-md-6">
                                         <div class="border rounded p-3 h-100 shadow-sm-sm">
                                             <label class="form-label fw-semibold">@policy.DisplayName</label>
 
-                                            @if (policy.Options?.Any() == true)
+                                            if (policy.Options?.Any() == true)
                                             {
                                                 <InputSelect @bind-Value="policy.Value" class="form-select">
                                                     @foreach (var option in policy.Options)
@@ -204,30 +229,17 @@ else
                                                 @switch (policy.ValueType)
                                                 {
                                                     case "Boolean":
-                                                        {
-                                                            var inputId = $"policy-{policy.PolicyName}";
-                                                            <div class="form-check form-switch">
-                                                                <InputCheckbox class="form-check-input"
-                                                                               @bind-Value="policy.BooleanValue"
-                                                                               id="@inputId" />
-                                                                <label class="form-check-label" for="@inputId">
-                                                                    @(policy.BooleanValue ? "Habilitado" : "Deshabilitado")
-                                                                </label>
-                                                            </div>
-                                                            break;
-                                                        }
-
+                                                        <div class="form-check form-switch">
+                                                            <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="@($"policy-{policy.PolicyName}")" />
+                                                            <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
+                                                        </div>
+                                                        break;
                                                     case "Number":
-                                                        {
-                                                            <InputNumber @bind-Value="policy.NumericValue" class="form-control" />
-                                                            break;
-                                                        }
-
+                                                        <InputNumber @bind-Value="policy.NumericValue" class="form-control" />
+                                                        break;
                                                     default:
-                                                        {
-                                                            <InputText @bind-Value="policy.Value" class="form-control" />
-                                                            break;
-                                                        }
+                                                        <InputText @bind-Value="policy.Value" class="form-control" />
+                                                        break;
                                                 }
                                             }
 
@@ -493,6 +505,12 @@ else
             : "Sin retención";
     }
 
+    private static string FormatRangeList(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "Sin restricción" : value;
+
+    private static string FormatResidency(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "Global" : value;
+
     private static string GetPolicyLabel(PolicyDto policy)
         => string.IsNullOrWhiteSpace(policy.DisplayName) ? policy.PolicyName : policy.DisplayName;
 
@@ -510,9 +528,12 @@ else
     {
         "Operaciones de archivo",
         "Acceso y sesiones",
+        "Contexto operativo",
         "Colaboración externa",
         "Protección de documentos",
+        "Respuesta a incidentes",
         "IA y automatización",
+        "Gobernanza de datos",
         "Auditoría y cumplimiento",
         "Otras políticas"
     };
