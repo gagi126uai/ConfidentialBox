@@ -3,7 +3,9 @@
 @inject IFileService FileService
 @inject IPdfViewerService PdfViewerService
 @inject IJSRuntime JS
+@using System.Collections.Generic
 @using System.Security.Cryptography
+@using System.Text.Json
 @using ConfidentialBox.Core.DTOs
 @implements IAsyncDisposable
 
@@ -23,7 +25,26 @@
 
                     @if (!string.IsNullOrEmpty(infoMessage))
                     {
-                        <div class="alert alert-info">@infoMessage</div>
+                        <div class="alert alert-info" role="status">@infoMessage</div>
+                    }
+
+                    @if (securityAlerts.Count > 0)
+                    {
+                        <div class="secure-alert-stack" aria-live="assertive">
+                            @for (var index = securityAlerts.Count - 1; index >= 0; index--)
+                            {
+                                var alert = securityAlerts[index];
+                                <div class="alert secure-alert @alert.CssClass" role="alert">
+                                    <div class="secure-alert__icon">
+                                        <i class="@alert.Icon"></i>
+                                    </div>
+                                    <div class="secure-alert__body">
+                                        <div class="secure-alert__message">@alert.Message</div>
+                                        <small class="secure-alert__timestamp text-muted">Detectado @FormatAlertTimestamp(alert)</small>
+                                    </div>
+                                </div>
+                            }
+                        </div>
                     }
 
                     @if (fileBlocked || viewerBlocked)
@@ -132,9 +153,12 @@
                             <div class="secure-pdf-toolbar" id="@ToolbarElementId"></div>
                             <div class="secure-pdf-frame" id="@PdfFrameElementId"></div>
                         </div>
-                        <p class="text-muted small mt-2">
-                            <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
-                        </p>
+                        @if (viewerConfig?.AIMonitoringEnabled ?? false)
+                        {
+                            <p class="text-muted small mt-2">
+                                <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
+                            </p>
+                        }
                     }
                 </div>
             </div>
@@ -166,6 +190,17 @@
     private const string ToolbarElementId = "securePdfToolbar";
     private bool shouldAutoStartViewer;
     private bool secureViewerScriptReady;
+    private readonly List<ViewerSecurityAlert> securityAlerts = new();
+
+    private static readonly IReadOnlyDictionary<string, ViewerSecurityAlertTemplate> SecurityAlertTemplates =
+        new Dictionary<string, ViewerSecurityAlertTemplate>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["DownloadAttempt"] = new("Intento de descarga bloqueado por la configuración del visor.", "alert-warning", "fas fa-download"),
+            ["PrintAttempt"] = new("Intento de impresión bloqueado por la política de seguridad.", "alert-warning", "fas fa-print"),
+            ["CopyAttempt"] = new("Intento de copiado de texto bloqueado en este documento.", "alert-warning", "fas fa-copy"),
+            ["ContextMenuBlocked"] = new("El menú contextual está bloqueado en el visor seguro.", "alert-info", "fas fa-ban"),
+            ["DeveloperToolsDetected"] = new("Se detectó la apertura de herramientas de desarrollo. La sesión fue marcada para revisión.", "alert-danger", "fas fa-user-secret")
+        };
 
     protected override async Task OnInitializedAsync()
     {
@@ -309,6 +344,7 @@
             dotNetReference?.Dispose();
             dotNetReference = DotNetObjectReference.Create(this);
 
+            securityAlerts.Clear();
             pdfLoaded = true;
             await InvokeAsync(StateHasChanged);
 
@@ -383,6 +419,8 @@
             return;
         }
 
+        var refreshRequested = await InvokeAsync(() => TryAppendSecurityAlert(eventType, eventData));
+
         var result = await PdfViewerService.RecordEventAsync(new ViewerEventRequest
         {
             SessionId = sessionId,
@@ -410,6 +448,13 @@
                 await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", sessionId);
                 sessionId = null;
             }
+
+            refreshRequested = true;
+        }
+
+        if (refreshRequested)
+        {
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -493,6 +538,90 @@
         }
     }
 
+    private bool TryAppendSecurityAlert(string eventType, string? eventData)
+    {
+        if (string.IsNullOrWhiteSpace(eventType))
+        {
+            return false;
+        }
+
+        if (string.Equals(eventType, "ScreenshotAttempt", StringComparison.OrdinalIgnoreCase))
+        {
+            var trigger = ExtractEventValue(eventData, "trigger");
+            var triggerText = DescribeScreenshotTrigger(trigger);
+            var message = triggerText != null
+                ? $"Intento de captura de pantalla detectado ({triggerText}). La actividad quedó registrada."
+                : "Intento de captura de pantalla detectado. La actividad quedó registrada.";
+            AppendSecurityAlert(new ViewerSecurityAlert(eventType, message, "alert-danger", "fas fa-camera", DateTimeOffset.UtcNow));
+            return true;
+        }
+
+        if (SecurityAlertTemplates.TryGetValue(eventType, out var template))
+        {
+            AppendSecurityAlert(new ViewerSecurityAlert(eventType, template.Message, template.CssClass, template.Icon, DateTimeOffset.UtcNow));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void AppendSecurityAlert(ViewerSecurityAlert alert)
+    {
+        ViewerSecurityAlert? lastAlert = securityAlerts.Count > 0 ? securityAlerts[^1] : null;
+        if (lastAlert != null && lastAlert.Message == alert.Message && (alert.Timestamp - lastAlert.Timestamp).TotalSeconds < 2)
+        {
+            return;
+        }
+
+        securityAlerts.Add(alert);
+
+        const int maxAlerts = 5;
+        while (securityAlerts.Count > maxAlerts)
+        {
+            securityAlerts.RemoveAt(0);
+        }
+    }
+
+    private static string? ExtractEventValue(string? eventData, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(eventData) || string.IsNullOrWhiteSpace(propertyName))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(eventData);
+            if (document.RootElement.TryGetProperty(propertyName, out var property))
+            {
+                return property.ValueKind == JsonValueKind.String ? property.GetString() : property.ToString();
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore malformed payloads from the browser; the event was still recorded.
+        }
+
+        return null;
+    }
+
+    private static string? DescribeScreenshotTrigger(string? trigger)
+    {
+        return trigger switch
+        {
+            "KeyDown" or "KeyUp" => "tecla Impr Pant",
+            "SystemCaptureShortcut" => "atajo de captura del sistema",
+            "SnippingShortcut" => "herramienta Recortes",
+            { Length: > 0 } => trigger,
+            _ => null
+        };
+    }
+
+    private static string FormatAlertTimestamp(ViewerSecurityAlert alert)
+    {
+        return alert.Timestamp.ToLocalTime().ToString("HH:mm:ss");
+    }
+
     public async ValueTask DisposeAsync()
     {
         var currentSession = sessionId;
@@ -555,6 +684,10 @@
     {
         public string? MasterPassword { get; set; }
     }
+
+    private sealed record ViewerSecurityAlert(string EventType, string Message, string CssClass, string Icon, DateTimeOffset Timestamp);
+
+    private sealed record ViewerSecurityAlertTemplate(string Message, string CssClass, string Icon);
 
     private sealed record ProtectionChip(string CssClass, string Icon, string Text);
 }
