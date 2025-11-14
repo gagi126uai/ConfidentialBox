@@ -987,6 +987,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
         viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
 
         const iframe = document.createElement('iframe');
+        let sandboxed = true;
         iframe.className = 'secure-pdf-iframe';
         iframe.title = 'Documento PDF seguro';
         iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
@@ -997,6 +998,19 @@ export async function renderPdf(frameId, base64Data, fileName) {
         iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation');
 
         iframe.addEventListener('load', () => {
+            if (sandboxed) {
+                try {
+                    const fallbackText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
+                    if (fallbackText.includes('ha bloqueado esta página') || fallbackText.includes('blocked this page')) {
+                        sandboxed = false;
+                        iframe.removeAttribute('sandbox');
+                        iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+                        return;
+                    }
+                } catch (sandboxErr) {
+                    console.warn('No se pudo verificar el estado del sandbox del visor seguro', sandboxErr);
+                }
+            }
             viewport.dispatchEvent(new Event('scroll'));
             try {
                 const frameWindow = iframe.contentWindow;

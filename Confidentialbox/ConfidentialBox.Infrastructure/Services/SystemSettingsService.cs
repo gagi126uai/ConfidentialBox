@@ -103,7 +103,11 @@ public class SystemSettingsService : ISystemSettingsService
         var result = new EmailServerSettings
         {
             Port = 587,
-            UseSsl = true
+            UseSsl = true,
+            UseStartTls = true,
+            ValidateCertificates = true,
+            ConnectionTimeoutSeconds = 30,
+            AuthenticationMechanism = "Auto"
         };
 
         var settings = await _context.SystemSettings
@@ -123,6 +127,12 @@ public class SystemSettingsService : ISystemSettingsService
                 case "UseSsl" when bool.TryParse(setting.Value, out var useSsl):
                     result.UseSsl = useSsl;
                     break;
+                case "UseStartTls" when bool.TryParse(setting.Value, out var useStartTls):
+                    result.UseStartTls = useStartTls;
+                    break;
+                case "ValidateCertificates" when bool.TryParse(setting.Value, out var validate):
+                    result.ValidateCertificates = validate;
+                    break;
                 case "Username":
                     result.Username = setting.Value;
                     break;
@@ -135,8 +145,22 @@ public class SystemSettingsService : ISystemSettingsService
                 case "FromName":
                     result.FromName = setting.Value;
                     break;
+                case "ReplyToEmail":
+                    result.ReplyToEmail = setting.Value;
+                    break;
+                case "ReplyToName":
+                    result.ReplyToName = setting.Value;
+                    break;
+                case "ConnectionTimeoutSeconds" when int.TryParse(setting.Value, out var timeout):
+                    result.ConnectionTimeoutSeconds = Math.Clamp(timeout, 5, 300);
+                    break;
+                case "AuthenticationMechanism" when !string.IsNullOrWhiteSpace(setting.Value):
+                    result.AuthenticationMechanism = setting.Value;
+                    break;
             }
         }
+
+        result.AuthenticationMechanism = NormalizeAuthenticationMechanism(result.AuthenticationMechanism);
 
         return result;
     }
@@ -147,13 +171,20 @@ public class SystemSettingsService : ISystemSettingsService
         settings.Username = settings.Username?.Trim();
         settings.FromEmail = settings.FromEmail?.Trim();
         settings.FromName = settings.FromName?.Trim();
+        settings.AuthenticationMechanism = NormalizeAuthenticationMechanism(settings.AuthenticationMechanism);
 
         await UpsertSettingAsync(EmailServerCategory, "SmtpHost", settings.SmtpHost ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "Port", settings.Port.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "UseSsl", settings.UseSsl.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "UseStartTls", settings.UseStartTls.ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "ValidateCertificates", settings.ValidateCertificates.ToString(), false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "Username", settings.Username ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "FromEmail", settings.FromEmail ?? string.Empty, false, updatedByUserId, cancellationToken);
         await UpsertSettingAsync(EmailServerCategory, "FromName", settings.FromName ?? string.Empty, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "ReplyToEmail", settings.ReplyToEmail ?? string.Empty, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "ReplyToName", settings.ReplyToName ?? string.Empty, false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "ConnectionTimeoutSeconds", Math.Clamp(settings.ConnectionTimeoutSeconds, 5, 300).ToString(), false, updatedByUserId, cancellationToken);
+        await UpsertSettingAsync(EmailServerCategory, "AuthenticationMechanism", settings.AuthenticationMechanism ?? "Auto", false, updatedByUserId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(settings.Password))
         {
@@ -421,6 +452,24 @@ public class SystemSettingsService : ISystemSettingsService
     }
 
     private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
+
+    private static string NormalizeAuthenticationMechanism(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Auto";
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "auto" => "Auto",
+            "plain" => "Plain",
+            "login" => "Login",
+            "crammd5" => "CramMd5",
+            "cram-md5" => "CramMd5",
+            _ => "Auto"
+        };
+    }
 
     private async Task UpsertSettingAsync(string category, string key, string value, bool isSensitive, string? updatedByUserId, CancellationToken cancellationToken)
     {

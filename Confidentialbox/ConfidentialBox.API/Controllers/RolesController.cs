@@ -49,7 +49,8 @@ public class RolesController : ControllerBase
                 Description = d.Description,
                 ValueType = d.ValueType.ToString(),
                 DefaultValue = d.DefaultValue,
-                Options = d.Options
+                Options = d.Options ?? Array.Empty<string>(),
+                Category = d.Category
             })
             .ToList();
 
@@ -181,7 +182,7 @@ public class RolesController : ControllerBase
                 DisplayName = definition.DisplayName,
                 Description = definition.Description,
                 ValueType = definition.ValueType.ToString(),
-                Options = definition.Options
+                Options = definition.Options ?? Array.Empty<string>()
             });
             usedKeys.Add(definition.Key);
         }
