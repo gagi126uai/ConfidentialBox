@@ -95,6 +95,10 @@ function forEachSessionByFrame(frameId, callback) {
     }
 }
 
+const PDF_JS_CDN_VERSION = '3.11.174';
+const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
+const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
+
 const defaultViewerSettings = {
     theme: 'dark',
     accentColor: '#f97316',
@@ -128,6 +132,48 @@ const defaultViewerSettings = {
     customCss: ''
 };
 
+let pdfjsLibPromise = null;
+
+async function ensurePdfJsLibrary() {
+    if (typeof window !== 'undefined' && window.pdfjsLib) {
+        const lib = window.pdfjsLib;
+        if (lib.GlobalWorkerOptions && !lib.GlobalWorkerOptions.workerSrc) {
+            lib.GlobalWorkerOptions.workerSrc = window.pdfjsWorkerSrc || PDF_JS_WORKER_URL;
+        }
+        return lib;
+    }
+
+    if (!pdfjsLibPromise) {
+        pdfjsLibPromise = import(PDF_JS_MODULE_URL)
+            .then((module) => {
+                const lib = module && module.getDocument ? module : module.default || module;
+                if (!lib || typeof lib.getDocument !== 'function') {
+                    throw new Error('La librería pdf.js no está disponible.');
+                }
+
+                if (lib.GlobalWorkerOptions) {
+                    lib.GlobalWorkerOptions.workerSrc = PDF_JS_WORKER_URL;
+                }
+
+                if (typeof window !== 'undefined' && !window.pdfjsLib) {
+                    window.pdfjsLib = lib;
+                    window.pdfjsWorkerSrc = PDF_JS_WORKER_URL;
+                }
+
+                return lib;
+            })
+            .catch((err) => {
+                console.error('No se pudo cargar pdf.js desde el CDN configurado', err);
+                if (typeof window !== 'undefined' && window.pdfjsLib) {
+                    return window.pdfjsLib;
+                }
+                throw err;
+            });
+    }
+
+    return pdfjsLibPromise;
+}
+
 function base64ToUint8Array(base64) {
     const binary = atob(base64);
     const length = binary.length;
@@ -138,12 +184,6 @@ function base64ToUint8Array(base64) {
     }
 
     return bytes;
-}
-
-function createPdfObjectUrl(base64) {
-    const pdfBytes = base64ToUint8Array(base64);
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    return URL.createObjectURL(blob);
 }
 
 function sendEvent(state, type, pageNumber, data) {
@@ -457,19 +497,128 @@ function applyZoomFromState(state, frameState) {
     updateZoom(state, frameState, zoom, { silent: true });
 }
 
+async function renderPageView(frameState, pageView, scale) {
+    if (!frameState?.pdfDoc || !pageView) {
+        return;
+    }
+
+    if (pageView.renderTask && typeof pageView.renderTask.cancel === 'function') {
+        try {
+            pageView.renderTask.cancel();
+        } catch { /* noop */ }
+    }
+
+    try {
+        const pdfPage = await frameState.pdfDoc.getPage(pageView.pageNumber);
+        const viewport = pdfPage.getViewport({ scale });
+        const canvas = pageView.canvas;
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) {
+            console.warn('No se pudo obtener el contexto del lienzo del visor seguro');
+            return;
+        }
+        const outputScale = window.devicePixelRatio || 1;
+        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
+
+        canvas.width = Math.floor(renderViewport.width);
+        canvas.height = Math.floor(renderViewport.height);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = 'auto';
+        pageView.element.style.width = '100%';
+        pageView.element.style.height = 'auto';
+
+        const renderTask = pdfPage.render({
+            canvasContext: context,
+            viewport: renderViewport
+        });
+
+        pageView.renderTask = renderTask;
+        await renderTask.promise;
+        pageView.viewport = viewport;
+
+        if (!pageView.textPromise) {
+            pageView.textPromise = pdfPage.getTextContent({ normalizeWhitespace: true })
+                .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
+                .catch((err) => {
+                    console.warn('No se pudo obtener el texto de la página segura', err);
+                    return '';
+                });
+        }
+    } catch (err) {
+        if (err?.name === 'RenderingCancelledException') {
+            return;
+        }
+        console.error('Error renderizando página del visor seguro', err);
+    } finally {
+        pageView.renderTask = null;
+    }
+}
+
+async function renderAllPages(frameState) {
+    if (!frameState) {
+        return;
+    }
+
+    const scale = frameState.scale ?? 1;
+    if (!frameState.pages || frameState.pages.length === 0) {
+        return;
+    }
+
+    for (const pageView of frameState.pages) {
+        await renderPageView(frameState, pageView, scale);
+    }
+}
+
+function scheduleRenderAllPages(frameState) {
+    if (!frameState) {
+        return;
+    }
+
+    if (frameState.renderScheduled) {
+        return;
+    }
+
+    frameState.renderScheduled = true;
+    Promise.resolve().then(async () => {
+        frameState.renderScheduled = false;
+        await renderAllPages(frameState);
+    });
+}
+
+async function resolvePageText(frameState, pageView) {
+    if (!frameState?.pdfDoc || !pageView) {
+        return '';
+    }
+
+    if (!pageView.textPromise) {
+        pageView.textPromise = frameState.pdfDoc.getPage(pageView.pageNumber)
+            .then((page) => page.getTextContent({ normalizeWhitespace: true }))
+            .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
+            .catch((err) => {
+                console.warn('No se pudo obtener el texto de la página segura', err);
+                return '';
+            });
+    }
+
+    try {
+        return await pageView.textPromise;
+    } catch (err) {
+        console.warn('Error recuperando texto de página segura', err);
+        return '';
+    }
+}
+
 function updateZoom(state, frameState, scale, options = {}) {
     const targetScale = Math.min(Math.max(scale, 0.25), 4);
     state.currentZoom = targetScale;
 
-    const iframe = frameState?.iframe;
-    if (iframe) {
-        iframe.style.transform = `scale(${targetScale})`;
-        iframe.style.width = `${(1 / targetScale) * 100}%`;
-        iframe.style.height = `${(1 / targetScale) * 100}%`;
-    }
-
-    if (frameState?.viewport) {
-        frameState.viewport.scrollTop = frameState.viewport.scrollTop;
+    if (frameState) {
+        const previousScale = typeof frameState.scale === 'number' ? frameState.scale : null;
+        frameState.scale = targetScale;
+        if (previousScale == null || Math.abs(previousScale - targetScale) > 0.001) {
+            scheduleRenderAllPages(frameState);
+        }
     }
 
     if (state.zoomLabel) {
@@ -522,7 +671,7 @@ function enterFullscreen(element) {
     }
 }
 
-function executeSearch(state, query) {
+async function executeSearch(state, query) {
     if (!query) {
         return;
     }
@@ -530,19 +679,37 @@ function executeSearch(state, query) {
     sendEvent(state, 'SearchRequested', null, { query });
 
     const frameState = pdfFrames.get(state.frameId);
-    const iframe = frameState?.iframe;
-    if (!iframe || !iframe.contentWindow) {
+    if (!frameState?.pdfDoc) {
+        sendEvent(state, 'SearchNotFound', null, { query });
         return;
     }
 
-    try {
-        const win = iframe.contentWindow;
-        const found = win.find(query, false, false, true, false, true, false);
-        if (!found) {
-            sendEvent(state, 'SearchNotFound', null, { query });
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+        return;
+    }
+
+    let matchView = null;
+    for (const pageView of frameState.pages) {
+        try {
+            const text = await resolvePageText(frameState, pageView);
+            if (text && text.includes(normalizedQuery)) {
+                matchView = pageView;
+                break;
+            }
+        } catch (err) {
+            console.warn('No se pudo evaluar la búsqueda segura en una página', err);
         }
-    } catch (err) {
-        console.warn('No se pudo ejecutar la búsqueda segura', err);
+    }
+
+    if (matchView) {
+        sendEvent(state, 'SearchMatch', matchView.pageNumber, { query });
+        if (frameState.viewport && matchView.element) {
+            const offsetTop = matchView.element.offsetTop;
+            frameState.viewport.scrollTo({ top: offsetTop - 32, behavior: 'smooth' });
+        }
+    } else {
+        sendEvent(state, 'SearchNotFound', null, { query });
     }
 }
 
@@ -627,9 +794,13 @@ function setupToolbar(state, container, toolbarElement, options) {
         input.className = 'form-control';
         searchForm.appendChild(input);
 
-        registerHandler(state, searchForm, 'submit', (event) => {
+        registerHandler(state, searchForm, 'submit', async (event) => {
             event.preventDefault();
-            executeSearch(state, input.value);
+            try {
+                await executeSearch(state, input.value);
+            } catch (err) {
+                console.warn('La búsqueda segura encontró un error', err);
+            }
         });
 
         rightGroup.appendChild(searchForm);
@@ -650,15 +821,48 @@ function setupToolbar(state, container, toolbarElement, options) {
     if (settings.showPrintButton && settings.allowPrint) {
         const printButton = createToolbarButton('fas fa-print', 'Imprimir', () => {
             const frame = pdfFrames.get(state.frameId);
-            const iframe = frame?.iframe;
             sendEvent(state, 'ToolbarPrint');
-            if (iframe && iframe.contentWindow && typeof iframe.contentWindow.print === 'function') {
-                try {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
-                } catch (err) {
-                    console.warn('No se pudo abrir el diálogo de impresión seguro', err);
+            if (!frame?.base64) {
+                console.warn('No se encontró el contenido del PDF para imprimir');
+                return;
+            }
+
+            try {
+                const bytes = frame.bytes ?? base64ToUint8Array(frame.base64);
+                const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+                const printWindow = window.open(blobUrl);
+                if (!printWindow) {
+                    console.warn('El navegador bloqueó la ventana de impresión segura');
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+                    return;
                 }
+
+                const cleanup = () => {
+                    try { URL.revokeObjectURL(blobUrl); } catch { /* noop */ }
+                };
+
+                const triggerPrint = () => {
+                    try {
+                        printWindow.focus();
+                        printWindow.print();
+                    } catch (err) {
+                        console.warn('No se pudo iniciar la impresión segura', err);
+                    } finally {
+                        cleanup();
+                    }
+                };
+
+                if (printWindow.document?.readyState === 'complete') {
+                    triggerPrint();
+                } else {
+                    printWindow.addEventListener('load', triggerPrint, { once: true });
+                    setTimeout(() => {
+                        try { printWindow.removeEventListener('load', triggerPrint); } catch { /* noop */ }
+                        triggerPrint();
+                    }, 1500);
+                }
+            } catch (err) {
+                console.warn('No se pudo preparar la impresión segura', err);
             }
         });
         rightGroup.appendChild(printButton);
@@ -936,9 +1140,6 @@ export async function disposePdfFrame(frameId) {
             } else if (frameState.loadingTask && typeof frameState.loadingTask.destroy === 'function') {
                 await frameState.loadingTask.destroy();
             }
-            if (frameState.objectUrl) {
-                URL.revokeObjectURL(frameState.objectUrl);
-            }
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
         }
@@ -977,9 +1178,12 @@ export async function renderPdf(frameId, base64Data, fileName) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
-    let objectUrl = null;
     try {
-        objectUrl = createPdfObjectUrl(base64Data);
+        const pdfjsLib = await ensurePdfJsLibrary();
+        const pdfBytes = base64ToUint8Array(base64Data);
+        const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+        const pdfDoc = await loadingTask.promise;
+
         frame.innerHTML = '';
 
         const viewport = document.createElement('div');
@@ -1037,60 +1241,9 @@ export async function renderPdf(frameId, base64Data, fileName) {
                         console.warn('No se pudo inyectar estilos anti selección en el visor seguro', styleErr);
                     }
 
-                    frameDoc.addEventListener('contextmenu', (evt) => {
-                        forEachSessionByFrame(frameId, (relatedState) => {
-                            if (relatedState.disableContextMenu) {
-                                evt.preventDefault();
-                                sendEvent(relatedState, 'ContextMenuBlocked');
-                            } else {
-                                sendEvent(relatedState, 'ContextMenuOpened');
-                            }
-                        });
-                    }, true);
-
-                    frameDoc.addEventListener('selectionchange', () => {
-                        forEachSessionByFrame(frameId, (relatedState) => {
-                            if (relatedState.settings?.disableTextSelection) {
-                                clearSelectionWithin(frameDoc.body, frameDoc);
-                                sendEvent(relatedState, 'SelectionCleared');
-                            }
-                        });
-                    });
-
-                    frameDoc.addEventListener('copy', (evt) => {
-                        forEachSessionByFrame(frameId, (relatedState) => {
-                            if (!relatedState.settings?.allowCopy) {
-                                evt.preventDefault();
-                                sendEvent(relatedState, 'CopyAttempt');
-                            }
-                        });
-                    }, true);
-                }
-
-                if (frameWindow) {
-                    frameWindow.addEventListener('keyup', (evt) => {
-                        const key = evt.key.toLowerCase();
-                        if (key === 'printscreen') {
-                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameKeyUp'));
-                        }
-                    }, true);
-
-                    frameWindow.addEventListener('keydown', (evt) => {
-                        const key = evt.key.toLowerCase();
-                        if (key === 'printscreen') {
-                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameKeyDown'));
-                        }
-                        if ((evt.ctrlKey || evt.metaKey) && evt.shiftKey && key === 's') {
-                            forEachSessionByFrame(frameId, (relatedState) => notifyScreenshotAttempt(relatedState, 'FrameSnippingShortcut'));
-                        }
-                    }, true);
-                }
-            } catch (err) {
-                console.warn('No se pudo interceptar el menú contextual interno del visor seguro', err);
-            }
-        });
-
-        viewport.appendChild(iframe);
+        const pagesHost = document.createElement('div');
+        pagesHost.className = 'secure-pdf-pages';
+        viewport.appendChild(pagesHost);
 
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
@@ -1104,18 +1257,45 @@ export async function renderPdf(frameId, base64Data, fileName) {
         viewport.appendChild(overlay);
         frame.appendChild(viewport);
 
-        pdfFrames.set(frameId, {
+        const frameState = {
             container: frame,
             viewport,
-            iframe,
+            pagesHost,
             pages: [],
-            objectUrl,
+            pdfDoc,
+            loadingTask,
+            scale: 1,
             base64: base64Data,
+            bytes: pdfBytes,
             fileName,
             overlay,
-            watermarkLayer
-        });
+            watermarkLayer,
+            renderScheduled: false
+        };
 
+        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'secure-pdf-page';
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'secure-pdf-canvas';
+            pageWrapper.appendChild(canvas);
+
+            pagesHost.appendChild(pageWrapper);
+
+            frameState.pages.push({
+                pageNumber,
+                element: pageWrapper,
+                canvas,
+                viewport: null,
+                renderTask: null,
+                textPromise: null
+            });
+        }
+
+        pdfFrames.set(frameId, frameState);
+
+        let initialScale = 1;
         forEachSessionByFrame(frameId, (state) => {
             const currentFrameState = pdfFrames.get(frameId);
             state.watermarkHost = ensureWatermarkHost(currentFrameState);
@@ -1134,8 +1314,13 @@ export async function renderPdf(frameId, base64Data, fileName) {
             } : null);
 
             state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);
+
+            initialScale = state.currentZoom ?? state.defaultZoom ?? initialScale;
+            sendEvent(state, 'DocumentReady', null, { pageCount: pdfDoc.numPages });
         });
 
+        frameState.scale = initialScale;
+        await renderAllPages(frameState);
         ensureTrackingForFrame(frameId);
     } catch (err) {
         console.error('Error renderizando el PDF seguro', err);
@@ -1144,12 +1329,13 @@ export async function renderPdf(frameId, base64Data, fileName) {
         errorMessage.className = 'secure-pdf-loading';
         errorMessage.textContent = 'No se pudo renderizar el documento.';
         frame.appendChild(errorMessage);
-        if (objectUrl) {
-            URL.revokeObjectURL(objectUrl);
-        }
+        forEachSessionByFrame(frameId, (state) => {
+            sendEvent(state, 'DocumentError', null, { message: err?.message || 'RenderFailed' });
+        });
         throw err;
     }
 }
+
 
 export function disposeSecurePdfViewer(sessionId) {
     const state = sessions.get(sessionId);
