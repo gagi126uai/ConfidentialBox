@@ -980,6 +980,9 @@ export async function renderPdf(frameId, base64Data, fileName) {
     let objectUrl = null;
     try {
         objectUrl = createPdfObjectUrl(base64Data);
+        let activeObjectUrl = objectUrl;
+        const buildViewerUrl = () => `${activeObjectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+
         frame.innerHTML = '';
 
         const viewport = document.createElement('div');
@@ -990,7 +993,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
         let sandboxed = true;
         iframe.className = 'secure-pdf-iframe';
         iframe.title = 'Documento PDF seguro';
-        iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+        iframe.src = buildViewerUrl();
         iframe.setAttribute('frameborder', '0');
         iframe.setAttribute('allowfullscreen', 'true');
         iframe.setAttribute('allow', 'fullscreen');
@@ -1001,10 +1004,42 @@ export async function renderPdf(frameId, base64Data, fileName) {
             if (sandboxed) {
                 try {
                     const fallbackText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
-                    if (fallbackText.includes('ha bloqueado esta página') || fallbackText.includes('blocked this page')) {
+                    const normalizedText = fallbackText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const blockedIndicators = [
+                        'ha bloqueado esta pagina',
+                        'ha bloqueado esta página',
+                        'chrome bloqueo esta pagina',
+                        'chrome bloqueó esta página',
+                        'blocked this page',
+                        'chrome blocked this page'
+                    ];
+
+                    const isBlocked = blockedIndicators.some((indicator) =>
+                        fallbackText.includes(indicator) || normalizedText.includes(indicator)
+                    );
+
+                    if (isBlocked) {
                         sandboxed = false;
                         iframe.removeAttribute('sandbox');
-                        iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+                        try {
+                            const nextObjectUrl = createPdfObjectUrl(base64Data);
+                            if (activeObjectUrl) {
+                                try { URL.revokeObjectURL(activeObjectUrl); } catch { /* noop */ }
+                            }
+                            activeObjectUrl = nextObjectUrl;
+                            objectUrl = nextObjectUrl;
+                            const frameState = pdfFrames.get(frameId);
+                            if (frameState) {
+                                frameState.objectUrl = nextObjectUrl;
+                                frameState.base64 = base64Data;
+                            }
+                            setTimeout(() => {
+                                iframe.src = 'about:blank';
+                                iframe.src = buildViewerUrl();
+                            }, 0);
+                        } catch (reloadErr) {
+                            console.error('No se pudo recargar el visor seguro sin sandbox', reloadErr);
+                        }
                         return;
                     }
                 } catch (sandboxErr) {
@@ -1013,8 +1048,20 @@ export async function renderPdf(frameId, base64Data, fileName) {
             }
             viewport.dispatchEvent(new Event('scroll'));
             try {
-                const frameWindow = iframe.contentWindow;
-                const frameDoc = iframe.contentDocument || frameWindow?.document;
+                let frameWindow = null;
+                let frameDoc = null;
+                try {
+                    frameWindow = iframe.contentWindow || null;
+                } catch {
+                    frameWindow = null;
+                }
+
+                try {
+                    frameDoc = iframe.contentDocument || frameWindow?.document || null;
+                } catch {
+                    frameDoc = null;
+                }
+
                 if (frameDoc) {
                     try {
                         const styleElement = frameDoc.createElement('style');
@@ -1062,6 +1109,8 @@ export async function renderPdf(frameId, base64Data, fileName) {
                             }
                         });
                     }, true);
+                } else {
+                    console.info('El visor seguro se cargó sin acceso directo al documento; se aplicarán protecciones mediante superposición.');
                 }
 
                 if (frameWindow) {
@@ -1106,7 +1155,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
             viewport,
             iframe,
             pages: [],
-            objectUrl,
+            objectUrl: activeObjectUrl,
             base64: base64Data,
             fileName,
             overlay,
@@ -1142,7 +1191,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
         errorMessage.textContent = 'No se pudo renderizar el documento.';
         frame.appendChild(errorMessage);
         if (objectUrl) {
-            URL.revokeObjectURL(objectUrl);
+            try { URL.revokeObjectURL(objectUrl); } catch { /* noop */ }
         }
         throw err;
     }
