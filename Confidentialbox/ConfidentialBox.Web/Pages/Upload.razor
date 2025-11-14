@@ -1,16 +1,26 @@
 ﻿@page "/upload"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
-@using System.IO;
-@using System.Linq;
+@using System.IO
+@using System.Security.Cryptography
 @attribute [Authorize]
 @inject IFileService FileService
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
-@using System.Security.Cryptography
 
 <PageTitle>Subir Archivo - ConfidentialBox</PageTitle>
+
+<style>
+    .drop-zone { position: relative; border: 2px dashed #ced4da; border-radius: 10px; }
+    .drop-zone.dragging { border-color: #0d6efd; background: rgba(13,110,253,.06); }
+    /* ESTE input captura click y DROP sin JS ni GetFileAsync */
+    .drop-zone-input-capture {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; cursor: pointer;
+    }
+</style>
 
 <h1><i class="fas fa-cloud-upload-alt"></i> Subir Archivo</h1>
 
@@ -50,16 +60,14 @@
                     </div>
                 }
 
-                <!-- Drag and Drop Area -->
-                <label class="drop-zone @(isDragging ? "dragging" : "")"
-                       @ondragenter="HandleDragEnter"
-                       @ondragenter:preventDefault
-                       @ondragleave="HandleDragLeave"
-                       @ondragover:preventDefault
-                       @ondrop="HandleDrop"
-                       @ondrop:preventDefault>
-
-                    <InputFile id="secureUploadInput" OnChange="HandleFileSelected" class="drop-zone-input" />
+                <!-- DROP DIRECTO SOBRE InputFile invisible -->
+                <div class="drop-zone @(isDragging ? "dragging" : "")"
+                     @ondragenter="HandleDragEnter"
+                     @ondragenter:preventDefault
+                     @ondragleave="HandleDragLeave"
+                     @ondragover="HandleDragOver"
+                     @ondragover:preventDefault>
+                    <InputFile OnChange="HandleFileSelected" class="drop-zone-input-capture" />
 
                     <div class="drop-zone-content text-center py-5">
                         <i class="fas fa-cloud-upload-alt fa-5x text-muted mb-3"></i>
@@ -69,13 +77,12 @@
                             <i class="fas fa-folder-open"></i> Seleccionar archivo
                         </span>
                     </div>
-                </label>
+                </div>
 
                 @if (selectedFile != null)
                 {
                     <div class="mt-4">
                         <h5>Archivo Seleccionado:</h5>
-
                         <div class="card bg-light">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
@@ -91,33 +98,26 @@
                             </div>
                         </div>
 
-                        <!-- Opciones de configuración -->
+                        <!-- Opciones -->
                         <div class="mt-4">
                             <h5>Opciones de Seguridad:</h5>
 
                             <div class="mb-3">
                                 <label class="form-label">Contraseña Maestra (Opcional)</label>
-                                <input type="password"
-                                       class="form-control"
-                                       @bind="masterPassword"
+                                <input type="password" class="form-control" @bind="masterPassword"
                                        placeholder="Dejar vacío para no usar contraseña" />
                                 <small class="text-muted">Si se establece, se requerirá esta contraseña para acceder al archivo</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Fecha de Expiración (Opcional)</label>
-                                <input type="datetime-local"
-                                       class="form-control"
-                                       @bind="expirationDate" />
+                                <input type="datetime-local" class="form-control" @bind="expirationDate" />
                                 <small class="text-muted">Dejar vacío para que no expire</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Límite de Accesos (Opcional)</label>
-                                <input type="number"
-                                       class="form-control"
-                                       @bind="maxAccesses"
-                                       min="1"
+                                <input type="number" class="form-control" @bind="maxAccesses" min="1"
                                        placeholder="Dejar vacío para accesos ilimitados" />
                                 <small class="text-muted">Número máximo de veces que se puede acceder al archivo</small>
                             </div>
@@ -131,41 +131,33 @@
 
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" @bind="enableWatermark" id="watermarkCheck" />
-                                            <label class="form-check-label" for="watermarkCheck">
-                                                <strong>Marca de agua "CONFIDENTIAL"</strong>
-                                            </label>
+                                            <label class="form-check-label" for="watermarkCheck"><strong>Marca de agua "CONFIDENTIAL"</strong></label>
                                         </div>
 
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" @bind="screenshotProtection" id="screenshotCheck" />
-                                            <label class="form-check-label" for="screenshotCheck">
-                                                <strong>Bloquear capturas de pantalla</strong>
-                                            </label>
+                                            <label class="form-check-label" for="screenshotCheck"><strong>Bloquear capturas de pantalla</strong></label>
                                         </div>
 
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" @bind="aiMonitoring" id="aiCheck" />
-                                            <label class="form-check-label" for="aiCheck">
-                                                <strong>Monitoreo con IA</strong> - Detecta comportamientos sospechosos
-                                            </label>
+                                            <label class="form-check-label" for="aiCheck"><strong>Monitoreo con IA</strong> - Detecta comportamientos sospechosos</label>
                                         </div>
                                     </div>
                                 </div>
                             }
 
-                            <button class="btn btn-success btn-lg w-100"
-                                    @onclick="UploadFile"
-                                    disabled="@isUploading">
+                            <button class="btn btn-success btn-lg w-100" @onclick="UploadFile" disabled="@isUploading">
                                 @if (isUploading)
                                 {
-                                    <span class="spinner-border spinner-border-sm me-2"></span>
-                                    @:Cifrando y Subiendo...
-                                }
+                                    <span class="spinner-border spinner-border-sm me-2">Cifrando y Subiendo...</span>
+                                    
+                                                        }
                                 else
                                 {
-                                    <i class="fas fa-lock"></i>
-                                    @:Cifrar y Subir Archivo
-                                }
+                                    <i class="fas fa-lock">Cifrar y Subir Archivo</i>
+                                    
+                                                        }
                             </button>
                         </div>
                     </div>
@@ -178,10 +170,7 @@
         <div class="card bg-info text-white">
             <div class="card-body">
                 <h5><i class="fas fa-shield-alt"></i> Seguridad</h5>
-                <p class="small">
-                    Tu archivo será cifrado en el navegador antes de ser enviado al servidor.
-                    Nadie, ni siquiera los administradores, podrán ver el contenido sin la clave de cifrado.
-                </p>
+                <p class="small">Tu archivo será cifrado en el navegador antes de ser enviado al servidor.</p>
             </div>
         </div>
 
@@ -201,75 +190,40 @@
 </div>
 
 @code {
-    private const long MaxUpload = 100 * 1024 * 1024; // 100 MB
+    private const long MaxUpload = 100 * 1024 * 1024;
 
     private IBrowserFile? selectedFile;
     private string? masterPassword;
     private DateTime? expirationDate;
     private int? maxAccesses;
 
-    private bool isUploading = false;
-    private bool isDragging = false;
+    private bool isUploading;
+    private bool isDragging;
 
     private string? errorMessage;
     private string? successMessage;
     private string? shareLink;
 
-    // Configuración PDF
     private bool enableWatermark = true;
     private bool screenshotProtection = true;
     private bool aiMonitoring = true;
+    private bool lastUploadedWasPdf;
 
-    // Para construir el link correcto luego de la subida
-    private bool lastUploadedWasPdf = false;
-
-    private bool _isDragging;
-
-        if (e.DataTransfer is null)
-        {
-            return;
-        }
-
-        IBrowserFile? browserFile = null;
-
-        if (e.DataTransfer.Files?.Count > 0)
-        {
-            browserFile = e.DataTransfer.Files[0];
-        }
-        else if (e.DataTransfer.Items?.Count > 0)
-        {
-            foreach (var item in e.DataTransfer.Items)
-            {
-                if (string.Equals(item.Kind, "file", StringComparison.OrdinalIgnoreCase))
-                {
-                    browserFile = await item.GetFileAsync();
-                    if (browserFile != null)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (browserFile != null)
-        {
-            await SelectFileAsync(browserFile);
-        }
-    }
+    // Solo para efectos visuales de la zona
+    private void HandleDragEnter(DragEventArgs _) { isDragging = true; StateHasChanged(); }
+    private void HandleDragLeave(DragEventArgs _) { isDragging = false; StateHasChanged(); }
+    private void HandleDragOver(DragEventArgs _) { if (!isDragging) { isDragging = true; StateHasChanged(); } }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
         if (e.FileCount > 0)
-            await SelectFileAsync(e.File);
+            await SelectFileAsync(e.File); // e.File SIEMPRE es IBrowserFile
     }
 
     private Task SelectFileAsync(IBrowserFile file)
     {
         selectedFile = file;
-        errorMessage = null;
-        successMessage = null;
-        shareLink = null;
-
+        errorMessage = successMessage = shareLink = null;
         return InvokeAsync(StateHasChanged);
     }
 
@@ -286,10 +240,9 @@
         enableWatermark = true;
         screenshotProtection = true;
         aiMonitoring = true;
-        // No afectar lastUploadedWasPdf (depende del último upload exitoso)
     }
 
-    private bool IsPDF(string filename)
+    private static bool IsPDF(string filename)
         => filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
     private async Task UploadFile()
@@ -308,10 +261,8 @@
                 return;
             }
 
-            // Flag local, para no “pegar” un estado si falla la subida
             var isPdf = IsPDF(selectedFile.Name);
 
-            // Leer por stream (sin reservar byte[] con long)
             using var readStream = selectedFile.OpenReadStream(maxAllowedSize: MaxUpload);
             using var ms = new MemoryStream();
             await readStream.CopyToAsync(ms);
@@ -346,7 +297,7 @@
                 shareLink = result.ShareLink;
                 successMessage = "¡Archivo subido exitosamente!";
                 selectedFile = null;
-                lastUploadedWasPdf = isPdf; // setear sólo si la subida fue exitosa
+                lastUploadedWasPdf = isPdf;
             }
             else
             {
@@ -363,7 +314,7 @@
         }
     }
 
-    private (string encryptionKey, string encryptedPayload) EncryptBuffer(byte[] buffer)
+    private static (string encryptionKey, string encryptedPayload) EncryptBuffer(byte[] buffer)
     {
         using var aes = Aes.Create();
         aes.KeySize = 256;
@@ -388,8 +339,7 @@
 
     private string GetFullShareLink()
     {
-        if (string.IsNullOrEmpty(shareLink))
-            return string.Empty;
+        if (string.IsNullOrEmpty(shareLink)) return string.Empty;
 
         var baseUri = NavigationManager.BaseUri.TrimEnd('/');
 
@@ -402,23 +352,15 @@
     {
         var link = GetFullShareLink();
         if (!string.IsNullOrEmpty(link))
-        {
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
-        }
     }
 
-    private string FormatBytes(long bytes)
+    private static string FormatBytes(long bytes)
     {
         string[] sizes = { "B", "KB", "MB", "GB" };
         double len = bytes;
         int order = 0;
-
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-
+        while (len >= 1024 && order < sizes.Length - 1) { order++; len /= 1024; }
         return $"{len:0.##} {sizes[order]}";
     }
 }
