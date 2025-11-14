@@ -132,9 +132,12 @@
                             <div class="secure-pdf-toolbar" id="@ToolbarElementId"></div>
                             <div class="secure-pdf-frame" id="@PdfFrameElementId"></div>
                         </div>
-                        <p class="text-muted small mt-2">
-                            <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
-                        </p>
+                        @if (viewerConfig?.AIMonitoringEnabled ?? false)
+                        {
+                            <p class="text-muted small mt-2">
+                                <i class="fas fa-robot"></i> Monitoreo IA activo: intentos sospechosos bloquearán automáticamente el acceso.
+                            </p>
+                        }
                     }
                 </div>
             </div>

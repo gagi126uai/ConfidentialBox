@@ -95,6 +95,20 @@ function forEachSessionByFrame(frameId, callback) {
     }
 }
 
+function frameRequiresContextMenuBlock(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId && state.disableContextMenu) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -196,6 +210,26 @@ function sendEvent(state, type, pageNumber, data) {
     } catch (err) {
         console.error('Error enviando evento al servidor', err);
     }
+}
+
+function ensureDocumentReady(state, frameState) {
+    if (!state || state.documentReadyReported) {
+        return;
+    }
+
+    if (!frameState || !frameState.pdfDoc) {
+        state.awaitingFrame = true;
+        return;
+    }
+
+    const pageCount = typeof frameState.pdfDoc.numPages === 'number'
+        ? frameState.pdfDoc.numPages
+        : undefined;
+
+    state.awaitingFrame = false;
+    state.documentReadyReported = true;
+    const payload = pageCount != null ? { pageCount } : undefined;
+    sendEvent(state, 'DocumentReady', null, payload);
 }
 
 function registerHandler(state, target, eventName, handler, options) {
@@ -901,6 +935,7 @@ function createState(sessionId, options, container) {
         watermarkOptions: { text: null, style: null },
         lastReportedPage: null,
         hasInitialPageReport: false,
+        documentReadyReported: false,
         awaitingFrame: false,
         container,
         toolbarElement: options.toolbarId ? document.getElementById(options.toolbarId) : null,
@@ -927,8 +962,20 @@ function ensureWatermarkHost(frameState) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
         overlay.style.pointerEvents = 'none';
+        if (!Array.isArray(frameState.cleanupCallbacks)) {
+            frameState.cleanupCallbacks = [];
+        }
+
+        const contextGuard = (event) => {
+            const frameId = frameState.container?.id;
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        frameState.cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
         frameState.viewport.appendChild(overlay);
         frameState.overlay = overlay;
     }
@@ -996,6 +1043,7 @@ function initSecurePdfViewer(elementId, options) {
         if (state.watermarkElement && state.watermarkHost) {
             state.watermarkHost.appendChild(state.watermarkElement);
         }
+        ensureDocumentReady(state, frameState);
     }
 
     state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
@@ -1126,6 +1174,7 @@ function initSecurePdfViewer(elementId, options) {
         setupToolbar(state, container, state.toolbarElement, options);
     }
 
+    ensureTrackingForFrame(state.frameId);
     ensurePageTracking(state);
 }
 
@@ -1134,6 +1183,17 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
+        if (Array.isArray(frameState.cleanupCallbacks)) {
+            for (const cleanup of frameState.cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (err) {
+                    console.warn('No se pudo limpiar un manejador del marco seguro', err);
+                }
+            }
+            frameState.cleanupCallbacks.length = 0;
+        }
+
         try {
             if (frameState.pdfDoc && typeof frameState.pdfDoc.destroy === 'function') {
                 await frameState.pdfDoc.destroy();
@@ -1142,6 +1202,15 @@ async function disposePdfFrame(frameId) {
             }
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
+        }
+
+        if (frameState.objectUrl) {
+            try {
+                URL.revokeObjectURL(frameState.objectUrl);
+            } catch (err) {
+                console.warn('No se pudo liberar el blob del visor seguro', err);
+            }
+            frameState.objectUrl = null;
         }
     }
 
@@ -1178,9 +1247,15 @@ async function renderPdf(frameId, base64Data, fileName) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
+    let objectUrl = null;
+    let frameStateCreated = false;
+    const cleanupCallbacks = [];
+
     try {
         const pdfjsLib = await ensurePdfJsLibrary();
         const pdfBytes = base64ToUint8Array(base64Data);
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
         const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
         const pdfDoc = await loadingTask.promise;
 
@@ -1188,7 +1263,6 @@ async function renderPdf(frameId, base64Data, fileName) {
 
         const viewport = document.createElement('div');
         viewport.className = 'secure-pdf-viewport';
-        viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
 
         const iframe = document.createElement('iframe');
         let sandboxed = true;
@@ -1248,7 +1322,17 @@ async function renderPdf(frameId, base64Data, fileName) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+
+        const contextGuard = (event) => {
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        viewport.addEventListener('contextmenu', contextGuard, true);
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        cleanupCallbacks.push(() => viewport.removeEventListener('contextmenu', contextGuard, true));
+        cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
 
         const watermarkLayer = document.createElement('div');
         watermarkLayer.className = 'secure-pdf-watermark-layer';
@@ -1270,7 +1354,9 @@ async function renderPdf(frameId, base64Data, fileName) {
             fileName,
             overlay,
             watermarkLayer,
-            renderScheduled: false
+            objectUrl,
+            renderScheduled: false,
+            cleanupCallbacks
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
@@ -1295,6 +1381,8 @@ async function renderPdf(frameId, base64Data, fileName) {
 
         pdfFrames.set(frameId, frameState);
 
+        frameStateCreated = true;
+
         let initialScale = 1;
         forEachSessionByFrame(frameId, (state) => {
             const currentFrameState = pdfFrames.get(frameId);
@@ -1316,7 +1404,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);
 
             initialScale = state.currentZoom ?? state.defaultZoom ?? initialScale;
-            sendEvent(state, 'DocumentReady', null, { pageCount: pdfDoc.numPages });
+            ensureDocumentReady(state, currentFrameState);
         });
 
         frameState.scale = initialScale;
@@ -1332,6 +1420,23 @@ async function renderPdf(frameId, base64Data, fileName) {
         forEachSessionByFrame(frameId, (state) => {
             sendEvent(state, 'DocumentError', null, { message: err?.message || 'RenderFailed' });
         });
+        if (cleanupCallbacks.length) {
+            for (const cleanup of cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (cleanupErr) {
+                    console.warn('No se pudo limpiar un recurso del visor seguro tras un error', cleanupErr);
+                }
+            }
+            cleanupCallbacks.length = 0;
+        }
+        if (!frameStateCreated && objectUrl) {
+            try {
+                URL.revokeObjectURL(objectUrl);
+            } catch (revokeErr) {
+                console.warn('No se pudo liberar el blob del visor seguro', revokeErr);
+            }
+        }
         throw err;
     }
 }

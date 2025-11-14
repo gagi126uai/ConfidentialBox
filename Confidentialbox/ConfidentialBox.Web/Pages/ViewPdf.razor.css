@@ -125,6 +125,19 @@
 
 .secure-pdf-toolbar {
     position: relative;
+    order: 0;
+}
+
+.secure-pdf-frame {
+    order: 1;
+}
+
+.secure-pdf-container[data-toolbar-position='bottom'] .secure-pdf-toolbar {
+    order: 2;
+}
+
+.secure-pdf-container[data-toolbar-position='bottom'] .secure-pdf-frame {
+    order: 1;
 }
 
 .secure-toolbar {
