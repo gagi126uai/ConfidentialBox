@@ -51,7 +51,7 @@
                 }
 
                 <!-- Drag and Drop Area -->
-                <div class="drop-zone @(isDragging ? "dragging" : "")"
+                <div class="drop-zone @(_isDragging ? "dragging" : "")"
                      @ondragenter="HandleDragEnter"
                      @ondragenter:preventDefault
                      @ondragleave="HandleDragLeave"
@@ -59,15 +59,20 @@
                      @ondrop="HandleDrop"
                      @ondrop:preventDefault>
 
+
+                    <!-- El input ocupa toda el área, invisible. Soporta drag & drop nativo -->
                     <InputFile OnChange="HandleFileSelected" class="drop-zone-input" />
 
                     <div class="drop-zone-content text-center py-5">
                         <i class="fas fa-cloud-upload-alt fa-5x text-muted mb-3"></i>
                         <h4>Arrastra y suelta tu archivo aquí</h4>
                         <p class="text-muted">o</p>
-                        <div class="btn btn-primary">
+
+                        <!-- Label para disparar el input sin JS -->
+                        <label class="btn btn-primary mb-0">
                             <i class="fas fa-folder-open"></i> Seleccionar archivo
-                        </div>
+                            <input type="file" class="visually-hidden" onchange="this.closest('.drop-zone').querySelector('input[type=file]').click()" />
+                        </label>
                     </div>
                 </div>
 
@@ -223,51 +228,16 @@
     // Para construir el link correcto luego de la subida
     private bool lastUploadedWasPdf = false;
 
-    private void HandleDragEnter() => isDragging = true;
-    private void HandleDragLeave() => isDragging = false;
+    private bool _isDragging;
 
-    private async Task HandleDrop(DragEventArgs e)
-    {
-        isDragging = false;
-
-        if (e.DataTransfer is null)
-        {
-            return;
-        }
-
-        IBrowserFile? browserFile = null;
-
-        if (e.DataTransfer.Files?.Count > 0)
-        {
-            browserFile = e.DataTransfer.Files[0];
-        }
-        else if (e.DataTransfer.Items?.Count > 0)
-        {
-            foreach (var item in e.DataTransfer.Items)
-            {
-                if (string.Equals(item.Kind, "file", StringComparison.OrdinalIgnoreCase))
-                {
-                    browserFile = await item.GetFileAsync();
-                    if (browserFile != null)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (browserFile != null)
-        {
-            await SelectFileAsync(browserFile);
-        }
-    }
+    private void HandleDragEnter(DragEventArgs _) => _isDragging = true;
+    private void HandleDragLeave(DragEventArgs _) => _isDragging = false;
+    private void HandleDrop(DragEventArgs _) => _isDragging = false;
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
         if (e.FileCount > 0)
-        {
             await SelectFileAsync(e.File);
-        }
     }
 
     private Task SelectFileAsync(IBrowserFile file)

@@ -98,6 +98,11 @@ public class AIScoringSettingsDto
     [Range(0.0, 1.0)]
     public double RiskLevelMediumThreshold { get; set; } = 0.4;
 
+    public bool EnableAutoBlocking { get; set; } = false;
+
+    public bool EnableAutoReview { get; set; } = false;
+
+
     [Required]
     public string SuspiciousExtensions { get; set; } = ".exe, .bat, .cmd, .ps1, .vbs, .js";
 

@@ -3444,6 +3444,12 @@
             "type": "number",
             "format": "double"
           },
+          "enableAutoBlocking": {
+            "type": "boolean"
+          },
+          "enableAutoReview": {
+            "type": "boolean"
+          },
           "suspiciousExtensions": {
             "minLength": 1,
             "type": "string"
@@ -4183,6 +4189,12 @@
           "useSsl": {
             "type": "boolean"
           },
+          "useStartTls": {
+            "type": "boolean"
+          },
+          "validateCertificates": {
+            "type": "boolean"
+          },
           "username": {
             "maxLength": 256,
             "minLength": 0,
@@ -4196,6 +4208,30 @@
           "fromName": {
             "maxLength": 128,
             "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "replyToEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "replyToName": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "connectionTimeoutSeconds": {
+            "maximum": 300,
+            "minimum": 5,
+            "type": "integer",
+            "format": "int32"
+          },
+          "authenticationMechanism": {
+            "maxLength": 64,
+            "minLength": 0,
+            "pattern": "^(Auto|Plain|Login|CramMd5)$",
             "type": "string",
             "nullable": true
           },
@@ -5368,6 +5404,10 @@
             "items": {
               "type": "string"
             },
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
             "nullable": true
           }
         },
