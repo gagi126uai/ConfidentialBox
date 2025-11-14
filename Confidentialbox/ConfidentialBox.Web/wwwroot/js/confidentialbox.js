@@ -1001,7 +1001,10 @@ export async function renderPdf(frameId, base64Data, fileName) {
             if (sandboxed) {
                 try {
                     const fallbackText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
-                    if (fallbackText.includes('ha bloqueado esta página') || fallbackText.includes('blocked this page')) {
+                    if (fallbackText.includes('ha bloqueado esta página')
+                        || fallbackText.includes('chrome bloqueó esta página')
+                        || fallbackText.includes('chrome bloqueo esta pagina')
+                        || fallbackText.includes('blocked this page')) {
                         sandboxed = false;
                         iframe.removeAttribute('sandbox');
                         iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
