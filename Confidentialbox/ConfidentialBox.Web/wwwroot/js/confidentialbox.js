@@ -1398,6 +1398,10 @@ function downloadFile(fileName, base64Data) {
     document.body.removeChild(link);
 }
 
+function ensureSecureViewerReady() {
+    return true;
+}
+
 const globalSecureViewerScope = typeof window !== 'undefined'
     ? window
     : (typeof self !== 'undefined'
@@ -1414,4 +1418,5 @@ if (globalSecureViewerScope) {
     namespace.disposeSecurePdfViewer = disposeSecurePdfViewer;
     namespace.notifyPdfPage = notifyPdfPage;
     namespace.downloadFile = downloadFile;
+    namespace.ensureSecureViewerReady = ensureSecureViewerReady;
 }
