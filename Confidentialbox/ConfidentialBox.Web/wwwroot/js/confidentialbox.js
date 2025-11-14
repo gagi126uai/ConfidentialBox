@@ -23,7 +23,7 @@ async function resolveGeoMetadata() {
     }
 }
 
-export async function collectClientContext() {
+async function collectClientContext() {
     const [{
         userAgent,
         platform
@@ -943,7 +943,7 @@ function ensureWatermarkHost(frameState) {
     return frameState.watermarkLayer;
 }
 
-export function initSecurePdfViewer(elementId, options) {
+function initSecurePdfViewer(elementId, options) {
     const container = document.getElementById(elementId);
     if (!container) {
         console.warn('No se encontró el contenedor del visor PDF seguro');
@@ -1129,7 +1129,7 @@ export function initSecurePdfViewer(elementId, options) {
     ensurePageTracking(state);
 }
 
-export async function disposePdfFrame(frameId) {
+async function disposePdfFrame(frameId) {
     const frameState = pdfFrames.get(frameId);
     pdfFrames.delete(frameId);
 
@@ -1165,7 +1165,7 @@ export async function disposePdfFrame(frameId) {
     }
 }
 
-export async function renderPdf(frameId, base64Data, fileName) {
+async function renderPdf(frameId, base64Data, fileName) {
     const frame = document.getElementById(frameId);
     if (!frame) {
         throw new Error('No se encontró el contenedor del PDF seguro');
@@ -1336,8 +1336,7 @@ export async function renderPdf(frameId, base64Data, fileName) {
     }
 }
 
-
-export function disposeSecurePdfViewer(sessionId) {
+function disposeSecurePdfViewer(sessionId) {
     const state = sessions.get(sessionId);
     if (!state) {
         return;
@@ -1376,7 +1375,7 @@ export function disposeSecurePdfViewer(sessionId) {
     sessions.delete(sessionId);
 }
 
-export function notifyPdfPage(sessionId, pageNumber) {
+function notifyPdfPage(sessionId, pageNumber) {
     const state = sessions.get(sessionId);
     if (!state) {
         return;
@@ -1389,7 +1388,7 @@ export function notifyPdfPage(sessionId, pageNumber) {
     sendEvent(state, 'PageView', pageNumber, { pageNumber });
 }
 
-export function downloadFile(fileName, base64Data) {
+function downloadFile(fileName, base64Data) {
     const link = document.createElement('a');
     link.href = `data:application/octet-stream;base64,${base64Data}`;
     link.download = fileName || 'archivo';
@@ -1397,4 +1396,22 @@ export function downloadFile(fileName, base64Data) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+const globalSecureViewerScope = typeof window !== 'undefined'
+    ? window
+    : (typeof self !== 'undefined'
+        ? self
+        : (typeof globalThis !== 'undefined' ? globalThis : {}));
+
+if (globalSecureViewerScope) {
+    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
+
+    namespace.collectClientContext = collectClientContext;
+    namespace.initSecurePdfViewer = initSecurePdfViewer;
+    namespace.disposePdfFrame = disposePdfFrame;
+    namespace.renderPdf = renderPdf;
+    namespace.disposeSecurePdfViewer = disposeSecurePdfViewer;
+    namespace.notifyPdfPage = notifyPdfPage;
+    namespace.downloadFile = downloadFile;
 }
