@@ -64,9 +64,26 @@ public class SettingsController : ControllerBase
             SmtpHost = settings.SmtpHost ?? string.Empty,
             Port = settings.Port,
             UseSsl = settings.UseSsl,
+            UseStartTls = settings.UseStartTls,
+            ValidateCertificates = settings.ValidateCertificates,
+            AllowSelfSignedCertificates = settings.AllowSelfSignedCertificates,
+            RequireTls12 = settings.RequireTls12,
             Username = settings.Username ?? string.Empty,
             FromEmail = settings.FromEmail,
             FromName = settings.FromName,
+            ReplyToEmail = settings.ReplyToEmail,
+            ReplyToName = settings.ReplyToName,
+            ConnectionTimeoutSeconds = settings.ConnectionTimeoutSeconds,
+            AuthenticationMechanism = settings.AuthenticationMechanism ?? "Auto",
+            SecondaryHost = settings.SecondaryHost,
+            SecondaryPort = settings.SecondaryPort,
+            MaxRetryAttempts = settings.MaxRetryAttempts,
+            RetryBackoffSeconds = settings.RetryBackoffSeconds,
+            EnableDeliveryStatusNotifications = settings.EnableDeliveryStatusNotifications,
+            TrackBounceReasons = settings.TrackBounceReasons,
+            UseClientCertificate = settings.UseClientCertificate,
+            ClientCertificateThumbprint = settings.ClientCertificateThumbprint,
+            OperationalContactEmail = settings.OperationalContactEmail,
             HasPassword = !string.IsNullOrWhiteSpace(settings.Password)
         };
 
@@ -81,15 +98,38 @@ public class SettingsController : ControllerBase
             return BadRequest(ModelState);
         }
 
+        var sanitizedMechanism = string.IsNullOrWhiteSpace(request.AuthenticationMechanism)
+            ? "Auto"
+            : request.AuthenticationMechanism.Trim();
+
         var settings = new EmailServerSettings
         {
             SmtpHost = request.SmtpHost,
             Port = request.Port,
             UseSsl = request.UseSsl,
+            UseStartTls = request.UseStartTls,
+            ValidateCertificates = request.ValidateCertificates,
+            AllowSelfSignedCertificates = request.AllowSelfSignedCertificates,
+            RequireTls12 = request.RequireTls12,
             Username = request.Username,
             Password = string.IsNullOrWhiteSpace(request.NewPassword) ? null : request.NewPassword,
             FromEmail = request.FromEmail,
-            FromName = request.FromName
+            FromName = request.FromName,
+            ReplyToEmail = request.ReplyToEmail,
+            ReplyToName = request.ReplyToName,
+            ConnectionTimeoutSeconds = request.ConnectionTimeoutSeconds,
+            AuthenticationMechanism = sanitizedMechanism,
+            SecondaryHost = request.SecondaryHost,
+            SecondaryPort = request.SecondaryPort,
+            MaxRetryAttempts = request.MaxRetryAttempts,
+            RetryBackoffSeconds = request.RetryBackoffSeconds,
+            EnableDeliveryStatusNotifications = request.EnableDeliveryStatusNotifications,
+            TrackBounceReasons = request.TrackBounceReasons,
+            UseClientCertificate = request.UseClientCertificate,
+            ClientCertificateThumbprint = request.UseClientCertificate
+                ? request.ClientCertificateThumbprint
+                : null,
+            OperationalContactEmail = request.OperationalContactEmail
         };
 
         await _systemSettingsService.UpdateEmailServerSettingsAsync(settings, GetUserId(), cancellationToken);

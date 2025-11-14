@@ -1,5 +1,6 @@
 @inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthStateProvider
+@using System
 @using System.Linq
 
 <div class="notification-bell" @onclick:stopPropagation="true">
@@ -50,29 +51,33 @@
             }
             else
             {
-                <ul class="notification-list">
-                    @foreach (var notification in notifications)
-                    {
-                        <li class="notification-card @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")">
-                            <div class="notification-card__icon">
-                                <i class="fas fa-shield-alt"></i>
-                            </div>
-                            <div class="notification-card__body">
-                                <div class="notification-card__title">@notification.Title</div>
-                                <div class="notification-card__message">@notification.Message</div>
-                                <div class="notification-card__meta">
-                                    <i class="fas fa-clock me-1"></i>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                <div class="notification-panel__content" role="list">
+                    <ul class="notification-list">
+                        @foreach (var notification in notifications)
+                        {
+                            <li class="notification-card @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")" role="listitem">
+                                <div class="notification-card__icon">
+                                    <i class="fas fa-shield-alt"></i>
                                 </div>
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(notification.Link))
-                            {
-                                <a class="notification-card__action" href="@notification.Link" title="Ver detalle">
-                                    <i class="fas fa-arrow-up-right-from-square"></i>
-                                </a>
-                            }
-                        </li>
-                    }
-                </ul>
+                                <div class="notification-card__body">
+                                    <div class="notification-card__title">@notification.Title</div>
+                                    <div class="notification-card__message">@notification.Message</div>
+                                    <div class="notification-card__meta">
+                                        <i class="fas fa-clock me-1"></i>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                        <span class="notification-card__dot" aria-hidden="true"></span>
+                                        <span class="notification-card__relative">@GetRelativeTime(notification.CreatedAt)</span>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(notification.Link))
+                                {
+                                    <a class="notification-card__action" href="@notification.Link" title="Ver detalle">
+                                        <i class="fas fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
             }
         </div>
     }
@@ -156,6 +161,33 @@
                 }
             }
         }
+    }
+
+    private static string GetRelativeTime(DateTime timestamp)
+    {
+        var delta = DateTime.UtcNow - timestamp.ToUniversalTime();
+
+        if (delta.TotalSeconds < 60)
+        {
+            return "Justo ahora";
+        }
+
+        if (delta.TotalMinutes < 60)
+        {
+            return $"{Math.Floor(delta.TotalMinutes)} min atras";
+        }
+
+        if (delta.TotalHours < 24)
+        {
+            return $"{Math.Floor(delta.TotalHours)} h atras";
+        }
+
+        if (delta.TotalDays < 7)
+        {
+            return $"{Math.Floor(delta.TotalDays)} d atras";
+        }
+
+        return timestamp.ToLocalTime().ToString("dd/MM/yyyy");
     }
 
     private static string GetSeverityClass(UserNotificationDto notification)

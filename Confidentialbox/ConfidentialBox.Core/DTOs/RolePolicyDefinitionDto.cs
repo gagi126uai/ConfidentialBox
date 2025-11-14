@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace ConfidentialBox.Core.DTOs;
 
 public class RolePolicyDefinitionDto
@@ -8,4 +11,5 @@ public class RolePolicyDefinitionDto
     public string ValueType { get; set; } = string.Empty;
     public string? DefaultValue { get; set; }
     public IReadOnlyList<string> Options { get; set; } = Array.Empty<string>();
+    public string Category { get; set; } = string.Empty;
 }

@@ -165,6 +165,7 @@
     private const string PdfFrameElementId = "securePdfFrame";
     private const string ViewerContainerElementId = "secureViewerContainer";
     private const string ToolbarElementId = "securePdfToolbar";
+    private bool shouldAutoStartViewer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -182,6 +183,7 @@
             blockedByAi = false;
             blockedReason = null;
             viewerBlocked = false;
+            shouldAutoStartViewer = false;
             metadataSummary = await FileService.AccessFileAsync(ShareLink, null);
             fileMetadata = metadataSummary?.File;
             viewerBlocked = metadataSummary?.Blocked ?? false;
@@ -210,6 +212,10 @@
             {
                 errorMessage = "No fue posible cargar la información del PDF.";
             }
+            else if (metadataSummary.RequiresPassword == false)
+            {
+                shouldAutoStartViewer = true;
+            }
         }
         catch (Exception ex)
         {
@@ -218,11 +224,16 @@
         finally
         {
             isLoading = false;
+            if (shouldAutoStartViewer)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 
     private async Task StartSecureViewer()
     {
+        shouldAutoStartViewer = false;
         formModel ??= new SecureViewerForm();
 
         if (fileMetadata == null)
@@ -342,6 +353,25 @@
         finally
         {
             isStarting = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if ((firstRender || shouldAutoStartViewer) && shouldAutoStartViewer && !isStarting && !pdfLoaded && !fileBlocked && metadataSummary?.RequiresPassword == false)
+        {
+            try
+            {
+                await StartSecureViewer();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 
