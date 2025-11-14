@@ -268,23 +268,68 @@
     background: rgba(148, 163, 184, 0.25);
 }
 
-.secure-pdf-iframe {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 70vh;
-    border: 0;
-    border-radius: 0.75rem;
-    background: #ffffff;
-    transform-origin: top left;
-    transition: transform 0.15s ease;
-}
-
 .secure-pdf-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
+}
+
+.secure-pdf-pages {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+    padding: 2rem 0 3rem;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.secure-pdf-page {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    background: #ffffff;
+    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.35);
+    max-width: min(100%, 940px);
+    width: 100%;
+    overflow: hidden;
+}
+
+.secure-pdf-container[data-secure-theme='dark'] .secure-pdf-page {
+    background: rgba(15, 23, 42, 0.6);
+    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.45);
+}
+
+.secure-pdf-container[data-secure-theme='dark'] .secure-pdf-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 1rem;
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95));
+    z-index: 0;
+}
+
+.secure-pdf-container[data-secure-theme='dark'] .secure-pdf-page > * {
+    position: relative;
+    z-index: 1;
+}
+
+.secure-pdf-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+    background: #ffffff;
+}
+
+.secure-pdf-container[data-secure-theme='dark'] .secure-pdf-canvas {
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
 }
 
 .secure-pdf-watermark-layer {
@@ -363,6 +408,10 @@
         width: 100%;
         min-width: 0;
     }
+
+    .secure-pdf-page {
+        max-width: min(100%, 760px);
+    }
 }
 
 @media (max-width: 576px) {
@@ -376,8 +425,7 @@
         border-radius: 1rem;
     }
 
-    .secure-pdf-frame,
-    .secure-pdf-iframe {
+    .secure-pdf-frame {
         min-height: 60vh;
     }
 
@@ -389,5 +437,16 @@
     .secure-toolbar-zoom-group {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .secure-pdf-pages {
+        padding: 1.5rem 0 2rem;
+        gap: 1.5rem;
+    }
+
+    .secure-pdf-page {
+        padding: 0.75rem;
+        border-radius: 0.85rem;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.3);
     }
 }
