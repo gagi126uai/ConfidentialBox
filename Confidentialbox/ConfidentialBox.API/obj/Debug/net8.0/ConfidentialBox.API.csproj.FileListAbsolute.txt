@@ -171,3 +171,4 @@ D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Deb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\ConfidentialBox.API.pdb
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\ConfidentialBox.API.genruntimeconfig.cache
 D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\ref\ConfidentialBox.API.dll
+D:\Documentos\GitHub\ConfidentialBox\Confidentialbox\ConfidentialBox.API\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt

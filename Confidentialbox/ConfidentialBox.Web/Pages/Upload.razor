@@ -229,11 +229,11 @@
     {
         isDragging = false;
 
-        var browserFile = e.DataTransfer?.Files?.FirstOrDefault();
-        if (browserFile != null)
-        {
-            await SelectFileAsync(browserFile);
-        }
+        // var browserFile = e.DataTransfer?.Files?.FirstOrDefault();
+        // if (browserFile != null)
+        // {
+        //     await SelectFileAsync(browserFile);
+        // }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)

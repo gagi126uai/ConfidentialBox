@@ -1813,6 +1813,37 @@
   },
   {
     "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
+    "Method": "ReplyToMessage",
+    "RelativePath": "api/Users/me/messages/{messageId}/reply",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "messageId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "ConfidentialBox.Core.DTOs.UserMessageReplyRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ConfidentialBox.Core.DTOs.OperationResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ConfidentialBox.API.Controllers.UsersController",
     "Method": "ChangeMyPassword",
     "RelativePath": "api/Users/me/password",
     "HttpMethod": "PUT",

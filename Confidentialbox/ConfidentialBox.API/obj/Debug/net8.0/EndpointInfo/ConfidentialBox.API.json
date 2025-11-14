@@ -3013,6 +3013,65 @@
         }
       }
     },
+    "/api/Users/me/messages/{messageId}/reply": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMessageReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Users/{id}/messages": {
       "post": {
         "tags": [
@@ -3194,6 +3253,7 @@
       },
       "AIScoringSettingsDto": {
         "required": [
+          "platformTimeZone",
           "suspiciousExtensions"
         ],
         "type": "object",
@@ -3387,6 +3447,10 @@
           "suspiciousExtensions": {
             "minLength": 1,
             "type": "string"
+          },
+          "platformTimeZone": {
+            "minLength": 1,
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3443,6 +3507,13 @@
             "additionalProperties": {
               "type": "integer",
               "format": "int32"
+            },
+            "nullable": true
+          },
+          "actionRecommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
             },
             "nullable": true
           }
@@ -6047,6 +6118,19 @@
           },
           "requiresResponse": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserMessageReplyRequest": {
+        "required": [
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "body": {
+            "minLength": 3,
+            "type": "string"
           }
         },
         "additionalProperties": false
