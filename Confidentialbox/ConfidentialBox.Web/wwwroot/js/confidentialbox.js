@@ -1143,6 +1143,15 @@ async function disposePdfFrame(frameId) {
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
         }
+
+        if (frameState.objectUrl) {
+            try {
+                URL.revokeObjectURL(frameState.objectUrl);
+            } catch (err) {
+                console.warn('No se pudo liberar el blob del visor seguro', err);
+            }
+            frameState.objectUrl = null;
+        }
     }
 
     const frameElement = document.getElementById(frameId);
@@ -1178,9 +1187,14 @@ async function renderPdf(frameId, base64Data, fileName) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
+    let objectUrl = null;
+    let frameStateCreated = false;
+
     try {
         const pdfjsLib = await ensurePdfJsLibrary();
         const pdfBytes = base64ToUint8Array(base64Data);
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
         const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
         const pdfDoc = await loadingTask.promise;
 
@@ -1270,6 +1284,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             fileName,
             overlay,
             watermarkLayer,
+            objectUrl,
             renderScheduled: false
         };
 
@@ -1294,6 +1309,8 @@ async function renderPdf(frameId, base64Data, fileName) {
         }
 
         pdfFrames.set(frameId, frameState);
+
+        frameStateCreated = true;
 
         let initialScale = 1;
         forEachSessionByFrame(frameId, (state) => {
@@ -1332,6 +1349,13 @@ async function renderPdf(frameId, base64Data, fileName) {
         forEachSessionByFrame(frameId, (state) => {
             sendEvent(state, 'DocumentError', null, { message: err?.message || 'RenderFailed' });
         });
+        if (!frameStateCreated && objectUrl) {
+            try {
+                URL.revokeObjectURL(objectUrl);
+            } catch (revokeErr) {
+                console.warn('No se pudo liberar el blob del visor seguro', revokeErr);
+            }
+        }
         throw err;
     }
 }
