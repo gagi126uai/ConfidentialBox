@@ -1001,7 +1001,21 @@ export async function renderPdf(frameId, base64Data, fileName) {
             if (sandboxed) {
                 try {
                     const fallbackText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
-                    if (fallbackText.includes('ha bloqueado esta página') || fallbackText.includes('blocked this page')) {
+                    const normalizedText = fallbackText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const blockedIndicators = [
+                        'ha bloqueado esta pagina',
+                        'ha bloqueado esta página',
+                        'chrome bloqueo esta pagina',
+                        'chrome bloqueó esta página',
+                        'blocked this page',
+                        'chrome blocked this page'
+                    ];
+
+                    const isBlocked = blockedIndicators.some((indicator) =>
+                        fallbackText.includes(indicator) || normalizedText.includes(indicator)
+                    );
+
+                    if (isBlocked) {
                         sandboxed = false;
                         iframe.removeAttribute('sandbox');
                         iframe.src = `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0`;
