@@ -1,5 +1,7 @@
 @page "/roles"
 @using Microsoft.AspNetCore.Authorization
+@using ConfidentialBox.Core.Configuration
+@using System.Globalization
 @attribute [Authorize(Roles = "Admin")]
 @inject IRoleService RoleService
 
@@ -54,16 +56,43 @@ else if (roles.Any())
                     <div class="card-body">
                         @if (role.Policies.Any())
                         {
-                            <h6 class="text-muted text-uppercase small">Políticas activas</h6>
-                            <ul class="list-unstyled small mb-0">
-                                @foreach (var policy in role.Policies.OrderBy(p => p.DisplayName))
-                                {
-                                    <li class="mb-1">
-                                        <span class="fw-semibold">@GetPolicyLabel(policy)</span>
-                                        <span class="text-muted">@FormatPolicyValue(policy)</span>
-                                    </li>
-                                }
-                            </ul>
+                            <div class="role-policy-grid small">
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Acceso y sesiones</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">MFA:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyRequiresMfa, true) ? "Obligatorio" : "Opcional")</li>
+                                        <li><span class="fw-semibold">Caducidad de sesión:</span> @FormatMinutes(GetNumberPolicy(role, RolePolicyCatalog.PolicySessionTimeoutMinutes))</li>
+                                        <li><span class="fw-semibold">Acceso offline:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyAllowOfflineAccess) ? "Permitido" : "Bloqueado")</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Protección de documentos</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">Tamaño máx.:</span> @FormatMegabytes(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxFileSizeMb))</li>
+                                        <li><span class="fw-semibold">Cupo por rol:</span> @FormatGigabytes(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxStorageGb))</li>
+                                        <li><span class="fw-semibold">Marca de agua:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyForceWatermark, true) ? "Siempre activa" : "Opcional")</li>
+                                        <li><span class="fw-semibold">Descargas/día:</span> @FormatCount(GetNumberPolicy(role, RolePolicyCatalog.PolicyMaxDailyDownloads))</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">Colaboración externa</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">Enlaces externos:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyCanShareExternal) ? "Permitidos" : "Deshabilitados")</li>
+                                        <li><span class="fw-semibold">Justificación:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyRequireExternalJustification, true) ? "Requerida" : "Opcional")</li>
+                                        <li><span class="fw-semibold">Aprobación previa:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyExternalApproval) ? "Necesaria" : "No requerida")</li>
+                                    </ul>
+                                </div>
+                                <div class="role-policy-section">
+                                    <h6 class="role-policy-title">IA y auditoría</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><span class="fw-semibold">Panel de IA:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyCanAccessAi) ? "Acceso total" : "Sin acceso")</li>
+                                        <li><span class="fw-semibold">Respuesta automática:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyEnableAiAutoResponse) ? "Activada" : "Manual")</li>
+                                        <li><span class="fw-semibold">Escalamiento IA:</span> Nivel @FormatCount(GetNumberPolicy(role, RolePolicyCatalog.PolicyAiEscalationLevel))</li>
+                                        <li><span class="fw-semibold">Auditoría:</span> @(GetBooleanPolicy(role, RolePolicyCatalog.PolicyCanViewAuditTrail) ? "Puede revisar" : "Solo reporte")</li>
+                                        <li><span class="fw-semibold">Retención logs:</span> @FormatDays(GetNumberPolicy(role, RolePolicyCatalog.PolicyAuditRetentionDays))</li>
+                                    </ul>
+                                </div>
+                            </div>
                         }
                         else
                         {
@@ -146,37 +175,59 @@ else
                         </div>
                     }
 
-                    <div class="row g-4">
-                        @foreach (var policy in editablePolicies)
-                        {
-                            <div class="col-md-6">
-                                <div class="border rounded p-3 h-100">
-                                    <label class="form-label fw-semibold">@policy.DisplayName</label>
-
-                                    @switch (policy.ValueType)
-                                    {
-                                        case "Boolean":
-                                            <div class="form-check form-switch">
-                                                <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="@($"policy-{policy.PolicyName}")" />
-                                                <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
-                                            </div>
-                                            break;
-                                        case "Number":
-                                            <InputNumber @bind-Value="policy.NumericValue" class="form-control" />
-                                            break;
-                                        default:
-                                            <InputText @bind-Value="policy.Value" class="form-control" />
-                                            break;
-                                    }
-
-                                    @if (!string.IsNullOrWhiteSpace(policy.Description))
-                                    {
-                                        <p class="form-text">@policy.Description</p>
-                                    }
-                                </div>
+                    @foreach (var section in GetPolicySections())
+                    {
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center mb-2">
+                                <h6 class="text-uppercase text-muted small mb-0">@section.Key</h6>
+                                <div class="flex-grow-1 ms-3 border-bottom"></div>
                             </div>
-                        }
-                    </div>
+
+                            <div class="row g-4">
+                                @foreach (var policy in section)
+                                {
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100 shadow-sm-sm">
+                                            <label class="form-label fw-semibold">@policy.DisplayName</label>
+
+                                            if (policy.Options?.Any() == true)
+                                            {
+                                                <InputSelect @bind-Value="policy.Value" class="form-select">
+                                                    @foreach (var option in policy.Options)
+                                                    {
+                                                        <option value="@option">@option</option>
+                                                    }
+                                                </InputSelect>
+                                            }
+                                            else
+                                            {
+                                                @switch (policy.ValueType)
+                                                {
+                                                    case "Boolean":
+                                                        <div class="form-check form-switch">
+                                                            <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="@($"policy-{policy.PolicyName}")" />
+                                                            <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
+                                                        </div>
+                                                        break;
+                                                    case "Number":
+                                                        <InputNumber @bind-Value="policy.NumericValue" class="form-control" />
+                                                        break;
+                                                    default:
+                                                        <InputText @bind-Value="policy.Value" class="form-control" />
+                                                        break;
+                                                }
+                                            }
+
+                                            @if (!string.IsNullOrWhiteSpace(policy.Description))
+                                            {
+                                                <p class="form-text">@policy.Description</p>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline-secondary" @onclick="ClosePolicyModal" disabled="@savingPolicies">Cerrar</button>
@@ -338,7 +389,8 @@ else
                     Description = definition.Description,
                     ValueType = definition.ValueType,
                     Options = definition.Options,
-                    Value = existing?.PolicyValue ?? definition.DefaultValue ?? string.Empty
+                    Value = existing?.PolicyValue ?? definition.DefaultValue ?? string.Empty,
+                    Category = definition.Category
                 };
             })
             .ToList();
@@ -352,9 +404,80 @@ else
                 Description = extra.Description ?? string.Empty,
                 ValueType = extra.ValueType ?? "Text",
                 Options = Array.Empty<string>(),
-                Value = extra.PolicyValue
+                Value = extra.PolicyValue,
+                Category = "Otras políticas"
             });
         }
+    }
+
+    private IEnumerable<IGrouping<string, PolicyEditModel>> GetPolicySections()
+    {
+        return editablePolicies
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.Category) ? "Otras políticas" : p.Category)
+            .OrderBy(g =>
+            {
+                var index = Array.IndexOf(PolicyCategoryOrder, g.Key);
+                return index >= 0 ? index : PolicyCategoryOrder.Length;
+            });
+    }
+
+    private static string? GetPolicyValue(RoleDto role, string policyName)
+    {
+        return role.Policies
+            .FirstOrDefault(p => p.PolicyName.Equals(policyName, StringComparison.OrdinalIgnoreCase))?
+            .PolicyValue;
+    }
+
+    private static bool GetBooleanPolicy(RoleDto role, string policyName, bool defaultValue = false)
+    {
+        var raw = GetPolicyValue(role, policyName);
+        return bool.TryParse(raw, out var parsed) ? parsed : defaultValue;
+    }
+
+    private static int? GetNumberPolicy(RoleDto role, string policyName)
+    {
+        var raw = GetPolicyValue(role, policyName);
+        if (int.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private static string FormatMinutes(int? minutes)
+    {
+        return minutes.HasValue && minutes.Value > 0
+            ? $"{minutes.Value} min"
+            : "Sin límite";
+    }
+
+    private static string FormatMegabytes(int? megabytes)
+    {
+        return megabytes.HasValue && megabytes.Value > 0
+            ? $"{megabytes.Value.ToString("N0", CultureInfo.InvariantCulture)} MB"
+            : "Sin límite";
+    }
+
+    private static string FormatGigabytes(int? gigabytes)
+    {
+        return gigabytes.HasValue && gigabytes.Value > 0
+            ? $"{gigabytes.Value.ToString("N0", CultureInfo.InvariantCulture)} GB"
+            : "Sin límite";
+    }
+
+    private static string FormatCount(int? value)
+    {
+        return value.HasValue && value.Value > 0
+            ? value.Value.ToString(CultureInfo.InvariantCulture)
+            : "Sin límite";
+    }
+
+    private static string FormatDays(int? days)
+    {
+        return days.HasValue && days.Value > 0
+            ? $"{days.Value} días"
+            : "Sin retención";
     }
 
     private static string GetPolicyLabel(PolicyDto policy)
@@ -370,6 +493,17 @@ else
         };
     }
 
+    private static readonly string[] PolicyCategoryOrder = new[]
+    {
+        "Operaciones de archivo",
+        "Acceso y sesiones",
+        "Colaboración externa",
+        "Protección de documentos",
+        "IA y automatización",
+        "Auditoría y cumplimiento",
+        "Otras políticas"
+    };
+
     private class PolicyEditModel
     {
         public string PolicyName { get; set; } = string.Empty;
@@ -378,6 +512,7 @@ else
         public string ValueType { get; set; } = string.Empty;
         public IReadOnlyList<string> Options { get; set; } = Array.Empty<string>();
         public string Value { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
 
         public bool BooleanValue
         {

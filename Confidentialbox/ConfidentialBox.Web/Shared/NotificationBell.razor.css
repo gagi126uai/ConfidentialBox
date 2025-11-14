@@ -74,6 +74,10 @@
     border: 1px solid rgba(15, 23, 42, 0.08);
     backdrop-filter: blur(18px);
     z-index: 2050;
+    max-height: min(75vh, 520px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .notification-panel::before {
@@ -119,6 +123,33 @@
     color: #6366f1;
 }
 
+.notification-panel__content {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.35rem;
+    flex: 1 1 auto;
+    max-height: 360px;
+    overscroll-behavior: contain;
+}
+
+.notification-panel__content::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.notification-panel__content::-webkit-scrollbar-thumb {
+    background-color: transparent;
+}
+
+.notification-panel__content {
+    scrollbar-width: none;
+}
+
 .notification-list {
     list-style: none;
     margin: 0;
@@ -126,19 +157,24 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    max-height: 380px;
-    overflow-y: auto;
 }
 
 .notification-card {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 0.75rem;
     padding: 0.75rem;
     border-radius: 1rem;
     border: 1px solid transparent;
     background: linear-gradient(135deg, rgba(241, 245, 249, 0.7), rgba(226, 232, 240, 0.4));
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.notification-card__message {
+    font-size: 0.85rem;
+    color: #475569;
+    word-break: break-word;
 }
 
 .notification-card:hover {

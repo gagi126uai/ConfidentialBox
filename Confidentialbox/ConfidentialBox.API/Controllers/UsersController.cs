@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System;
 using ConfidentialBox.Infrastructure.Repositories;
 using ConfidentialBox.Infrastructure.Services;
 
@@ -121,10 +122,19 @@ public class UsersController : ControllerBase
             return BadRequest(result.Errors);
         }
 
-        if (request.Roles.Any())
+        var normalizedRoles = request.Roles
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(1)
+            .ToList();
+
+        if (normalizedRoles.Count == 0)
         {
-            await _userManager.AddToRolesAsync(user, request.Roles);
+            normalizedRoles.Add("User");
         }
+
+        await _userManager.AddToRolesAsync(user, normalizedRoles);
 
         var roles = await _userManager.GetRolesAsync(user);
         return Ok(new UserDto
@@ -151,6 +161,19 @@ public class UsersController : ControllerBase
         if (user == null)
         {
             return NotFound(new OperationResultDto { Success = false, Error = "Usuario no encontrado" });
+        }
+
+        if (user.IsActive)
+        {
+            var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+            if (isAdmin)
+            {
+                return BadRequest(new OperationResultDto
+                {
+                    Success = false,
+                    Error = "Las cuentas con rol Admin no pueden ser desactivadas"
+                });
+            }
         }
 
         user.IsActive = !user.IsActive;
@@ -185,13 +208,30 @@ public class UsersController : ControllerBase
             return NotFound();
         }
 
+        if (roles == null || roles.Count == 0)
+        {
+            return BadRequest("Debe seleccionar un rol principal.");
+        }
+
+        var normalizedRoles = roles
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(1)
+            .ToList();
+
+        if (normalizedRoles.Count == 0)
+        {
+            return BadRequest("Debe seleccionar un rol principal.");
+        }
+
         var currentRoles = await _userManager.GetRolesAsync(user);
         await _userManager.RemoveFromRolesAsync(user, currentRoles);
-        await _userManager.AddToRolesAsync(user, roles);
+        await _userManager.AddToRolesAsync(user, normalizedRoles);
 
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var context = _clientContextResolver.Resolve(HttpContext);
-        await RegisterAuditAsync(actorId, "UserRolesUpdated", "ApplicationUser", id, string.Join(",", roles), context);
+        await RegisterAuditAsync(actorId, "UserRolesUpdated", "ApplicationUser", id, string.Join(",", normalizedRoles), context);
 
         return Ok();
     }
@@ -234,6 +274,12 @@ public class UsersController : ControllerBase
         if (user == null)
         {
             return NotFound();
+        }
+
+        var currentRoles = await _userManager.GetRolesAsync(user);
+        if (!request.IsActive && currentRoles.Any(r => r.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
+        {
+            return BadRequest("Las cuentas con rol Admin no pueden ser desactivadas.");
         }
 
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -297,7 +343,7 @@ public class UsersController : ControllerBase
             return BadRequest(string.Join(", ", updateResult.Errors.Select(e => e.Description)));
         }
 
-        var roles = await _userManager.GetRolesAsync(user);
+        var roles = currentRoles;
         await RegisterAuditAsync(actorId, "UserProfileUpdated", "ApplicationUser", id, $"{request.FirstName} {request.LastName}", context);
 
         if (previousActive != user.IsActive)
