@@ -109,6 +109,25 @@ function frameRequiresContextMenuBlock(frameId) {
     return false;
 }
 
+function frameAllowsTextSelection(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    let allow = false;
+    forEachSessionByFrame(frameId, (state) => {
+        if (!state?.settings) {
+            return;
+        }
+
+        if (state.settings.allowCopy && !state.settings.disableTextSelection) {
+            allow = true;
+        }
+    });
+
+    return allow;
+}
+
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -561,6 +580,54 @@ function toggleSelection(container, disabled) {
     }
 }
 
+function clearFrameTextLayers(frameState) {
+    if (!frameState?.pages) {
+        return;
+    }
+
+    for (const pageView of frameState.pages) {
+        if (pageView.renderTask && typeof pageView.renderTask.cancel === 'function') {
+            try { pageView.renderTask.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+            try { pageView.textLayerRender.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerDiv) {
+            try { pageView.textLayerDiv.remove(); } catch { /* noop */ }
+            pageView.textLayerDiv = null;
+        }
+
+        pageView.textLayerRender = null;
+        pageView.textDivs = null;
+        pageView.textContentPromise = null;
+        pageView.searchTextPromise = null;
+    }
+}
+
+function applySelectionState(state) {
+    if (!state) {
+        return;
+    }
+
+    const frameState = pdfFrames.get(state.frameId);
+    if (!frameState) {
+        return;
+    }
+
+    const allowSelection = state.settings?.allowCopy && !state.settings?.disableTextSelection;
+    frameState.allowTextSelection = allowSelection;
+
+    if (!allowSelection) {
+        clearFrameTextLayers(frameState);
+        clearSelectionWithin(state.container || frameState.container);
+        return;
+    }
+
+    scheduleRenderAllPages(frameState);
+}
+
 function clearSelectionWithin(container, targetDocument = document) {
     if (!container || !targetDocument) {
         return;
@@ -637,23 +704,30 @@ async function renderPageView(frameState, pageView, scale) {
         } catch { /* noop */ }
     }
 
+    if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+        try {
+            pageView.textLayerRender.cancel();
+        } catch { /* noop */ }
+    }
+
     try {
         const pdfPage = await frameState.pdfDoc.getPage(pageView.pageNumber);
         const viewport = pdfPage.getViewport({ scale });
+        const outputScale = window.devicePixelRatio || 1;
+        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
+
         const canvas = pageView.canvas;
         const context = canvas.getContext('2d', { alpha: false });
         if (!context) {
             console.warn('No se pudo obtener el contexto del lienzo del visor seguro');
             return;
         }
-        const outputScale = window.devicePixelRatio || 1;
-        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
 
         canvas.width = Math.floor(renderViewport.width);
         canvas.height = Math.floor(renderViewport.height);
         canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
         canvas.style.maxWidth = '100%';
-        canvas.style.height = 'auto';
         pageView.element.style.width = '100%';
         pageView.element.style.height = 'auto';
 
@@ -666,8 +740,62 @@ async function renderPageView(frameState, pageView, scale) {
         await renderTask.promise;
         pageView.viewport = viewport;
 
-        if (!pageView.textPromise) {
-            pageView.textPromise = pdfPage.getTextContent({ normalizeWhitespace: true })
+        const allowTextSelection = frameState.allowTextSelection === true;
+
+        if (allowTextSelection) {
+            if (!pageView.textLayerDiv) {
+                const layer = document.createElement('div');
+                layer.className = 'secure-pdf-text-layer';
+                pageView.element.appendChild(layer);
+                pageView.textLayerDiv = layer;
+            }
+
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            const textContent = await textContentPromise.catch((err) => {
+                console.warn('No se pudo obtener el contenido de texto seguro', err);
+                return null;
+            });
+
+            if (textContent && frameState.pdfjsLib?.renderTextLayer) {
+                pageView.textLayerDiv.innerHTML = '';
+                const textDivs = [];
+                const textLayerRender = frameState.pdfjsLib.renderTextLayer({
+                    textContent,
+                    container: pageView.textLayerDiv,
+                    viewport,
+                    textDivs,
+                    enhanceTextSelection: true
+                });
+
+                pageView.textDivs = textDivs;
+                pageView.textLayerRender = textLayerRender;
+
+                try {
+                    await textLayerRender.promise;
+                } catch (err) {
+                    if (err?.name !== 'RenderingCancelledException') {
+                        console.warn('No se pudo renderizar la capa de texto segura', err);
+                    }
+                }
+            }
+        } else {
+            if (pageView.textLayerDiv) {
+                pageView.textLayerDiv.remove();
+                pageView.textLayerDiv = null;
+            }
+            pageView.textDivs = null;
+            pageView.textLayerRender = null;
+        }
+
+        if (!pageView.searchTextPromise) {
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            pageView.searchTextPromise = textContentPromise
                 .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
                 .catch((err) => {
                     console.warn('No se pudo obtener el texto de la página segura', err);
@@ -720,9 +848,14 @@ async function resolvePageText(frameState, pageView) {
         return '';
     }
 
-    if (!pageView.textPromise) {
-        pageView.textPromise = frameState.pdfDoc.getPage(pageView.pageNumber)
-            .then((page) => page.getTextContent({ normalizeWhitespace: true }))
+    if (!pageView.searchTextPromise) {
+        const textContentPromise = pageView.textContentPromise
+            ?? frameState.pdfDoc.getPage(pageView.pageNumber)
+                .then((page) => page.getTextContent({ normalizeWhitespace: true }));
+
+        pageView.textContentPromise = textContentPromise;
+
+        pageView.searchTextPromise = textContentPromise
             .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
             .catch((err) => {
                 console.warn('No se pudo obtener el texto de la página segura', err);
@@ -731,7 +864,7 @@ async function resolvePageText(frameState, pageView) {
     }
 
     try {
-        return await pageView.textPromise;
+        return await pageView.searchTextPromise;
     } catch (err) {
         console.warn('Error recuperando texto de página segura', err);
         return '';
@@ -1106,6 +1239,7 @@ function initSecurePdfViewer(elementId, options) {
     container.setAttribute('data-secure-viewer', 'true');
     applyViewerTheme(container, settings);
     toggleSelection(container, settings.disableTextSelection);
+    applySelectionState(state);
 
     registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
 
@@ -1278,6 +1412,8 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
+        clearFrameTextLayers(frameState);
+
         if (Array.isArray(frameState.cleanupCallbacks)) {
             for (const cleanup of frameState.cleanupCallbacks) {
                 try {
@@ -1442,6 +1578,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             pagesHost,
             pages: [],
             pdfDoc,
+            pdfjsLib,
             loadingTask,
             scale: 1,
             base64: base64Data,
@@ -1451,7 +1588,8 @@ async function renderPdf(frameId, base64Data, fileName) {
             watermarkLayer,
             objectUrl,
             renderScheduled: false,
-            cleanupCallbacks
+            cleanupCallbacks,
+            allowTextSelection: frameAllowsTextSelection(frameId)
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
@@ -1470,7 +1608,11 @@ async function renderPdf(frameId, base64Data, fileName) {
                 canvas,
                 viewport: null,
                 renderTask: null,
-                textPromise: null
+                textLayerDiv: null,
+                textLayerRender: null,
+                textDivs: null,
+                textContentPromise: null,
+                searchTextPromise: null
             });
         }
 
