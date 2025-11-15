@@ -1,6 +1,135 @@
 const sessions = new Map();
 const pdfFrames = new Map();
 
+const globalGuards = {
+    printStyleElement: null,
+    originalPrint: null,
+    printOverrideActive: false
+};
+
+function anySession(predicate) {
+    for (const state of sessions.values()) {
+        if (predicate(state)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function broadcastEventTo(predicate, callback) {
+    for (const state of sessions.values()) {
+        if (predicate(state)) {
+            callback(state);
+        }
+    }
+}
+
+function ensurePrintBlockedStyles() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    if (!globalGuards.printStyleElement) {
+        const style = document.createElement('style');
+        style.id = 'secure-print-blocker';
+        style.textContent = `@media print {
+            body * {
+                visibility: hidden !important;
+            }
+
+            body::before {
+                visibility: visible !important;
+                display: block !important;
+                content: 'Impresión bloqueada por la política de ConfidentialBox';
+                font-size: 22px !important;
+                font-weight: 600 !important;
+                text-align: center !important;
+                margin-top: 30vh !important;
+                color: #b91c1c !important;
+                font-family: 'Inter', 'Segoe UI', sans-serif !important;
+            }
+        }`;
+
+        document.head.appendChild(style);
+        globalGuards.printStyleElement = style;
+    }
+}
+
+function removePrintBlockedStyles() {
+    if (globalGuards.printStyleElement && globalGuards.printStyleElement.parentElement) {
+        globalGuards.printStyleElement.parentElement.removeChild(globalGuards.printStyleElement);
+    }
+
+    globalGuards.printStyleElement = null;
+}
+
+function overrideWindowPrint() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (globalGuards.printOverrideActive) {
+        return;
+    }
+
+    const originalPrint = typeof window.print === 'function'
+        ? window.print.bind(window)
+        : null;
+
+    window.print = function securePrintOverride() {
+        let blocked = false;
+        broadcastEventTo((state) => !state.permissions?.printAllowed, (state) => {
+            blocked = true;
+            reportPrintAttempt(state);
+        });
+
+        if (blocked) {
+            return;
+        }
+
+        if (originalPrint) {
+            return originalPrint();
+        }
+
+        return undefined;
+    };
+
+    globalGuards.originalPrint = originalPrint;
+    globalGuards.printOverrideActive = true;
+}
+
+function restoreWindowPrint() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!globalGuards.printOverrideActive) {
+        return;
+    }
+
+    if (globalGuards.originalPrint) {
+        window.print = globalGuards.originalPrint;
+    } else {
+        delete window.print;
+    }
+
+    globalGuards.originalPrint = null;
+    globalGuards.printOverrideActive = false;
+}
+
+function updateGlobalPolicyGuards() {
+    const requiresPrintBlock = anySession((state) => !state.permissions?.printAllowed);
+
+    if (requiresPrintBlock) {
+        ensurePrintBlockedStyles();
+        overrideWindowPrint();
+    } else {
+        removePrintBlockedStyles();
+        restoreWindowPrint();
+    }
+}
+
 async function resolveGeoMetadata() {
     try {
         const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
@@ -249,6 +378,34 @@ function sendEvent(state, type, pageNumber, data) {
     } catch (err) {
         console.error('Error enviando evento al servidor', err);
     }
+}
+
+function reportPrintAttempt(state) {
+    if (!state) {
+        return;
+    }
+
+    const now = Date.now();
+    if (now - (state.lastPrintAttemptAt || 0) < 400) {
+        return;
+    }
+
+    state.lastPrintAttemptAt = now;
+    sendEvent(state, 'PrintAttempt');
+}
+
+function reportDownloadAttempt(state) {
+    if (!state) {
+        return;
+    }
+
+    const now = Date.now();
+    if (now - (state.lastDownloadAttemptAt || 0) < 400) {
+        return;
+    }
+
+    state.lastDownloadAttemptAt = now;
+    sendEvent(state, 'DownloadAttempt');
 }
 
 function ensureDocumentReady(state, frameState) {
@@ -1209,7 +1366,7 @@ function setupToolbar(state, container, toolbarElement, options) {
                 return;
             }
             sendEvent(state, 'ToolbarDownload');
-            downloadFile(frame.fileName, frame.base64);
+            downloadFile(frame.fileName, frame.base64, { state });
         });
         rightGroup.appendChild(downloadButton);
     }
@@ -1315,7 +1472,9 @@ function createState(sessionId, options, container) {
         pageIndicator: null,
         currentPage: null,
         disableContextMenu: permissions.contextMenuBlocked,
-        devToolsFlagged: false
+        devToolsFlagged: false,
+        lastPrintAttemptAt: 0,
+        lastDownloadAttemptAt: 0
     };
 }
 
@@ -1374,6 +1533,7 @@ function initSecurePdfViewer(elementId, options) {
     state.dotNetRef = options.dotNetRef;
 
     sessions.set(sessionId, state);
+    updateGlobalPolicyGuards();
 
     container.setAttribute('data-secure-viewer', 'true');
     updateContainerPolicyAttributes(container, permissions);
@@ -1394,6 +1554,9 @@ function initSecurePdfViewer(elementId, options) {
         style: options.watermarkStyle
     };
     const frameState = pdfFrames.get(state.frameId);
+    if (frameState && !permissions.downloadAllowed) {
+        frameState.base64 = null;
+    }
     state.watermarkHost = ensureWatermarkHost(frameState);
     const watermarkTarget = state.watermarkHost || container;
     state.watermarkElement = buildWatermark(watermarkTarget, state.watermarkOptions.text, state.watermarkOptions.style);
@@ -1418,6 +1581,16 @@ function initSecurePdfViewer(elementId, options) {
     state.disableContextMenu = options.disableContextMenu || permissions.contextMenuBlocked;
     if (container) {
         container.dataset.contextMenuBlocked = state.disableContextMenu ? 'true' : 'false';
+    }
+
+    if (typeof window !== 'undefined' && !permissions.printAllowed) {
+        registerHandler(state, window, 'beforeprint', () => {
+            reportPrintAttempt(state);
+        });
+        registerHandler(state, window, 'afterprint', () => {
+            // Reenfoca para evitar vistas persistentes tras intento bloqueado.
+            try { window.focus(); } catch { /* noop */ }
+        });
     }
 
     const contextMenuHandler = (event) => {
@@ -1455,7 +1628,7 @@ function initSecurePdfViewer(elementId, options) {
         }
     }
 
-    registerHandler(state, document, 'keydown', (e) => {
+    const keydownHandler = (e) => {
         const key = e.key.toLowerCase();
         const meta = e.metaKey || e.ctrlKey;
         if (key === 'printscreen') {
@@ -1464,20 +1637,20 @@ function initSecurePdfViewer(elementId, options) {
 
         if (meta && key === 'p' && !permissions.printAllowed) {
             e.preventDefault();
-            sendEvent(state, 'PrintAttempt');
+            reportPrintAttempt(state);
         }
 
         if (meta && key === 's' && !permissions.downloadAllowed) {
             e.preventDefault();
-            sendEvent(state, 'DownloadAttempt');
+            reportDownloadAttempt(state);
         }
 
         if ((e.metaKey && e.shiftKey && (key === '3' || key === '4')) || (e.ctrlKey && e.altKey && key === 'printscreen')) {
             notifyScreenshotAttempt(state, 'SystemCaptureShortcut');
         }
-    }, true);
+    };
 
-    registerHandler(state, document, 'keyup', (e) => {
+    const keyupHandler = (e) => {
         const key = e.key.toLowerCase();
         if (key === 'printscreen') {
             notifyScreenshotAttempt(state, 'KeyUp');
@@ -1486,7 +1659,15 @@ function initSecurePdfViewer(elementId, options) {
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 's') {
             notifyScreenshotAttempt(state, 'SnippingShortcut');
         }
-    }, true);
+    };
+
+    if (typeof window !== 'undefined') {
+        registerHandler(state, window, 'keydown', keydownHandler, true);
+        registerHandler(state, window, 'keyup', keyupHandler, true);
+    } else {
+        registerHandler(state, document, 'keydown', keydownHandler, true);
+        registerHandler(state, document, 'keyup', keyupHandler, true);
+    }
 
     registerHandler(state, window, 'blur', () => {
         sendEvent(state, 'WindowBlur');
@@ -1859,6 +2040,7 @@ function disposeSecurePdfViewer(sessionId) {
     toggleSelection(state.container, false);
 
     sessions.delete(sessionId);
+    updateGlobalPolicyGuards();
 }
 
 function notifyPdfPage(sessionId, pageNumber) {
@@ -1874,7 +2056,14 @@ function notifyPdfPage(sessionId, pageNumber) {
     sendEvent(state, 'PageView', pageNumber, { pageNumber });
 }
 
-function downloadFile(fileName, base64Data) {
+function downloadFile(fileName, base64Data, options) {
+    const targetState = options && typeof options === 'object' ? options.state : null;
+
+    if (targetState && (!targetState.permissions || !targetState.permissions.downloadAllowed)) {
+        reportDownloadAttempt(targetState);
+        return;
+    }
+
     const link = document.createElement('a');
     link.href = `data:application/octet-stream;base64,${base64Data}`;
     link.download = fileName || 'archivo';
