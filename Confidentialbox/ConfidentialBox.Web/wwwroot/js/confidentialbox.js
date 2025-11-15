@@ -1554,7 +1554,7 @@ function initSecurePdfViewer(elementId, options) {
         style: options.watermarkStyle
     };
     const frameState = pdfFrames.get(state.frameId);
-    if (frameState && !permissions.downloadAllowed) {
+    if (frameState && !permissions.downloadAllowed && !permissions.printAllowed) {
         frameState.base64 = null;
     }
     state.watermarkHost = ensureWatermarkHost(frameState);
