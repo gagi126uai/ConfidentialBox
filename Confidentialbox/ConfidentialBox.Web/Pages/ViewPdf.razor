@@ -419,7 +419,8 @@
             return;
         }
 
-        var refreshRequested = await InvokeAsync(() => TryAppendSecurityAlert(eventType, eventData));
+        // Ejecutar TryAppendSecurityAlert sin asignar el resultado a una variable
+        await InvokeAsync(() => TryAppendSecurityAlert(eventType, eventData));
 
         var result = await PdfViewerService.RecordEventAsync(new ViewerEventRequest
         {
@@ -448,15 +449,12 @@
                 await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", sessionId);
                 sessionId = null;
             }
-
-            refreshRequested = true;
         }
 
-        if (refreshRequested)
-        {
-            await InvokeAsync(StateHasChanged);
-        }
+        // Llamar a StateHasChanged para refrescar el estado
+        await InvokeAsync(StateHasChanged);
     }
+
 
     private async Task EnsureSecureViewerScriptAsync()
     {
