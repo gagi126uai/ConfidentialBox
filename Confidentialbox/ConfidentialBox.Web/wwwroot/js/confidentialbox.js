@@ -109,6 +109,25 @@ function frameRequiresContextMenuBlock(frameId) {
     return false;
 }
 
+function frameAllowsTextSelection(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    let allow = false;
+    forEachSessionByFrame(frameId, (state) => {
+        if (!state?.permissions) {
+            return;
+        }
+
+        if (state.permissions.copyAllowed && !state.permissions.textSelectionBlocked) {
+            allow = true;
+        }
+    });
+
+    return allow;
+}
+
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -144,6 +163,26 @@ const defaultViewerSettings = {
     zoomStepPercent: 15,
     viewerPadding: '1.5rem',
     customCss: ''
+};
+
+const defaultViewerPermissions = {
+    toolbarVisible: defaultViewerSettings.showToolbar,
+    fileDetailsVisible: defaultViewerSettings.showFileDetails,
+    searchEnabled: defaultViewerSettings.showSearch,
+    zoomControlsEnabled: defaultViewerSettings.showPageControls,
+    pageIndicatorEnabled: defaultViewerSettings.showPageIndicator,
+    downloadButtonVisible: defaultViewerSettings.showDownloadButton && defaultViewerSettings.allowDownload,
+    printButtonVisible: defaultViewerSettings.showPrintButton && defaultViewerSettings.allowPrint,
+    fullscreenButtonVisible: defaultViewerSettings.showFullscreenButton,
+    downloadAllowed: defaultViewerSettings.allowDownload,
+    printAllowed: defaultViewerSettings.allowPrint,
+    copyAllowed: defaultViewerSettings.allowCopy,
+    contextMenuBlocked: defaultViewerSettings.disableContextMenu,
+    textSelectionBlocked: defaultViewerSettings.disableTextSelection,
+    watermarkForced: defaultViewerSettings.forceGlobalWatermark,
+    defaultZoomPercent: defaultViewerSettings.defaultZoomPercent,
+    zoomStepPercent: defaultViewerSettings.zoomStepPercent,
+    maxViewTimeMinutes: defaultViewerSettings.maxViewTimeMinutes
 };
 
 let pdfjsLibPromise = null;
@@ -519,6 +558,92 @@ function normalizeViewerSettings(raw) {
     return normalized;
 }
 
+function normalizeViewerPermissions(raw, settings) {
+    const normalized = { ...defaultViewerPermissions };
+
+    if (settings && typeof settings === 'object') {
+        normalized.toolbarVisible = coerceBoolean(settings.showToolbar, normalized.toolbarVisible);
+        normalized.fileDetailsVisible = coerceBoolean(settings.showFileDetails, normalized.fileDetailsVisible);
+        normalized.searchEnabled = normalized.toolbarVisible && coerceBoolean(settings.showSearch, normalized.searchEnabled);
+        normalized.zoomControlsEnabled = normalized.toolbarVisible && coerceBoolean(settings.showPageControls, normalized.zoomControlsEnabled);
+        normalized.pageIndicatorEnabled = normalized.toolbarVisible && coerceBoolean(settings.showPageIndicator, normalized.pageIndicatorEnabled);
+        const downloadAllowed = coerceBoolean(settings.allowDownload, normalized.downloadAllowed);
+        const printAllowed = coerceBoolean(settings.allowPrint, normalized.printAllowed);
+        const copyAllowed = coerceBoolean(settings.allowCopy, normalized.copyAllowed);
+        normalized.downloadAllowed = downloadAllowed;
+        normalized.printAllowed = printAllowed;
+        normalized.copyAllowed = copyAllowed;
+        normalized.downloadButtonVisible = downloadAllowed && coerceBoolean(settings.showDownloadButton, normalized.downloadButtonVisible);
+        normalized.printButtonVisible = printAllowed && coerceBoolean(settings.showPrintButton, normalized.printButtonVisible);
+        normalized.fullscreenButtonVisible = coerceBoolean(settings.showFullscreenButton, normalized.fullscreenButtonVisible);
+        normalized.contextMenuBlocked = coerceBoolean(settings.disableContextMenu, normalized.contextMenuBlocked);
+        normalized.textSelectionBlocked = coerceBoolean(settings.disableTextSelection, normalized.textSelectionBlocked) || !copyAllowed;
+        normalized.watermarkForced = coerceBoolean(settings.forceGlobalWatermark, normalized.watermarkForced);
+        normalized.defaultZoomPercent = coerceNumber(settings.defaultZoomPercent, normalized.defaultZoomPercent);
+        normalized.zoomStepPercent = coerceNumber(settings.zoomStepPercent, normalized.zoomStepPercent);
+        normalized.maxViewTimeMinutes = coerceNumber(settings.maxViewTimeMinutes, normalized.maxViewTimeMinutes);
+    }
+
+    if (raw && typeof raw === 'object') {
+        for (const [key, value] of Object.entries(raw)) {
+            if (value === undefined || value === null) {
+                continue;
+            }
+
+            const camelKey = toCamelCaseKey(key);
+            switch (camelKey) {
+                case 'toolbarVisible':
+                case 'fileDetailsVisible':
+                case 'searchEnabled':
+                case 'zoomControlsEnabled':
+                case 'pageIndicatorEnabled':
+                case 'downloadButtonVisible':
+                case 'printButtonVisible':
+                case 'fullscreenButtonVisible':
+                case 'downloadAllowed':
+                case 'printAllowed':
+                case 'copyAllowed':
+                case 'contextMenuBlocked':
+                case 'textSelectionBlocked':
+                case 'watermarkForced':
+                    normalized[camelKey] = coerceBoolean(value, normalized[camelKey]);
+                    break;
+                case 'defaultZoomPercent':
+                case 'zoomStepPercent':
+                case 'maxViewTimeMinutes':
+                    normalized[camelKey] = coerceNumber(value, normalized[camelKey]);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    if (!normalized.toolbarVisible) {
+        normalized.searchEnabled = false;
+        normalized.zoomControlsEnabled = false;
+        normalized.pageIndicatorEnabled = false;
+    }
+
+    if (!normalized.downloadAllowed) {
+        normalized.downloadButtonVisible = false;
+    }
+
+    if (!normalized.printAllowed) {
+        normalized.printButtonVisible = false;
+    }
+
+    if (!normalized.copyAllowed) {
+        normalized.textSelectionBlocked = true;
+    }
+
+    normalized.defaultZoomPercent = Math.min(Math.max(normalized.defaultZoomPercent, 25), 400);
+    normalized.zoomStepPercent = Math.min(Math.max(normalized.zoomStepPercent, 5), 50);
+    normalized.maxViewTimeMinutes = Math.max(0, Math.round(normalized.maxViewTimeMinutes || 0));
+
+    return normalized;
+}
+
 function applyViewerTheme(container, settings) {
     if (!container) {
         return;
@@ -561,6 +686,32 @@ function toggleSelection(container, disabled) {
     }
 }
 
+function updateContainerPolicyAttributes(container, permissions) {
+    if (!container || !permissions) {
+        return;
+    }
+
+    container.dataset.allowDownload = permissions.downloadAllowed ? 'true' : 'false';
+    container.dataset.allowPrint = permissions.printAllowed ? 'true' : 'false';
+    container.dataset.allowCopy = permissions.copyAllowed ? 'true' : 'false';
+    container.dataset.contextMenuBlocked = permissions.contextMenuBlocked ? 'true' : 'false';
+    container.dataset.textSelectionBlocked = permissions.textSelectionBlocked ? 'true' : 'false';
+    container.dataset.toolbarVisible = permissions.toolbarVisible ? 'true' : 'false';
+}
+
+function clearContainerPolicyAttributes(container) {
+    if (!container) {
+        return;
+    }
+
+    delete container.dataset.allowDownload;
+    delete container.dataset.allowPrint;
+    delete container.dataset.allowCopy;
+    delete container.dataset.contextMenuBlocked;
+    delete container.dataset.textSelectionBlocked;
+    delete container.dataset.toolbarVisible;
+}
+
 function clearFrameTextLayers(frameState) {
     if (!frameState?.pages) {
         return;
@@ -597,7 +748,7 @@ function applySelectionState(state) {
         return;
     }
 
-    const allowSelection = state.settings?.allowCopy && !state.settings?.disableTextSelection;
+    const allowSelection = state.permissions?.copyAllowed && !state.permissions?.textSelectionBlocked;
     frameState.allowTextSelection = allowSelection;
 
     if (!allowSelection) {
@@ -962,12 +1113,14 @@ function setupToolbar(state, container, toolbarElement, options) {
     }
 
     const settings = state.settings;
+    const permissions = state.permissions;
     toolbarElement.innerHTML = '';
     toolbarElement.classList.add('secure-toolbar');
     toolbarElement.dataset.position = settings.toolbarPosition;
     state.pageIndicator = null;
+    state.zoomLabel = null;
 
-    if (!settings.showToolbar) {
+    if (!permissions.toolbarVisible) {
         toolbarElement.style.display = 'none';
         return;
     }
@@ -984,7 +1137,7 @@ function setupToolbar(state, container, toolbarElement, options) {
     title.textContent = options.fileName || 'Documento protegido';
     leftGroup.appendChild(title);
 
-    if (settings.showPageIndicator) {
+    if (permissions.pageIndicatorEnabled) {
         const indicator = document.createElement('span');
         indicator.className = 'secure-toolbar-page-indicator';
         indicator.textContent = 'Pág. --';
@@ -992,7 +1145,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         state.pageIndicator = indicator;
     }
 
-    if (settings.showPageControls) {
+    if (permissions.zoomControlsEnabled) {
         const zoomGroup = document.createElement('div');
         zoomGroup.className = 'secure-toolbar-group secure-toolbar-zoom-group';
 
@@ -1028,7 +1181,7 @@ function setupToolbar(state, container, toolbarElement, options) {
     const rightGroup = document.createElement('div');
     rightGroup.className = 'secure-toolbar-group secure-toolbar-group-right';
 
-    if (settings.showSearch) {
+    if (permissions.searchEnabled) {
         const searchForm = document.createElement('form');
         searchForm.className = 'secure-toolbar-search';
         const input = document.createElement('input');
@@ -1049,7 +1202,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         rightGroup.appendChild(searchForm);
     }
 
-    if (settings.showDownloadButton && settings.allowDownload) {
+    if (permissions.downloadButtonVisible && permissions.downloadAllowed) {
         const downloadButton = createToolbarButton('fas fa-download', 'Descargar PDF', () => {
             const frame = pdfFrames.get(state.frameId);
             if (!frame?.base64) {
@@ -1061,7 +1214,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         rightGroup.appendChild(downloadButton);
     }
 
-    if (settings.showPrintButton && settings.allowPrint) {
+    if (permissions.printButtonVisible && permissions.printAllowed) {
         const printButton = createToolbarButton('fas fa-print', 'Imprimir', () => {
             const frame = pdfFrames.get(state.frameId);
             sendEvent(state, 'ToolbarPrint');
@@ -1111,7 +1264,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         rightGroup.appendChild(printButton);
     }
 
-    if (settings.showFullscreenButton) {
+    if (permissions.fullscreenButtonVisible) {
         const fullscreenButton = createToolbarButton('fas fa-expand', 'Pantalla completa', () => {
             sendEvent(state, 'ToolbarFullscreen');
             enterFullscreen(container);
@@ -1130,8 +1283,11 @@ function setupToolbar(state, container, toolbarElement, options) {
 
 function createState(sessionId, options, container) {
     const settings = normalizeViewerSettings(options.settings);
-    const defaultZoom = Math.max(settings.defaultZoomPercent / 100, 0.25);
-    const zoomStep = Math.max(settings.zoomStepPercent / 100, 0.05);
+    const permissions = normalizeViewerPermissions(options.policy, settings);
+    const defaultZoomPercent = permissions.defaultZoomPercent ?? settings.defaultZoomPercent;
+    const zoomStepPercent = permissions.zoomStepPercent ?? settings.zoomStepPercent;
+    const defaultZoom = Math.max(defaultZoomPercent / 100, 0.25);
+    const zoomStep = Math.max(zoomStepPercent / 100, 0.05);
 
     return {
         dotNetRef: options.dotNetRef,
@@ -1150,6 +1306,7 @@ function createState(sessionId, options, container) {
         toolbarElement: options.toolbarId ? document.getElementById(options.toolbarId) : null,
         customStyleElement: null,
         settings,
+        permissions,
         defaultZoom,
         zoomStep,
         currentZoom: defaultZoom,
@@ -1157,7 +1314,7 @@ function createState(sessionId, options, container) {
         zoomLabel: null,
         pageIndicator: null,
         currentPage: null,
-        disableContextMenu: false,
+        disableContextMenu: permissions.contextMenuBlocked,
         devToolsFlagged: false
     };
 }
@@ -1213,18 +1370,20 @@ function initSecurePdfViewer(elementId, options) {
 
     const state = createState(sessionId, options, container);
     const settings = state.settings;
+    const permissions = state.permissions;
     state.dotNetRef = options.dotNetRef;
 
     sessions.set(sessionId, state);
 
     container.setAttribute('data-secure-viewer', 'true');
+    updateContainerPolicyAttributes(container, permissions);
     applyViewerTheme(container, settings);
-    toggleSelection(container, settings.disableTextSelection);
+    toggleSelection(container, permissions.textSelectionBlocked);
     applySelectionState(state);
 
     registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
 
-    if (settings.disableTextSelection) {
+    if (permissions.textSelectionBlocked) {
         const selectionHandler = () => clearSelectionWithin(container);
         registerHandler(state, document, 'selectionchange', selectionHandler, true);
         registerHandler(state, container, 'mouseup', selectionHandler, true);
@@ -1256,7 +1415,10 @@ function initSecurePdfViewer(elementId, options) {
         ensureDocumentReady(state, frameState);
     }
 
-    state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
+    state.disableContextMenu = options.disableContextMenu || permissions.contextMenuBlocked;
+    if (container) {
+        container.dataset.contextMenuBlocked = state.disableContextMenu ? 'true' : 'false';
+    }
 
     const contextMenuHandler = (event) => {
         if (!container) {
@@ -1300,12 +1462,12 @@ function initSecurePdfViewer(elementId, options) {
             notifyScreenshotAttempt(state, 'KeyDown');
         }
 
-        if (meta && key === 'p' && !settings.allowPrint) {
+        if (meta && key === 'p' && !permissions.printAllowed) {
             e.preventDefault();
             sendEvent(state, 'PrintAttempt');
         }
 
-        if (meta && key === 's' && !settings.allowDownload) {
+        if (meta && key === 's' && !permissions.downloadAllowed) {
             e.preventDefault();
             sendEvent(state, 'DownloadAttempt');
         }
@@ -1334,7 +1496,7 @@ function initSecurePdfViewer(elementId, options) {
         sendEvent(state, 'WindowFocus');
     });
 
-    if (!settings.allowCopy) {
+    if (!permissions.copyAllowed) {
         registerHandler(state, document, 'copy', (e) => {
             e.preventDefault();
             sendEvent(state, 'CopyAttempt');
@@ -1393,6 +1555,8 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
+        clearFrameTextLayers(frameState);
+
         if (Array.isArray(frameState.cleanupCallbacks)) {
             for (const cleanup of frameState.cleanupCallbacks) {
                 try {
@@ -1567,7 +1731,8 @@ async function renderPdf(frameId, base64Data, fileName) {
             watermarkLayer,
             objectUrl,
             renderScheduled: false,
-            cleanupCallbacks
+            cleanupCallbacks,
+            allowTextSelection: frameAllowsTextSelection(frameId)
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
@@ -1606,8 +1771,8 @@ async function renderPdf(frameId, base64Data, fileName) {
                 state.watermarkElement.remove();
             }
 
-            const desiredText = state.settings?.forceGlobalWatermark
-                ? state.settings.globalWatermarkText
+            const desiredText = state.permissions?.watermarkForced
+                ? (state.settings?.globalWatermarkText || state.watermarkOptions?.text)
                 : state.watermarkOptions?.text;
 
             const desiredStyle = state.watermarkOptions?.style || (state.settings ? {
@@ -1690,6 +1855,7 @@ function disposeSecurePdfViewer(sessionId) {
     }
 
     clearViewerTheme(state.container);
+    clearContainerPolicyAttributes(state.container);
     toggleSelection(state.container, false);
 
     sessions.delete(sessionId);

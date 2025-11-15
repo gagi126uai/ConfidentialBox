@@ -16,4 +16,5 @@ public class PDFViewerConfigDto
     public bool AIMonitoringEnabled { get; set; }
     public string SessionId { get; set; } = string.Empty;
     public PDFViewerSettingsDto ViewerSettings { get; set; } = new();
+    public PDFViewerPermissionsDto EffectivePermissions { get; set; } = new();
 }

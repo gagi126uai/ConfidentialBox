@@ -4,6 +4,7 @@
 @inject IPdfViewerService PdfViewerService
 @inject IJSRuntime JS
 @using System.Collections.Generic
+@using System.Linq
 @using System.Security.Cryptography
 @using System.Text.Json
 @using ConfidentialBox.Core.DTOs
@@ -67,7 +68,11 @@
                     }
                     else
                     {
-                        if (fileMetadata != null && (viewerConfig?.ViewerSettings?.ShowFileDetails ?? true))
+                        var showFileDetails = viewerConfig?.EffectivePermissions?.FileDetailsVisible
+                            ?? viewerConfig?.ViewerSettings?.ShowFileDetails
+                            ?? true;
+
+                        if (fileMetadata != null && showFileDetails)
                         {
                             <div class="secure-file-summary mb-4">
                                 <div class="secure-file-summary__header">
@@ -107,14 +112,18 @@
                                         <strong>@(fileMetadata.ExpiresAt.HasValue ? fileMetadata.ExpiresAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Sin vencimiento")</strong>
                                     </div>
                                 </div>
-                                @if (viewerConfig?.ViewerSettings is not null)
+                                @if (viewerConfig?.EffectivePermissions is not null)
                                 {
-                                    <div class="secure-file-summary__protections">
-                                        @foreach (var chip in BuildProtectionChips(viewerConfig.ViewerSettings))
-                                        {
-                                            <span class="secure-chip @chip.CssClass"><i class="@chip.Icon me-1"></i>@chip.Text</span>
-                                        }
-                                    </div>
+                                    var protectionChips = BuildProtectionChips(viewerConfig.EffectivePermissions);
+                                    if (protectionChips.Any())
+                                    {
+                                        <div class="secure-file-summary__protections">
+                                            @foreach (var chip in protectionChips)
+                                            {
+                                                <span class="secure-chip @chip.CssClass"><i class="@chip.Icon me-1"></i>@chip.Text</span>
+                                            }
+                                        </div>
+                                    }
                                 }
                             </div>
                         }
@@ -375,6 +384,7 @@
                     disableContextMenu = viewerConfig.ScreenshotProtectionEnabled,
                     maxViewMinutes = viewerConfig.MaxViewTimeMinutes,
                     settings = viewerConfig.ViewerSettings,
+                    policy = viewerConfig.EffectivePermissions,
                     fileName = viewerConfig.FileName
                 });
 
@@ -500,32 +510,38 @@
         return $"{len:0.##} {sizes[order]}";
     }
 
-    private static IEnumerable<ProtectionChip> BuildProtectionChips(PDFViewerSettingsDto settings)
+    private static IEnumerable<ProtectionChip> BuildProtectionChips(PDFViewerPermissionsDto settings)
     {
-        yield return new ProtectionChip(
-            settings.AllowDownload ? "chip-allowed" : "chip-blocked",
-            settings.AllowDownload ? "fas fa-download" : "fas fa-ban",
-            settings.AllowDownload ? "Descarga habilitada" : "Descarga bloqueada");
+        if (settings.DownloadAllowed || settings.DownloadButtonVisible)
+        {
+            yield return new ProtectionChip(
+                settings.DownloadAllowed ? "chip-allowed" : "chip-blocked",
+                settings.DownloadAllowed ? "fas fa-download" : "fas fa-ban",
+                settings.DownloadAllowed ? "Descarga habilitada" : "Descarga bloqueada");
+        }
+
+        if (settings.PrintAllowed || settings.PrintButtonVisible)
+        {
+            yield return new ProtectionChip(
+                settings.PrintAllowed ? "chip-allowed" : "chip-blocked",
+                settings.PrintAllowed ? "fas fa-print" : "fas fa-ban",
+                settings.PrintAllowed ? "Impresión permitida" : "Impresión bloqueada");
+        }
 
         yield return new ProtectionChip(
-            settings.AllowPrint ? "chip-allowed" : "chip-blocked",
-            settings.AllowPrint ? "fas fa-print" : "fas fa-ban",
-            settings.AllowPrint ? "Impresión permitida" : "Impresión bloqueada");
+            settings.CopyAllowed ? "chip-allowed" : "chip-blocked",
+            settings.CopyAllowed ? "fas fa-copy" : "fas fa-ban",
+            settings.CopyAllowed ? "Copiado habilitado" : "Copiado bloqueado");
 
         yield return new ProtectionChip(
-            settings.AllowCopy ? "chip-allowed" : "chip-blocked",
-            settings.AllowCopy ? "fas fa-copy" : "fas fa-ban",
-            settings.AllowCopy ? "Copiado habilitado" : "Copiado bloqueado");
+            settings.ContextMenuBlocked ? "chip-blocked" : "chip-allowed",
+            settings.ContextMenuBlocked ? "fas fa-hand" : "fas fa-mouse",
+            settings.ContextMenuBlocked ? "Menú contextual bloqueado" : "Menú contextual permitido");
 
         yield return new ProtectionChip(
-            settings.DisableContextMenu ? "chip-blocked" : "chip-allowed",
-            settings.DisableContextMenu ? "fas fa-hand" : "fas fa-mouse",
-            settings.DisableContextMenu ? "Menú contextual bloqueado" : "Menú contextual permitido");
-
-        yield return new ProtectionChip(
-            settings.DisableTextSelection ? "chip-blocked" : "chip-allowed",
-            settings.DisableTextSelection ? "fas fa-font" : "fas fa-font",
-            settings.DisableTextSelection ? "Selección deshabilitada" : "Selección habilitada");
+            settings.TextSelectionBlocked ? "chip-blocked" : "chip-allowed",
+            settings.TextSelectionBlocked ? "fas fa-font" : "fas fa-font",
+            settings.TextSelectionBlocked ? "Selección deshabilitada" : "Selección habilitada");
 
         if (settings.MaxViewTimeMinutes > 0)
         {

@@ -152,6 +152,7 @@ public class PDFViewerController : ControllerBase
             var viewerSettings = await _systemSettingsService.GetPdfViewerSettingsAsync(ct);
             var combinedMaxViewTime = CombineMaxViewTime(file.MaxViewTimeMinutes, viewerSettings.MaxViewTimeMinutes);
             var sessionViewerSettings = BuildViewerSettingsDto(viewerSettings, file, combinedMaxViewTime);
+            var permissions = BuildViewerPermissionsDto(sessionViewerSettings);
             _sessionPolicyStore.Store(session.SessionId, sessionViewerSettings, combinedMaxViewTime);
 
             var hasWatermark = viewerSettings.ForceGlobalWatermark || file.HasWatermark;
@@ -174,7 +175,8 @@ public class PDFViewerController : ControllerBase
                 MaxViewTimeMinutes = combinedMaxViewTime,
                 AIMonitoringEnabled = file.AIMonitoringEnabled,
                 SessionId = session.SessionId,
-                ViewerSettings = sessionViewerSettings
+                ViewerSettings = sessionViewerSettings,
+                EffectivePermissions = permissions
             };
 
             return Ok(new StartViewerSessionResponse
@@ -426,6 +428,30 @@ public class PDFViewerController : ControllerBase
             ZoomStepPercent = settings.ZoomStepPercent,
             ViewerPadding = settings.ViewerPadding,
             CustomCss = settings.CustomCss
+        };
+    }
+
+    private static PDFViewerPermissionsDto BuildViewerPermissionsDto(PDFViewerSettingsDto settings)
+    {
+        return new PDFViewerPermissionsDto
+        {
+            ToolbarVisible = settings.ShowToolbar,
+            FileDetailsVisible = settings.ShowFileDetails,
+            SearchEnabled = settings.ShowSearch && settings.ShowToolbar,
+            ZoomControlsEnabled = settings.ShowPageControls && settings.ShowToolbar,
+            PageIndicatorEnabled = settings.ShowPageIndicator && settings.ShowToolbar,
+            DownloadButtonVisible = settings.ShowDownloadButton && settings.AllowDownload,
+            PrintButtonVisible = settings.ShowPrintButton && settings.AllowPrint,
+            FullscreenButtonVisible = settings.ShowFullscreenButton,
+            DownloadAllowed = settings.AllowDownload,
+            PrintAllowed = settings.AllowPrint,
+            CopyAllowed = settings.AllowCopy,
+            ContextMenuBlocked = settings.DisableContextMenu,
+            TextSelectionBlocked = settings.DisableTextSelection,
+            WatermarkForced = settings.ForceGlobalWatermark,
+            DefaultZoomPercent = settings.DefaultZoomPercent,
+            ZoomStepPercent = settings.ZoomStepPercent,
+            MaxViewTimeMinutes = settings.MaxViewTimeMinutes
         };
     }
 
