@@ -200,22 +200,22 @@ else
                         </div>
                     }
 
-                    @foreach (var section in GetPolicySections())
+                    @foreach (var group in GetPolicySections())
                     {
                         <div class="mb-4">
                             <div class="d-flex align-items-center mb-2">
-                                <h6 class="text-uppercase text-muted small mb-0">@section.Key</h6>
+                                <h6 class="text-uppercase text-muted small mb-0">@group.Key</h6>
                                 <div class="flex-grow-1 ms-3 border-bottom"></div>
                             </div>
 
                             <div class="row g-4">
-                                @foreach (var policy in section)
+                                @foreach (var policy in group)
                                 {
                                     <div class="col-md-6">
                                         <div class="border rounded p-3 h-100 shadow-sm-sm">
                                             <label class="form-label fw-semibold">@policy.DisplayName</label>
 
-                                            if (policy.Options?.Any() == true)
+                                            @if (policy.Options?.Any() == true)
                                             {
                                                 <InputSelect @bind-Value="policy.Value" class="form-select">
                                                     @foreach (var option in policy.Options)
@@ -230,8 +230,12 @@ else
                                                 {
                                                     case "Boolean":
                                                         <div class="form-check form-switch">
-                                                            <InputCheckbox class="form-check-input" @bind-Value="policy.BooleanValue" id="@($"policy-{policy.PolicyName}")" />
-                                                            <label class="form-check-label" for="policy-@policy.PolicyName">@(policy.BooleanValue ? "Habilitado" : "Deshabilitado")</label>
+                                                            <InputCheckbox class="form-check-input"
+                                                                           @bind-Value="policy.BooleanValue"
+                                                                           id="@($"policy-{policy.PolicyName}")" />
+                                                            <label class="form-check-label" for="policy-@policy.PolicyName">
+                                                                @(policy.BooleanValue ? "Habilitado" : "Deshabilitado")
+                                                            </label>
                                                         </div>
                                                         break;
                                                     case "Number":
@@ -253,7 +257,6 @@ else
                             </div>
                         </div>
                     }
-                </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline-secondary" @onclick="ClosePolicyModal" disabled="@savingPolicies">Cerrar</button>
                     <button class="btn btn-primary" @onclick="SavePolicies" disabled="@savingPolicies">
@@ -266,6 +269,7 @@ else
                 </div>
             </div>
         </div>
+    </div>
     </div>
     <div class="modal-backdrop show"></div>
 }

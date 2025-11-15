@@ -25,35 +25,35 @@ else
             <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link @(activeTab == "storage" ? "active" : string.Empty)"
+                            class='@($"nav-link {(activeTab == "storage" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("storage")'>
                         <i class="fas fa-database"></i> Almacenamiento
                     </button>
                 </li>
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link @(activeTab == "email" ? "active" : string.Empty)"
+                            class='@($"nav-link {(activeTab == "email" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("email")'>
                         <i class="fas fa-envelope"></i> Correo seguro
                     </button>
                 </li>
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link @(activeTab == "notifications" ? "active" : string.Empty)"
+                            class='@($"nav-link {(activeTab == "notifications" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("notifications")'>
                         <i class="fas fa-bell"></i> Notificaciones
                     </button>
                 </li>
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link @(activeTab == "viewer" ? "active" : string.Empty)"
+                            class='@($"nav-link {(activeTab == "viewer" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("viewer")'>
                         <i class="fas fa-file-pdf"></i> Visor PDF
                     </button>
                 </li>
                 <li class="nav-item">
                     <button type="button"
-                            class="nav-link @(activeTab == "security" ? "active" : string.Empty)"
+                            class='@($"nav-link {(activeTab == "security" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("security")'>
                         <i class="fas fa-user-shield"></i> Seguridad de acceso
                     </button>
@@ -111,8 +111,8 @@ else
                                 <button type="submit" class="btn btn-primary" disabled="@storageSaving">
                                     @if (storageSaving)
                                     {
-                                        <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
-                                        
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Guardando…</span>
                                     }
                                     else
                                     {
@@ -294,7 +294,8 @@ else
                         <button type="submit" class="btn btn-primary mt-4" disabled="@emailSaving">
                             @if (emailSaving)
                             {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Guardando…</span>
                             }
                             else
                             {
@@ -345,7 +346,8 @@ else
                         <button type="submit" class="btn btn-primary" disabled="@notificationsSaving">
                             @if (notificationsSaving)
                             {
-                                <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Guardando…</span>
                             }
                             else
                             {
@@ -619,7 +621,8 @@ else
                                 <button type="submit" class="btn btn-primary" disabled="@tokenSaving">
                                     @if (tokenSaving)
                                     {
-                                        <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Guardando…</span>
                                     }
                                     else
                                     {
@@ -650,7 +653,8 @@ else
                                     <button class="btn btn-outline-primary" @onclick="UpdateRegistrationSettingsAsync" disabled="@registrationSaving">
                                         @if (registrationSaving)
                                         {
-                                            <span class="spinner-border spinner-border-sm me-2">Guardando…</span>
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Guardando…</span>
                                         }
                                         else
                                         {
@@ -684,7 +688,7 @@ else
                                         </div>
                                     </div>
                                     <div>
-                                        <button class="btn btn-outline-primary" @onclick="() => NavigationManager.NavigateTo(\"/ai-security#settings\")">
+                                        <button class="btn btn-outline-primary" @onclick='() => NavigationManager.NavigateTo("/ai-security#settings")'>
                                             <i class="fas fa-sliders-h me-1"></i> Abrir AI Security
                                         </button>
                                     </div>

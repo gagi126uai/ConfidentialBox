@@ -670,6 +670,31 @@
         dotNetReference?.Dispose();
         dotNetReference = null;
     }
+    
+    private async Task DisposePdfFrame()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("ConfidentialBox.disposePdfFrame", "securePdfFrame");
+        }
+        catch (Exception ex)
+        {
+            // Manejo de errores, por si el método no está definido
+            Console.WriteLine($"Error al invocar disposePdfFrame: {ex.Message}");
+        }
+    }
+
+    private async Task RenderPdf(string base64Content, string fileName)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("ConfidentialBox.renderPdf", "securePdfFrame", base64Content, fileName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al invocar renderPdf: {ex.Message}");
+        }
+    }
 
     private sealed class SecureViewerForm
     {
