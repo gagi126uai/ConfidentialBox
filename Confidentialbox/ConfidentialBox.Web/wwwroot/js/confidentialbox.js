@@ -1,6 +1,135 @@
 const sessions = new Map();
 const pdfFrames = new Map();
 
+const globalGuards = {
+    printStyleElement: null,
+    originalPrint: null,
+    printOverrideActive: false
+};
+
+function anySession(predicate) {
+    for (const state of sessions.values()) {
+        if (predicate(state)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function broadcastEventTo(predicate, callback) {
+    for (const state of sessions.values()) {
+        if (predicate(state)) {
+            callback(state);
+        }
+    }
+}
+
+function ensurePrintBlockedStyles() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    if (!globalGuards.printStyleElement) {
+        const style = document.createElement('style');
+        style.id = 'secure-print-blocker';
+        style.textContent = `@media print {
+            body * {
+                visibility: hidden !important;
+            }
+
+            body::before {
+                visibility: visible !important;
+                display: block !important;
+                content: 'Impresión bloqueada por la política de ConfidentialBox';
+                font-size: 22px !important;
+                font-weight: 600 !important;
+                text-align: center !important;
+                margin-top: 30vh !important;
+                color: #b91c1c !important;
+                font-family: 'Inter', 'Segoe UI', sans-serif !important;
+            }
+        }`;
+
+        document.head.appendChild(style);
+        globalGuards.printStyleElement = style;
+    }
+}
+
+function removePrintBlockedStyles() {
+    if (globalGuards.printStyleElement && globalGuards.printStyleElement.parentElement) {
+        globalGuards.printStyleElement.parentElement.removeChild(globalGuards.printStyleElement);
+    }
+
+    globalGuards.printStyleElement = null;
+}
+
+function overrideWindowPrint() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (globalGuards.printOverrideActive) {
+        return;
+    }
+
+    const originalPrint = typeof window.print === 'function'
+        ? window.print.bind(window)
+        : null;
+
+    window.print = function securePrintOverride() {
+        let blocked = false;
+        broadcastEventTo((state) => !state.permissions?.printAllowed, (state) => {
+            blocked = true;
+            reportPrintAttempt(state);
+        });
+
+        if (blocked) {
+            return;
+        }
+
+        if (originalPrint) {
+            return originalPrint();
+        }
+
+        return undefined;
+    };
+
+    globalGuards.originalPrint = originalPrint;
+    globalGuards.printOverrideActive = true;
+}
+
+function restoreWindowPrint() {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!globalGuards.printOverrideActive) {
+        return;
+    }
+
+    if (globalGuards.originalPrint) {
+        window.print = globalGuards.originalPrint;
+    } else {
+        delete window.print;
+    }
+
+    globalGuards.originalPrint = null;
+    globalGuards.printOverrideActive = false;
+}
+
+function updateGlobalPolicyGuards() {
+    const requiresPrintBlock = anySession((state) => !state.permissions?.printAllowed);
+
+    if (requiresPrintBlock) {
+        ensurePrintBlockedStyles();
+        overrideWindowPrint();
+    } else {
+        removePrintBlockedStyles();
+        restoreWindowPrint();
+    }
+}
+
 async function resolveGeoMetadata() {
     try {
         const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
@@ -95,6 +224,39 @@ function forEachSessionByFrame(frameId, callback) {
     }
 }
 
+function frameRequiresContextMenuBlock(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    for (const state of sessions.values()) {
+        if (state.frameId === frameId && state.disableContextMenu) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function frameAllowsTextSelection(frameId) {
+    if (!frameId) {
+        return false;
+    }
+
+    let allow = false;
+    forEachSessionByFrame(frameId, (state) => {
+        if (!state?.permissions) {
+            return;
+        }
+
+        if (state.permissions.copyAllowed && !state.permissions.textSelectionBlocked) {
+            allow = true;
+        }
+    });
+
+    return allow;
+}
+
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
@@ -130,6 +292,26 @@ const defaultViewerSettings = {
     zoomStepPercent: 15,
     viewerPadding: '1.5rem',
     customCss: ''
+};
+
+const defaultViewerPermissions = {
+    toolbarVisible: defaultViewerSettings.showToolbar,
+    fileDetailsVisible: defaultViewerSettings.showFileDetails,
+    searchEnabled: defaultViewerSettings.showSearch,
+    zoomControlsEnabled: defaultViewerSettings.showPageControls,
+    pageIndicatorEnabled: defaultViewerSettings.showPageIndicator,
+    downloadButtonVisible: defaultViewerSettings.showDownloadButton && defaultViewerSettings.allowDownload,
+    printButtonVisible: defaultViewerSettings.showPrintButton && defaultViewerSettings.allowPrint,
+    fullscreenButtonVisible: defaultViewerSettings.showFullscreenButton,
+    downloadAllowed: defaultViewerSettings.allowDownload,
+    printAllowed: defaultViewerSettings.allowPrint,
+    copyAllowed: defaultViewerSettings.allowCopy,
+    contextMenuBlocked: defaultViewerSettings.disableContextMenu,
+    textSelectionBlocked: defaultViewerSettings.disableTextSelection,
+    watermarkForced: defaultViewerSettings.forceGlobalWatermark,
+    defaultZoomPercent: defaultViewerSettings.defaultZoomPercent,
+    zoomStepPercent: defaultViewerSettings.zoomStepPercent,
+    maxViewTimeMinutes: defaultViewerSettings.maxViewTimeMinutes
 };
 
 let pdfjsLibPromise = null;
@@ -196,6 +378,54 @@ function sendEvent(state, type, pageNumber, data) {
     } catch (err) {
         console.error('Error enviando evento al servidor', err);
     }
+}
+
+function reportPrintAttempt(state) {
+    if (!state) {
+        return;
+    }
+
+    const now = Date.now();
+    if (now - (state.lastPrintAttemptAt || 0) < 400) {
+        return;
+    }
+
+    state.lastPrintAttemptAt = now;
+    sendEvent(state, 'PrintAttempt');
+}
+
+function reportDownloadAttempt(state) {
+    if (!state) {
+        return;
+    }
+
+    const now = Date.now();
+    if (now - (state.lastDownloadAttemptAt || 0) < 400) {
+        return;
+    }
+
+    state.lastDownloadAttemptAt = now;
+    sendEvent(state, 'DownloadAttempt');
+}
+
+function ensureDocumentReady(state, frameState) {
+    if (!state || state.documentReadyReported) {
+        return;
+    }
+
+    if (!frameState || !frameState.pdfDoc) {
+        state.awaitingFrame = true;
+        return;
+    }
+
+    const pageCount = typeof frameState.pdfDoc.numPages === 'number'
+        ? frameState.pdfDoc.numPages
+        : undefined;
+
+    state.awaitingFrame = false;
+    state.documentReadyReported = true;
+    const payload = pageCount != null ? { pageCount } : undefined;
+    sendEvent(state, 'DocumentReady', null, payload);
 }
 
 function registerHandler(state, target, eventName, handler, options) {
@@ -374,19 +604,200 @@ function ensureTrackingForFrame(frameId) {
     }
 }
 
+function toCamelCaseKey(key) {
+    if (!key || typeof key !== 'string') {
+        return key;
+    }
+
+    return key.length === 1 ? key.toLowerCase() : key.charAt(0).toLowerCase() + key.slice(1);
+}
+
+function coerceBoolean(value, fallback) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const lowered = value.trim().toLowerCase();
+        if (lowered === 'true') {
+            return true;
+        }
+        if (lowered === 'false') {
+            return false;
+        }
+    }
+
+    return fallback;
+}
+
+function coerceNumber(value, fallback) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return fallback;
+}
+
+function coerceString(value, fallback) {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+            return trimmed;
+        }
+    }
+
+    return fallback;
+}
+
 function normalizeViewerSettings(raw) {
-    const normalized = { ...defaultViewerSettings, ...(raw || {}) };
-    normalized.theme = (normalized.theme || 'dark').toLowerCase();
+    const normalized = { ...defaultViewerSettings };
+
+    if (raw && typeof raw === 'object') {
+        for (const [key, value] of Object.entries(raw)) {
+            if (value === undefined || value === null) {
+                continue;
+            }
+
+            const camelKey = toCamelCaseKey(key);
+            normalized[camelKey] = value;
+        }
+    }
+
+    normalized.theme = coerceString(normalized.theme, defaultViewerSettings.theme).toLowerCase();
     normalized.toolbarPosition = normalized.toolbarPosition === 'bottom' ? 'bottom' : 'top';
-    normalized.viewerPadding = normalized.viewerPadding || defaultViewerSettings.viewerPadding;
-    normalized.fontFamily = normalized.fontFamily || defaultViewerSettings.fontFamily;
-    normalized.customCss = normalized.customCss || '';
-    normalized.defaultZoomPercent = Math.min(Math.max(normalized.defaultZoomPercent || defaultViewerSettings.defaultZoomPercent, 25), 400);
-    normalized.zoomStepPercent = Math.min(Math.max(normalized.zoomStepPercent || defaultViewerSettings.zoomStepPercent, 5), 50);
-    normalized.watermarkFontSize = Math.min(Math.max(normalized.watermarkFontSize || defaultViewerSettings.watermarkFontSize, 16), 120);
-    normalized.watermarkOpacity = Math.min(Math.max(typeof normalized.watermarkOpacity === 'number' ? normalized.watermarkOpacity : defaultViewerSettings.watermarkOpacity, 0), 1);
-    normalized.maxViewTimeMinutes = Math.max(0, normalized.maxViewTimeMinutes || 0);
-    normalized.showPageIndicator = normalized.showPageIndicator !== false;
+    normalized.viewerPadding = coerceString(normalized.viewerPadding, defaultViewerSettings.viewerPadding);
+    normalized.fontFamily = coerceString(normalized.fontFamily, defaultViewerSettings.fontFamily);
+    normalized.customCss = coerceString(normalized.customCss, defaultViewerSettings.customCss);
+    normalized.accentColor = coerceString(normalized.accentColor, defaultViewerSettings.accentColor);
+    normalized.backgroundColor = coerceString(normalized.backgroundColor, defaultViewerSettings.backgroundColor);
+    normalized.toolbarBackgroundColor = coerceString(normalized.toolbarBackgroundColor, defaultViewerSettings.toolbarBackgroundColor);
+    normalized.toolbarTextColor = coerceString(normalized.toolbarTextColor, defaultViewerSettings.toolbarTextColor);
+    normalized.globalWatermarkText = coerceString(normalized.globalWatermarkText, defaultViewerSettings.globalWatermarkText);
+    normalized.watermarkColor = coerceString(normalized.watermarkColor, defaultViewerSettings.watermarkColor);
+
+    normalized.showToolbar = coerceBoolean(normalized.showToolbar, defaultViewerSettings.showToolbar);
+    normalized.showSearch = coerceBoolean(normalized.showSearch, defaultViewerSettings.showSearch);
+    normalized.showPageControls = coerceBoolean(normalized.showPageControls, defaultViewerSettings.showPageControls);
+    normalized.showPageIndicator = coerceBoolean(normalized.showPageIndicator, defaultViewerSettings.showPageIndicator);
+    normalized.showDownloadButton = coerceBoolean(normalized.showDownloadButton, defaultViewerSettings.showDownloadButton);
+    normalized.showPrintButton = coerceBoolean(normalized.showPrintButton, defaultViewerSettings.showPrintButton);
+    normalized.showFullscreenButton = coerceBoolean(normalized.showFullscreenButton, defaultViewerSettings.showFullscreenButton);
+    normalized.allowDownload = coerceBoolean(normalized.allowDownload, defaultViewerSettings.allowDownload);
+    normalized.allowPrint = coerceBoolean(normalized.allowPrint, defaultViewerSettings.allowPrint);
+    normalized.allowCopy = coerceBoolean(normalized.allowCopy, defaultViewerSettings.allowCopy);
+    normalized.disableTextSelection = coerceBoolean(normalized.disableTextSelection, defaultViewerSettings.disableTextSelection);
+    normalized.disableContextMenu = coerceBoolean(normalized.disableContextMenu, defaultViewerSettings.disableContextMenu);
+    normalized.forceGlobalWatermark = coerceBoolean(normalized.forceGlobalWatermark, defaultViewerSettings.forceGlobalWatermark);
+    normalized.showFileDetails = coerceBoolean(normalized.showFileDetails, defaultViewerSettings.showFileDetails);
+
+    const defaultZoom = coerceNumber(normalized.defaultZoomPercent, defaultViewerSettings.defaultZoomPercent);
+    normalized.defaultZoomPercent = Math.min(Math.max(defaultZoom, 25), 400);
+
+    const zoomStep = coerceNumber(normalized.zoomStepPercent, defaultViewerSettings.zoomStepPercent);
+    normalized.zoomStepPercent = Math.min(Math.max(zoomStep, 5), 50);
+
+    const watermarkFontSize = coerceNumber(normalized.watermarkFontSize, defaultViewerSettings.watermarkFontSize);
+    normalized.watermarkFontSize = Math.min(Math.max(watermarkFontSize, 16), 120);
+
+    const watermarkOpacity = coerceNumber(normalized.watermarkOpacity, defaultViewerSettings.watermarkOpacity);
+    normalized.watermarkOpacity = Math.min(Math.max(watermarkOpacity, 0), 1);
+
+    const maxViewTime = coerceNumber(normalized.maxViewTimeMinutes, defaultViewerSettings.maxViewTimeMinutes);
+    normalized.maxViewTimeMinutes = Math.max(0, Math.round(maxViewTime));
+
+    return normalized;
+}
+
+function normalizeViewerPermissions(raw, settings) {
+    const normalized = { ...defaultViewerPermissions };
+
+    if (settings && typeof settings === 'object') {
+        normalized.toolbarVisible = coerceBoolean(settings.showToolbar, normalized.toolbarVisible);
+        normalized.fileDetailsVisible = coerceBoolean(settings.showFileDetails, normalized.fileDetailsVisible);
+        normalized.searchEnabled = normalized.toolbarVisible && coerceBoolean(settings.showSearch, normalized.searchEnabled);
+        normalized.zoomControlsEnabled = normalized.toolbarVisible && coerceBoolean(settings.showPageControls, normalized.zoomControlsEnabled);
+        normalized.pageIndicatorEnabled = normalized.toolbarVisible && coerceBoolean(settings.showPageIndicator, normalized.pageIndicatorEnabled);
+        const downloadAllowed = coerceBoolean(settings.allowDownload, normalized.downloadAllowed);
+        const printAllowed = coerceBoolean(settings.allowPrint, normalized.printAllowed);
+        const copyAllowed = coerceBoolean(settings.allowCopy, normalized.copyAllowed);
+        normalized.downloadAllowed = downloadAllowed;
+        normalized.printAllowed = printAllowed;
+        normalized.copyAllowed = copyAllowed;
+        normalized.downloadButtonVisible = downloadAllowed && coerceBoolean(settings.showDownloadButton, normalized.downloadButtonVisible);
+        normalized.printButtonVisible = printAllowed && coerceBoolean(settings.showPrintButton, normalized.printButtonVisible);
+        normalized.fullscreenButtonVisible = coerceBoolean(settings.showFullscreenButton, normalized.fullscreenButtonVisible);
+        normalized.contextMenuBlocked = coerceBoolean(settings.disableContextMenu, normalized.contextMenuBlocked);
+        normalized.textSelectionBlocked = coerceBoolean(settings.disableTextSelection, normalized.textSelectionBlocked) || !copyAllowed;
+        normalized.watermarkForced = coerceBoolean(settings.forceGlobalWatermark, normalized.watermarkForced);
+        normalized.defaultZoomPercent = coerceNumber(settings.defaultZoomPercent, normalized.defaultZoomPercent);
+        normalized.zoomStepPercent = coerceNumber(settings.zoomStepPercent, normalized.zoomStepPercent);
+        normalized.maxViewTimeMinutes = coerceNumber(settings.maxViewTimeMinutes, normalized.maxViewTimeMinutes);
+    }
+
+    if (raw && typeof raw === 'object') {
+        for (const [key, value] of Object.entries(raw)) {
+            if (value === undefined || value === null) {
+                continue;
+            }
+
+            const camelKey = toCamelCaseKey(key);
+            switch (camelKey) {
+                case 'toolbarVisible':
+                case 'fileDetailsVisible':
+                case 'searchEnabled':
+                case 'zoomControlsEnabled':
+                case 'pageIndicatorEnabled':
+                case 'downloadButtonVisible':
+                case 'printButtonVisible':
+                case 'fullscreenButtonVisible':
+                case 'downloadAllowed':
+                case 'printAllowed':
+                case 'copyAllowed':
+                case 'contextMenuBlocked':
+                case 'textSelectionBlocked':
+                case 'watermarkForced':
+                    normalized[camelKey] = coerceBoolean(value, normalized[camelKey]);
+                    break;
+                case 'defaultZoomPercent':
+                case 'zoomStepPercent':
+                case 'maxViewTimeMinutes':
+                    normalized[camelKey] = coerceNumber(value, normalized[camelKey]);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    if (!normalized.toolbarVisible) {
+        normalized.searchEnabled = false;
+        normalized.zoomControlsEnabled = false;
+        normalized.pageIndicatorEnabled = false;
+    }
+
+    if (!normalized.downloadAllowed) {
+        normalized.downloadButtonVisible = false;
+    }
+
+    if (!normalized.printAllowed) {
+        normalized.printButtonVisible = false;
+    }
+
+    if (!normalized.copyAllowed) {
+        normalized.textSelectionBlocked = true;
+    }
+
+    normalized.defaultZoomPercent = Math.min(Math.max(normalized.defaultZoomPercent, 25), 400);
+    normalized.zoomStepPercent = Math.min(Math.max(normalized.zoomStepPercent, 5), 50);
+    normalized.maxViewTimeMinutes = Math.max(0, Math.round(normalized.maxViewTimeMinutes || 0));
+
     return normalized;
 }
 
@@ -430,6 +841,80 @@ function toggleSelection(container, disabled) {
     } else {
         container.classList.remove('secure-pdf-no-select');
     }
+}
+
+function updateContainerPolicyAttributes(container, permissions) {
+    if (!container || !permissions) {
+        return;
+    }
+
+    container.dataset.allowDownload = permissions.downloadAllowed ? 'true' : 'false';
+    container.dataset.allowPrint = permissions.printAllowed ? 'true' : 'false';
+    container.dataset.allowCopy = permissions.copyAllowed ? 'true' : 'false';
+    container.dataset.contextMenuBlocked = permissions.contextMenuBlocked ? 'true' : 'false';
+    container.dataset.textSelectionBlocked = permissions.textSelectionBlocked ? 'true' : 'false';
+    container.dataset.toolbarVisible = permissions.toolbarVisible ? 'true' : 'false';
+}
+
+function clearContainerPolicyAttributes(container) {
+    if (!container) {
+        return;
+    }
+
+    delete container.dataset.allowDownload;
+    delete container.dataset.allowPrint;
+    delete container.dataset.allowCopy;
+    delete container.dataset.contextMenuBlocked;
+    delete container.dataset.textSelectionBlocked;
+    delete container.dataset.toolbarVisible;
+}
+
+function clearFrameTextLayers(frameState) {
+    if (!frameState?.pages) {
+        return;
+    }
+
+    for (const pageView of frameState.pages) {
+        if (pageView.renderTask && typeof pageView.renderTask.cancel === 'function') {
+            try { pageView.renderTask.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+            try { pageView.textLayerRender.cancel(); } catch { /* noop */ }
+        }
+
+        if (pageView.textLayerDiv) {
+            try { pageView.textLayerDiv.remove(); } catch { /* noop */ }
+            pageView.textLayerDiv = null;
+        }
+
+        pageView.textLayerRender = null;
+        pageView.textDivs = null;
+        pageView.textContentPromise = null;
+        pageView.searchTextPromise = null;
+    }
+}
+
+function applySelectionState(state) {
+    if (!state) {
+        return;
+    }
+
+    const frameState = pdfFrames.get(state.frameId);
+    if (!frameState) {
+        return;
+    }
+
+    const allowSelection = state.permissions?.copyAllowed && !state.permissions?.textSelectionBlocked;
+    frameState.allowTextSelection = allowSelection;
+
+    if (!allowSelection) {
+        clearFrameTextLayers(frameState);
+        clearSelectionWithin(state.container || frameState.container);
+        return;
+    }
+
+    scheduleRenderAllPages(frameState);
 }
 
 function clearSelectionWithin(container, targetDocument = document) {
@@ -508,23 +993,30 @@ async function renderPageView(frameState, pageView, scale) {
         } catch { /* noop */ }
     }
 
+    if (pageView.textLayerRender && typeof pageView.textLayerRender.cancel === 'function') {
+        try {
+            pageView.textLayerRender.cancel();
+        } catch { /* noop */ }
+    }
+
     try {
         const pdfPage = await frameState.pdfDoc.getPage(pageView.pageNumber);
         const viewport = pdfPage.getViewport({ scale });
+        const outputScale = window.devicePixelRatio || 1;
+        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
+
         const canvas = pageView.canvas;
         const context = canvas.getContext('2d', { alpha: false });
         if (!context) {
             console.warn('No se pudo obtener el contexto del lienzo del visor seguro');
             return;
         }
-        const outputScale = window.devicePixelRatio || 1;
-        const renderViewport = pdfPage.getViewport({ scale: scale * outputScale });
 
         canvas.width = Math.floor(renderViewport.width);
         canvas.height = Math.floor(renderViewport.height);
         canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
         canvas.style.maxWidth = '100%';
-        canvas.style.height = 'auto';
         pageView.element.style.width = '100%';
         pageView.element.style.height = 'auto';
 
@@ -537,8 +1029,62 @@ async function renderPageView(frameState, pageView, scale) {
         await renderTask.promise;
         pageView.viewport = viewport;
 
-        if (!pageView.textPromise) {
-            pageView.textPromise = pdfPage.getTextContent({ normalizeWhitespace: true })
+        const allowTextSelection = frameState.allowTextSelection === true;
+
+        if (allowTextSelection) {
+            if (!pageView.textLayerDiv) {
+                const layer = document.createElement('div');
+                layer.className = 'secure-pdf-text-layer';
+                pageView.element.appendChild(layer);
+                pageView.textLayerDiv = layer;
+            }
+
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            const textContent = await textContentPromise.catch((err) => {
+                console.warn('No se pudo obtener el contenido de texto seguro', err);
+                return null;
+            });
+
+            if (textContent && frameState.pdfjsLib?.renderTextLayer) {
+                pageView.textLayerDiv.innerHTML = '';
+                const textDivs = [];
+                const textLayerRender = frameState.pdfjsLib.renderTextLayer({
+                    textContent,
+                    container: pageView.textLayerDiv,
+                    viewport,
+                    textDivs,
+                    enhanceTextSelection: true
+                });
+
+                pageView.textDivs = textDivs;
+                pageView.textLayerRender = textLayerRender;
+
+                try {
+                    await textLayerRender.promise;
+                } catch (err) {
+                    if (err?.name !== 'RenderingCancelledException') {
+                        console.warn('No se pudo renderizar la capa de texto segura', err);
+                    }
+                }
+            }
+        } else {
+            if (pageView.textLayerDiv) {
+                pageView.textLayerDiv.remove();
+                pageView.textLayerDiv = null;
+            }
+            pageView.textDivs = null;
+            pageView.textLayerRender = null;
+        }
+
+        if (!pageView.searchTextPromise) {
+            const textContentPromise = pageView.textContentPromise
+                ?? pdfPage.getTextContent({ normalizeWhitespace: true });
+            pageView.textContentPromise = textContentPromise;
+
+            pageView.searchTextPromise = textContentPromise
                 .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
                 .catch((err) => {
                     console.warn('No se pudo obtener el texto de la página segura', err);
@@ -591,9 +1137,14 @@ async function resolvePageText(frameState, pageView) {
         return '';
     }
 
-    if (!pageView.textPromise) {
-        pageView.textPromise = frameState.pdfDoc.getPage(pageView.pageNumber)
-            .then((page) => page.getTextContent({ normalizeWhitespace: true }))
+    if (!pageView.searchTextPromise) {
+        const textContentPromise = pageView.textContentPromise
+            ?? frameState.pdfDoc.getPage(pageView.pageNumber)
+                .then((page) => page.getTextContent({ normalizeWhitespace: true }));
+
+        pageView.textContentPromise = textContentPromise;
+
+        pageView.searchTextPromise = textContentPromise
             .then((content) => content.items.map((item) => item.str).join(' ').toLowerCase())
             .catch((err) => {
                 console.warn('No se pudo obtener el texto de la página segura', err);
@@ -602,7 +1153,7 @@ async function resolvePageText(frameState, pageView) {
     }
 
     try {
-        return await pageView.textPromise;
+        return await pageView.searchTextPromise;
     } catch (err) {
         console.warn('Error recuperando texto de página segura', err);
         return '';
@@ -719,12 +1270,14 @@ function setupToolbar(state, container, toolbarElement, options) {
     }
 
     const settings = state.settings;
+    const permissions = state.permissions;
     toolbarElement.innerHTML = '';
     toolbarElement.classList.add('secure-toolbar');
     toolbarElement.dataset.position = settings.toolbarPosition;
     state.pageIndicator = null;
+    state.zoomLabel = null;
 
-    if (!settings.showToolbar) {
+    if (!permissions.toolbarVisible) {
         toolbarElement.style.display = 'none';
         return;
     }
@@ -741,7 +1294,7 @@ function setupToolbar(state, container, toolbarElement, options) {
     title.textContent = options.fileName || 'Documento protegido';
     leftGroup.appendChild(title);
 
-    if (settings.showPageIndicator) {
+    if (permissions.pageIndicatorEnabled) {
         const indicator = document.createElement('span');
         indicator.className = 'secure-toolbar-page-indicator';
         indicator.textContent = 'Pág. --';
@@ -749,7 +1302,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         state.pageIndicator = indicator;
     }
 
-    if (settings.showPageControls) {
+    if (permissions.zoomControlsEnabled) {
         const zoomGroup = document.createElement('div');
         zoomGroup.className = 'secure-toolbar-group secure-toolbar-zoom-group';
 
@@ -785,7 +1338,7 @@ function setupToolbar(state, container, toolbarElement, options) {
     const rightGroup = document.createElement('div');
     rightGroup.className = 'secure-toolbar-group secure-toolbar-group-right';
 
-    if (settings.showSearch) {
+    if (permissions.searchEnabled) {
         const searchForm = document.createElement('form');
         searchForm.className = 'secure-toolbar-search';
         const input = document.createElement('input');
@@ -806,19 +1359,19 @@ function setupToolbar(state, container, toolbarElement, options) {
         rightGroup.appendChild(searchForm);
     }
 
-    if (settings.showDownloadButton && settings.allowDownload) {
+    if (permissions.downloadButtonVisible && permissions.downloadAllowed) {
         const downloadButton = createToolbarButton('fas fa-download', 'Descargar PDF', () => {
             const frame = pdfFrames.get(state.frameId);
             if (!frame?.base64) {
                 return;
             }
             sendEvent(state, 'ToolbarDownload');
-            downloadFile(frame.fileName, frame.base64);
+            downloadFile(frame.fileName, frame.base64, { state });
         });
         rightGroup.appendChild(downloadButton);
     }
 
-    if (settings.showPrintButton && settings.allowPrint) {
+    if (permissions.printButtonVisible && permissions.printAllowed) {
         const printButton = createToolbarButton('fas fa-print', 'Imprimir', () => {
             const frame = pdfFrames.get(state.frameId);
             sendEvent(state, 'ToolbarPrint');
@@ -868,7 +1421,7 @@ function setupToolbar(state, container, toolbarElement, options) {
         rightGroup.appendChild(printButton);
     }
 
-    if (settings.showFullscreenButton) {
+    if (permissions.fullscreenButtonVisible) {
         const fullscreenButton = createToolbarButton('fas fa-expand', 'Pantalla completa', () => {
             sendEvent(state, 'ToolbarFullscreen');
             enterFullscreen(container);
@@ -887,8 +1440,11 @@ function setupToolbar(state, container, toolbarElement, options) {
 
 function createState(sessionId, options, container) {
     const settings = normalizeViewerSettings(options.settings);
-    const defaultZoom = Math.max(settings.defaultZoomPercent / 100, 0.25);
-    const zoomStep = Math.max(settings.zoomStepPercent / 100, 0.05);
+    const permissions = normalizeViewerPermissions(options.policy, settings);
+    const defaultZoomPercent = permissions.defaultZoomPercent ?? settings.defaultZoomPercent;
+    const zoomStepPercent = permissions.zoomStepPercent ?? settings.zoomStepPercent;
+    const defaultZoom = Math.max(defaultZoomPercent / 100, 0.25);
+    const zoomStep = Math.max(zoomStepPercent / 100, 0.05);
 
     return {
         dotNetRef: options.dotNetRef,
@@ -901,11 +1457,13 @@ function createState(sessionId, options, container) {
         watermarkOptions: { text: null, style: null },
         lastReportedPage: null,
         hasInitialPageReport: false,
+        documentReadyReported: false,
         awaitingFrame: false,
         container,
         toolbarElement: options.toolbarId ? document.getElementById(options.toolbarId) : null,
         customStyleElement: null,
         settings,
+        permissions,
         defaultZoom,
         zoomStep,
         currentZoom: defaultZoom,
@@ -913,8 +1471,10 @@ function createState(sessionId, options, container) {
         zoomLabel: null,
         pageIndicator: null,
         currentPage: null,
-        disableContextMenu: false,
-        devToolsFlagged: false
+        disableContextMenu: permissions.contextMenuBlocked,
+        devToolsFlagged: false,
+        lastPrintAttemptAt: 0,
+        lastDownloadAttemptAt: 0
     };
 }
 
@@ -927,8 +1487,20 @@ function ensureWatermarkHost(frameState) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
         overlay.style.pointerEvents = 'none';
+        if (!Array.isArray(frameState.cleanupCallbacks)) {
+            frameState.cleanupCallbacks = [];
+        }
+
+        const contextGuard = (event) => {
+            const frameId = frameState.container?.id;
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        frameState.cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
         frameState.viewport.appendChild(overlay);
         frameState.overlay = overlay;
     }
@@ -957,17 +1529,21 @@ function initSecurePdfViewer(elementId, options) {
 
     const state = createState(sessionId, options, container);
     const settings = state.settings;
+    const permissions = state.permissions;
     state.dotNetRef = options.dotNetRef;
 
     sessions.set(sessionId, state);
+    updateGlobalPolicyGuards();
 
     container.setAttribute('data-secure-viewer', 'true');
+    updateContainerPolicyAttributes(container, permissions);
     applyViewerTheme(container, settings);
-    toggleSelection(container, settings.disableTextSelection);
+    toggleSelection(container, permissions.textSelectionBlocked);
+    applySelectionState(state);
 
     registerHandler(state, container, 'dragstart', (e) => e.preventDefault());
 
-    if (settings.disableTextSelection) {
+    if (permissions.textSelectionBlocked) {
         const selectionHandler = () => clearSelectionWithin(container);
         registerHandler(state, document, 'selectionchange', selectionHandler, true);
         registerHandler(state, container, 'mouseup', selectionHandler, true);
@@ -978,6 +1554,9 @@ function initSecurePdfViewer(elementId, options) {
         style: options.watermarkStyle
     };
     const frameState = pdfFrames.get(state.frameId);
+    if (frameState && !permissions.downloadAllowed) {
+        frameState.base64 = null;
+    }
     state.watermarkHost = ensureWatermarkHost(frameState);
     const watermarkTarget = state.watermarkHost || container;
     state.watermarkElement = buildWatermark(watermarkTarget, state.watermarkOptions.text, state.watermarkOptions.style);
@@ -996,9 +1575,23 @@ function initSecurePdfViewer(elementId, options) {
         if (state.watermarkElement && state.watermarkHost) {
             state.watermarkHost.appendChild(state.watermarkElement);
         }
+        ensureDocumentReady(state, frameState);
     }
 
-    state.disableContextMenu = options.disableContextMenu || settings.disableContextMenu;
+    state.disableContextMenu = options.disableContextMenu || permissions.contextMenuBlocked;
+    if (container) {
+        container.dataset.contextMenuBlocked = state.disableContextMenu ? 'true' : 'false';
+    }
+
+    if (typeof window !== 'undefined' && !permissions.printAllowed) {
+        registerHandler(state, window, 'beforeprint', () => {
+            reportPrintAttempt(state);
+        });
+        registerHandler(state, window, 'afterprint', () => {
+            // Reenfoca para evitar vistas persistentes tras intento bloqueado.
+            try { window.focus(); } catch { /* noop */ }
+        });
+    }
 
     const contextMenuHandler = (event) => {
         if (!container) {
@@ -1035,29 +1628,29 @@ function initSecurePdfViewer(elementId, options) {
         }
     }
 
-    registerHandler(state, document, 'keydown', (e) => {
+    const keydownHandler = (e) => {
         const key = e.key.toLowerCase();
         const meta = e.metaKey || e.ctrlKey;
         if (key === 'printscreen') {
             notifyScreenshotAttempt(state, 'KeyDown');
         }
 
-        if (meta && key === 'p' && !settings.allowPrint) {
+        if (meta && key === 'p' && !permissions.printAllowed) {
             e.preventDefault();
-            sendEvent(state, 'PrintAttempt');
+            reportPrintAttempt(state);
         }
 
-        if (meta && key === 's' && !settings.allowDownload) {
+        if (meta && key === 's' && !permissions.downloadAllowed) {
             e.preventDefault();
-            sendEvent(state, 'DownloadAttempt');
+            reportDownloadAttempt(state);
         }
 
         if ((e.metaKey && e.shiftKey && (key === '3' || key === '4')) || (e.ctrlKey && e.altKey && key === 'printscreen')) {
             notifyScreenshotAttempt(state, 'SystemCaptureShortcut');
         }
-    }, true);
+    };
 
-    registerHandler(state, document, 'keyup', (e) => {
+    const keyupHandler = (e) => {
         const key = e.key.toLowerCase();
         if (key === 'printscreen') {
             notifyScreenshotAttempt(state, 'KeyUp');
@@ -1066,7 +1659,15 @@ function initSecurePdfViewer(elementId, options) {
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 's') {
             notifyScreenshotAttempt(state, 'SnippingShortcut');
         }
-    }, true);
+    };
+
+    if (typeof window !== 'undefined') {
+        registerHandler(state, window, 'keydown', keydownHandler, true);
+        registerHandler(state, window, 'keyup', keyupHandler, true);
+    } else {
+        registerHandler(state, document, 'keydown', keydownHandler, true);
+        registerHandler(state, document, 'keyup', keyupHandler, true);
+    }
 
     registerHandler(state, window, 'blur', () => {
         sendEvent(state, 'WindowBlur');
@@ -1076,7 +1677,7 @@ function initSecurePdfViewer(elementId, options) {
         sendEvent(state, 'WindowFocus');
     });
 
-    if (!settings.allowCopy) {
+    if (!permissions.copyAllowed) {
         registerHandler(state, document, 'copy', (e) => {
             e.preventDefault();
             sendEvent(state, 'CopyAttempt');
@@ -1126,6 +1727,7 @@ function initSecurePdfViewer(elementId, options) {
         setupToolbar(state, container, state.toolbarElement, options);
     }
 
+    ensureTrackingForFrame(state.frameId);
     ensurePageTracking(state);
 }
 
@@ -1134,6 +1736,19 @@ async function disposePdfFrame(frameId) {
     pdfFrames.delete(frameId);
 
     if (frameState) {
+        clearFrameTextLayers(frameState);
+
+        if (Array.isArray(frameState.cleanupCallbacks)) {
+            for (const cleanup of frameState.cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (err) {
+                    console.warn('No se pudo limpiar un manejador del marco seguro', err);
+                }
+            }
+            frameState.cleanupCallbacks.length = 0;
+        }
+
         try {
             if (frameState.pdfDoc && typeof frameState.pdfDoc.destroy === 'function') {
                 await frameState.pdfDoc.destroy();
@@ -1142,6 +1757,15 @@ async function disposePdfFrame(frameId) {
             }
         } catch (err) {
             console.warn('No se pudo liberar recursos del PDF seguro', err);
+        }
+
+        if (frameState.objectUrl) {
+            try {
+                URL.revokeObjectURL(frameState.objectUrl);
+            } catch (err) {
+                console.warn('No se pudo liberar el blob del visor seguro', err);
+            }
+            frameState.objectUrl = null;
         }
     }
 
@@ -1178,9 +1802,15 @@ async function renderPdf(frameId, base64Data, fileName) {
     loadingIndicator.textContent = 'Cargando documento seguro…';
     frame.appendChild(loadingIndicator);
 
+    let objectUrl = null;
+    let frameStateCreated = false;
+    const cleanupCallbacks = [];
+
     try {
         const pdfjsLib = await ensurePdfJsLibrary();
         const pdfBytes = base64ToUint8Array(base64Data);
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
         const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
         const pdfDoc = await loadingTask.promise;
 
@@ -1188,7 +1818,6 @@ async function renderPdf(frameId, base64Data, fileName) {
 
         const viewport = document.createElement('div');
         viewport.className = 'secure-pdf-viewport';
-        viewport.addEventListener('contextmenu', (evt) => evt.preventDefault(), true);
 
         const iframe = document.createElement('iframe');
         let sandboxed = true;
@@ -1248,7 +1877,17 @@ async function renderPdf(frameId, base64Data, fileName) {
         const overlay = document.createElement('div');
         overlay.className = 'secure-pdf-overlay';
         overlay.setAttribute('aria-hidden', 'true');
-        overlay.addEventListener('contextmenu', (event) => event.preventDefault(), true);
+
+        const contextGuard = (event) => {
+            if (frameRequiresContextMenuBlock(frameId)) {
+                event.preventDefault();
+            }
+        };
+
+        viewport.addEventListener('contextmenu', contextGuard, true);
+        overlay.addEventListener('contextmenu', contextGuard, true);
+        cleanupCallbacks.push(() => viewport.removeEventListener('contextmenu', contextGuard, true));
+        cleanupCallbacks.push(() => overlay.removeEventListener('contextmenu', contextGuard, true));
 
         const watermarkLayer = document.createElement('div');
         watermarkLayer.className = 'secure-pdf-watermark-layer';
@@ -1263,6 +1902,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             pagesHost,
             pages: [],
             pdfDoc,
+            pdfjsLib,
             loadingTask,
             scale: 1,
             base64: base64Data,
@@ -1270,7 +1910,10 @@ async function renderPdf(frameId, base64Data, fileName) {
             fileName,
             overlay,
             watermarkLayer,
-            renderScheduled: false
+            objectUrl,
+            renderScheduled: false,
+            cleanupCallbacks,
+            allowTextSelection: frameAllowsTextSelection(frameId)
         };
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
@@ -1289,11 +1932,17 @@ async function renderPdf(frameId, base64Data, fileName) {
                 canvas,
                 viewport: null,
                 renderTask: null,
-                textPromise: null
+                textLayerDiv: null,
+                textLayerRender: null,
+                textDivs: null,
+                textContentPromise: null,
+                searchTextPromise: null
             });
         }
 
         pdfFrames.set(frameId, frameState);
+
+        frameStateCreated = true;
 
         let initialScale = 1;
         forEachSessionByFrame(frameId, (state) => {
@@ -1303,8 +1952,8 @@ async function renderPdf(frameId, base64Data, fileName) {
                 state.watermarkElement.remove();
             }
 
-            const desiredText = state.settings?.forceGlobalWatermark
-                ? state.settings.globalWatermarkText
+            const desiredText = state.permissions?.watermarkForced
+                ? (state.settings?.globalWatermarkText || state.watermarkOptions?.text)
                 : state.watermarkOptions?.text;
 
             const desiredStyle = state.watermarkOptions?.style || (state.settings ? {
@@ -1316,7 +1965,7 @@ async function renderPdf(frameId, base64Data, fileName) {
             state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);
 
             initialScale = state.currentZoom ?? state.defaultZoom ?? initialScale;
-            sendEvent(state, 'DocumentReady', null, { pageCount: pdfDoc.numPages });
+            ensureDocumentReady(state, currentFrameState);
         });
 
         frameState.scale = initialScale;
@@ -1332,6 +1981,23 @@ async function renderPdf(frameId, base64Data, fileName) {
         forEachSessionByFrame(frameId, (state) => {
             sendEvent(state, 'DocumentError', null, { message: err?.message || 'RenderFailed' });
         });
+        if (cleanupCallbacks.length) {
+            for (const cleanup of cleanupCallbacks) {
+                try {
+                    cleanup();
+                } catch (cleanupErr) {
+                    console.warn('No se pudo limpiar un recurso del visor seguro tras un error', cleanupErr);
+                }
+            }
+            cleanupCallbacks.length = 0;
+        }
+        if (!frameStateCreated && objectUrl) {
+            try {
+                URL.revokeObjectURL(objectUrl);
+            } catch (revokeErr) {
+                console.warn('No se pudo liberar el blob del visor seguro', revokeErr);
+            }
+        }
         throw err;
     }
 }
@@ -1370,9 +2036,11 @@ function disposeSecurePdfViewer(sessionId) {
     }
 
     clearViewerTheme(state.container);
+    clearContainerPolicyAttributes(state.container);
     toggleSelection(state.container, false);
 
     sessions.delete(sessionId);
+    updateGlobalPolicyGuards();
 }
 
 function notifyPdfPage(sessionId, pageNumber) {
@@ -1388,7 +2056,14 @@ function notifyPdfPage(sessionId, pageNumber) {
     sendEvent(state, 'PageView', pageNumber, { pageNumber });
 }
 
-function downloadFile(fileName, base64Data) {
+function downloadFile(fileName, base64Data, options) {
+    const targetState = options && typeof options === 'object' ? options.state : null;
+
+    if (targetState && (!targetState.permissions || !targetState.permissions.downloadAllowed)) {
+        reportDownloadAttempt(targetState);
+        return;
+    }
+
     const link = document.createElement('a');
     link.href = `data:application/octet-stream;base64,${base64Data}`;
     link.download = fileName || 'archivo';
