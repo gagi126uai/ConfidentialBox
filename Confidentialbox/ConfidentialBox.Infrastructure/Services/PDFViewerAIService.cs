@@ -9,6 +9,7 @@ public class PDFViewerAIService : IPDFViewerAIService
 {
     private readonly ApplicationDbContext _context;
     private readonly IAISecurityService _aiSecurityService;
+    private readonly ISecurePdfSessionPolicyStore _policyStore;
 
     // Umbrales de detección
     private const int MAX_SCREENSHOT_ATTEMPTS = 3;
@@ -17,10 +18,11 @@ public class PDFViewerAIService : IPDFViewerAIService
     private const double SUSPICIOUS_SCORE_THRESHOLD = 0.6;
     private const double BLOCK_SCORE_THRESHOLD = 0.8;
 
-    public PDFViewerAIService(ApplicationDbContext context, IAISecurityService aiSecurityService)
+    public PDFViewerAIService(ApplicationDbContext context, IAISecurityService aiSecurityService, ISecurePdfSessionPolicyStore policyStore)
     {
         _context = context;
         _aiSecurityService = aiSecurityService;
+        _policyStore = policyStore;
     }
 
     public async Task<PDFViewerSession> StartSessionAsync(SharedFile file, string? userId, string ipAddress, string userAgent)
@@ -50,20 +52,30 @@ public class PDFViewerAIService : IPDFViewerAIService
         if (session == null || session.WasBlocked)
             return;
 
+        var rawEventType = string.IsNullOrWhiteSpace(eventType) ? "Unknown" : eventType;
+        var eventKey = rawEventType.Trim().ToLowerInvariant();
+
+        _policyStore.TryGet(sessionId, out var policy);
+        var policySettings = policy?.Settings;
+        var allowPrint = policySettings?.AllowPrint ?? true;
+        var allowDownload = policySettings?.AllowDownload ?? true;
+        var allowCopy = policySettings?.AllowCopy ?? true;
+        var blockContextMenu = policySettings?.DisableContextMenu ?? false;
+
         // Crear evento
         var viewerEvent = new PDFViewerEvent
         {
             SessionId = session.Id,
-            EventType = eventType,
+            EventType = rawEventType,
             Timestamp = DateTime.UtcNow,
             PageNumber = pageNumber,
             EventData = eventData ?? "{}"
         };
 
         // Actualizar contadores según el tipo de evento
-        switch (eventType)
+        switch (eventKey)
         {
-            case "ScreenshotAttempt":
+            case "screenshotattempt":
                 session.ScreenshotAttempts++;
                 if (session.ScreenshotAttempts >= MAX_SCREENSHOT_ATTEMPTS)
                 {
@@ -72,8 +84,13 @@ public class PDFViewerAIService : IPDFViewerAIService
                 }
                 break;
 
-            case "PrintAttempt":
+            case "printattempt":
+            case "toolbarprint":
                 session.PrintAttempts++;
+                if (!allowPrint)
+                {
+                    viewerEvent.WasBlocked = true;
+                }
                 if (session.PrintAttempts >= MAX_PRINT_ATTEMPTS)
                 {
                     await BlockSessionAsync(session, "Múltiples intentos de impresión detectados");
@@ -81,13 +98,21 @@ public class PDFViewerAIService : IPDFViewerAIService
                 }
                 break;
 
-            case "CopyAttempt":
+            case "copyattempt":
                 session.CopyAttempts++;
+                if (!allowCopy)
+                {
+                    viewerEvent.WasBlocked = true;
+                }
                 break;
 
-            case "ClipboardCopy":
+            case "clipboardcopy":
                 session.CopyAttempts++;
                 session.ClipboardEvents++;
+                if (!allowCopy)
+                {
+                    viewerEvent.WasBlocked = true;
+                }
                 if (session.ClipboardEvents >= 5)
                 {
                     await BlockSessionAsync(session, "Copiado recurrente detectado por IA");
@@ -95,7 +120,15 @@ public class PDFViewerAIService : IPDFViewerAIService
                 }
                 break;
 
-            case "PageView":
+            case "downloadattempt":
+            case "toolbardownload":
+                if (!allowDownload)
+                {
+                    viewerEvent.WasBlocked = true;
+                }
+                break;
+
+            case "pageview":
                 session.PageViewCount++;
                 session.CurrentPage = pageNumber ?? 1;
 
@@ -117,7 +150,7 @@ public class PDFViewerAIService : IPDFViewerAIService
                 }
                 break;
 
-            case "VisibilityHidden":
+            case "visibilityhidden":
                 session.VisibilityLossEvents++;
                 if (session.VisibilityLossEvents >= 6)
                 {
@@ -126,15 +159,22 @@ public class PDFViewerAIService : IPDFViewerAIService
                 }
                 break;
 
-            case "WindowBlur":
+            case "windowblur":
                 session.WindowBlurEvents++;
                 break;
 
-            case "FullscreenExit":
+            case "fullscreenexit":
                 session.FullscreenExitEvents++;
                 if (session.FullscreenExitEvents >= 3)
                 {
                     await BlockSessionAsync(session, "Salidas de pantalla completa sospechosas");
+                    viewerEvent.WasBlocked = true;
+                }
+                break;
+
+            case "contextmenuopened":
+                if (blockContextMenu)
+                {
                     viewerEvent.WasBlocked = true;
                 }
                 break;
@@ -220,6 +260,8 @@ public class PDFViewerAIService : IPDFViewerAIService
 
             await _context.SaveChangesAsync();
         }
+
+        _policyStore.Remove(sessionId);
     }
 
     public async Task<double> CalculateSuspicionScoreAsync(PDFViewerSession session)
@@ -297,6 +339,7 @@ public class PDFViewerAIService : IPDFViewerAIService
         session.BlockReason = reason;
         session.BlockedAt = DateTime.UtcNow;
         session.IsSuspicious = true;
+        _policyStore.Remove(session.SessionId);
 
         // Crear alerta crítica
         var alert = new SecurityAlert
