@@ -100,10 +100,19 @@ function frameRequiresContextMenuBlock(frameId) {
         return false;
     }
 
+    let hasSessionForFrame = false;
+
     for (const state of sessions.values()) {
-        if (state.frameId === frameId && state.disableContextMenu) {
-            return true;
+        if (state.frameId === frameId) {
+            hasSessionForFrame = true;
+            if (state.disableContextMenu) {
+                return true;
+            }
         }
+    }
+
+    if (!hasSessionForFrame) {
+        return true;
     }
 
     return false;
@@ -1043,7 +1052,7 @@ function createState(sessionId, options, container) {
         zoomLabel: null,
         pageIndicator: null,
         currentPage: null,
-        disableContextMenu: false,
+        disableContextMenu: true,
         devToolsFlagged: false
     };
 }
