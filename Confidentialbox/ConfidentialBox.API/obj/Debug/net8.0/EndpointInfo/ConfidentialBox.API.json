@@ -5080,6 +5080,69 @@
           },
           "viewerSettings": {
             "$ref": "#/components/schemas/PDFViewerSettingsDto"
+          },
+          "effectivePermissions": {
+            "$ref": "#/components/schemas/PDFViewerPermissionsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PDFViewerPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "toolbarVisible": {
+            "type": "boolean"
+          },
+          "fileDetailsVisible": {
+            "type": "boolean"
+          },
+          "searchEnabled": {
+            "type": "boolean"
+          },
+          "zoomControlsEnabled": {
+            "type": "boolean"
+          },
+          "pageIndicatorEnabled": {
+            "type": "boolean"
+          },
+          "downloadButtonVisible": {
+            "type": "boolean"
+          },
+          "printButtonVisible": {
+            "type": "boolean"
+          },
+          "fullscreenButtonVisible": {
+            "type": "boolean"
+          },
+          "downloadAllowed": {
+            "type": "boolean"
+          },
+          "printAllowed": {
+            "type": "boolean"
+          },
+          "copyAllowed": {
+            "type": "boolean"
+          },
+          "contextMenuBlocked": {
+            "type": "boolean"
+          },
+          "textSelectionBlocked": {
+            "type": "boolean"
+          },
+          "watermarkForced": {
+            "type": "boolean"
+          },
+          "defaultZoomPercent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "zoomStepPercent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxViewTimeMinutes": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

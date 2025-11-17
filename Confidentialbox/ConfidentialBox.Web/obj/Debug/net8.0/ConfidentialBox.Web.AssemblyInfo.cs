@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ConfidentialBox.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9b732b814c4579a8c60e4a7861b31ca0c95d94d7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dcaf780047db6f4e98266874e7fa64071aebbc85")]
 [assembly: System.Reflection.AssemblyProductAttribute("ConfidentialBox.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ConfidentialBox.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

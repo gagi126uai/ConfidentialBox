@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ConfidentialBox.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dd864f6573752ff92123ff5475cab1b7c002541d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+746ab1fc4ba1687d90b70e2cf4bc327e0eb7a82c")]
 [assembly: System.Reflection.AssemblyProductAttribute("ConfidentialBox.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ConfidentialBox.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
