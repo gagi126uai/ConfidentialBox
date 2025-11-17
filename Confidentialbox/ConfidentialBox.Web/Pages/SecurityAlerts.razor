@@ -242,6 +242,7 @@
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
                                 <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
                             </div>
                         </div>
 
@@ -324,7 +325,7 @@
                                 <div class="mt-4">
                                     <h6 class="fw-semibold mb-2">Centro de acciones (modo tickets)</h6>
                                     <p class="text-muted small mb-3">Activa o combina acciones y deja trazabilidad clara para el equipo SOC.</p>
-                                    <div class="row row-cols-1 row-cols-lg-2 g-3 mb-3">
+                                    <div class="row row-cols-1 row-cols-lg-3 g-3 mb-3">
                                         <div class="col">
                                             <div class="border rounded p-3 h-100">
                                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -343,6 +344,27 @@
                                                 {
                                                     <InputTextArea class="form-control mb-2" @bind-Value="blockUserNotes" rows="2" placeholder="Detalle para la auditoría" />
                                                     <small class="text-muted">Se actualizará el estado a Escalada.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-dark mb-1"><i class="fas fa-key me-1"></i>Sesiones</span>
+                                                        <h6 class="mb-0">Revocar sesiones activas</h6>
+                                                        <small class="text-muted">Cierra sesiones y limpia tokens del usuario.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(revokeSessionsAction ? "btn-dark" : "btn-outline-dark")" @onclick="TriggerRevokeSessions"><i class="fas fa-door-closed"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="revokeSessionsCheck" @bind-Value="revokeSessionsAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="revokeSessionsCheck">Cerrar sesiones y revocar tokens</label>
+                                                </div>
+                                                @if (revokeSessionsAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="revokeSessionNotes" rows="2" placeholder="Contexto para el cierre de sesión" />
+                                                    <small class="text-muted">Incluye la caducidad de tokens sincronizada con bloqueo.</small>
                                                 }
                                             </div>
                                         </div>
@@ -410,6 +432,90 @@
                                                 <label class="form-label">Mensaje interno al usuario</label>
                                                 <InputTextArea class="form-control" @bind-Value="chatMessage" rows="2" placeholder="Consulta o aviso para el usuario (opcional)" />
                                                 <small class="text-muted">Se deja como ticket y se envía a través del canal interno.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-primary mb-1"><i class="fas fa-fingerprint me-1"></i>Identidad</span>
+                                                        <h6 class="mb-0">Forzar MFA + reset</h6>
+                                                        <small class="text-muted">Solicita MFA inmediato y reinicio de clave.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(forceMfaAction ? "btn-primary" : "btn-outline-primary")" @onclick="TriggerForceMfa"><i class="fas fa-lock"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="forceMfaCheck" @bind-Value="forceMfaAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="forceMfaCheck">Forzar reautenticación segura</label>
+                                                </div>
+                                                @if (forceMfaAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="forceMfaNotes" placeholder="Mensaje para el usuario / auditoría" />
+                                                    <small class="text-muted">Acción combinada: MFA + reset de contraseña + cierre de sesiones persistentes.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-secondary mb-1"><i class="fas fa-link-slash me-1"></i>Compartición</span>
+                                                        <h6 class="mb-0">Purgar enlaces y accesos</h6>
+                                                        <small class="text-muted">Revoca enlaces compartidos del archivo.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(purgeShareLinksAction ? "btn-secondary" : "btn-outline-secondary")" @onclick="TriggerPurgeLinks" disabled="@(selectedAlert.FileId is null)"><i class="fas fa-scissors"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="purgeLinksCheck" @bind-Value="purgeShareLinksAction" disabled="@(selectedAlert.FileId is null)" />
+                                                    <label class="form-check-label" for="purgeLinksCheck">Eliminar enlaces públicos y revocar compartidos</label>
+                                                </div>
+                                                @if (purgeShareLinksAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="purgeLinksNotes" placeholder="Notas de purga" />
+                                                    <small class="text-muted">Se documenta en el ticket como limpieza de exposición.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-info text-dark mb-1"><i class="fas fa-eye me-1"></i>Seguimiento</span>
+                                                        <h6 class="mb-0">Lista de observación</h6>
+                                                        <small class="text-muted">Suma al usuario a la watchlist con caducidad.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(watchlistAction ? "btn-info" : "btn-outline-info") text-dark" @onclick="TriggerWatchlist"><i class="fas fa-user-secret"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="watchlistCheck" @bind-Value="watchlistAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="watchlistCheck">Añadir a observación reforzada</label>
+                                                </div>
+                                                @if (watchlistAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="watchlistReason" placeholder="Motivo / duración" />
+                                                    <small class="text-muted">Ideal para reincidencias o actividad lateral sospechosa.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-success mb-1"><i class="fas fa-shield-halved me-1"></i>Evidencia</span>
+                                                        <h6 class="mb-0">Preservar evidencia</h6>
+                                                        <small class="text-muted">Activa snapshot y retención para forense.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(preserveEvidenceAction ? "btn-success" : "btn-outline-success")" @onclick="TriggerPreserveEvidence"><i class="fas fa-hard-drive"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="preserveEvidenceCheck" @bind-Value="preserveEvidenceAction" />
+                                                    <label class="form-check-label" for="preserveEvidenceCheck">Solicitar retención de evidencia</label>
+                                                </div>
+                                                @if (preserveEvidenceAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="preserveEvidenceNotes" rows="2" placeholder="Qué preservar y por cuánto tiempo" />
+                                                    <small class="text-muted">Genera ticket de cadena de custodia en el backend.</small>
+                                                }
                                             </div>
                                         </div>
                                     </div>
@@ -516,10 +622,20 @@
     private bool blockFileAction;
     private bool blockUserAction;
     private bool escalateMonitoring;
+    private bool revokeSessionsAction;
+    private bool forceMfaAction;
+    private bool purgeShareLinksAction;
+    private bool watchlistAction;
+    private bool preserveEvidenceAction;
     private int? monitoringLevel;
     private string? blockFileNotes;
     private string? blockUserNotes;
     private string? escalationNotes;
+    private string? revokeSessionNotes;
+    private string? forceMfaNotes;
+    private string? purgeLinksNotes;
+    private string? watchlistReason;
+    private string? preserveEvidenceNotes;
     private string? chatMessage;
     private string? reviewError;
 
@@ -684,10 +800,20 @@
         blockFileAction = false;
         blockUserAction = false;
         escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
         blockUserNotes = null;
         escalationNotes = null;
+        revokeSessionNotes = null;
+        forceMfaNotes = null;
+        purgeLinksNotes = null;
+        watchlistReason = null;
+        preserveEvidenceNotes = null;
         chatMessage = null;
         reviewError = null;
         showReviewModal = true;
@@ -819,6 +945,23 @@
                 MarkAsFalsePositive();
                 reviewNotes = reviewNotes ?? "Marcado como falso positivo después de revisión";
                 break;
+
+            case "lockdown":
+                blockUserAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                blockFileAction = selectedAlert?.FileId != null;
+                revokeSessionsAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                forceMfaAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                purgeShareLinksAction = selectedAlert?.FileId != null;
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Modo contención activado";
+                actionTaken = "Bloqueo inmediato + purga de sesiones y enlaces";
+                blockUserNotes = "Cuenta bloqueada y sesiones revocadas desde el dashboard";
+                blockFileNotes = "Archivo aislado y enlaces eliminados";
+                revokeSessionNotes = "Revocación forzada por incidente crítico";
+                purgeLinksNotes = "Purgado automático por riesgo de exfiltración";
+                forceMfaNotes = "Se requiere MFA y reset tras contención";
+                reviewNotes = reviewNotes ?? "Se ejecutó contención total para evitar propagación";
+                break;
         }
 
         await SubmitReview();
@@ -856,6 +999,57 @@
                 TargetUserId = selectedAlert?.UserId,
                 MonitoringLevel = level,
                 Notes = escalationNotes
+            });
+        }
+
+        if (revokeSessionsAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "RevokeSessions",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = revokeSessionNotes
+            });
+        }
+
+        if (forceMfaAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ForceMfaReset",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = forceMfaNotes
+            });
+        }
+
+        if (purgeShareLinksAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "PurgeShareLinks",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = purgeLinksNotes
+            });
+        }
+
+        if (watchlistAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "AddToWatchlist",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = watchlistReason
+            });
+        }
+
+        if (preserveEvidenceAction)
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "PreserveEvidence",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = preserveEvidenceNotes
             });
         }
 
@@ -917,6 +1111,57 @@
         }
     }
 
+    private void TriggerRevokeSessions()
+    {
+        revokeSessionsAction = !revokeSessionsAction;
+        if (revokeSessionsAction)
+        {
+            actionTaken ??= "Sesiones revocadas y tokens invalidados";
+            revokeSessionNotes ??= "Cierre forzado por actividad sospechosa";
+        }
+    }
+
+    private void TriggerForceMfa()
+    {
+        forceMfaAction = !forceMfaAction;
+        if (forceMfaAction)
+        {
+            actionTaken ??= "Se exige MFA y restablecimiento de contraseña";
+            forceMfaNotes ??= "Reautenticación requerida tras alerta";
+            selectedStatusForReview = "Escalated";
+        }
+    }
+
+    private void TriggerPurgeLinks()
+    {
+        purgeShareLinksAction = !purgeShareLinksAction;
+        if (purgeShareLinksAction)
+        {
+            actionTaken ??= "Enlaces compartidos eliminados";
+            purgeLinksNotes ??= "Se revocaron enlaces públicos y compartidos";
+        }
+    }
+
+    private void TriggerWatchlist()
+    {
+        watchlistAction = !watchlistAction;
+        if (watchlistAction)
+        {
+            selectedStatusForReview = "Investigating";
+            watchlistReason ??= "Observación reforzada por patrón de riesgo";
+        }
+    }
+
+    private void TriggerPreserveEvidence()
+    {
+        preserveEvidenceAction = !preserveEvidenceAction;
+        if (preserveEvidenceAction)
+        {
+            preserveEvidenceNotes ??= "Retener logs, snapshots y accesos relacionados";
+            actionTaken ??= "Cadena de custodia activada";
+        }
+    }
+
     private void PresetMessage()
     {
         if (string.IsNullOrWhiteSpace(chatMessage))
@@ -932,6 +1177,11 @@
         blockUserAction = false;
         blockFileAction = false;
         escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
         selectedStatusForReview = "Dismissed";
         reviewVerdict = "Falso positivo confirmado";
         actionTaken = "Se documenta como excepción aprobada";
@@ -951,10 +1201,20 @@
         blockFileAction = false;
         blockUserAction = false;
         escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
         blockUserNotes = null;
         escalationNotes = null;
+        revokeSessionNotes = null;
+        forceMfaNotes = null;
+        purgeLinksNotes = null;
+        watchlistReason = null;
+        preserveEvidenceNotes = null;
         chatMessage = null;
         selectedStatusForReview = string.IsNullOrWhiteSpace(selectedAlert?.Status) ? "Pending" : NormalizeStatusKey(selectedAlert?.Status);
         reviewVerdict = selectedAlert?.Verdict;
