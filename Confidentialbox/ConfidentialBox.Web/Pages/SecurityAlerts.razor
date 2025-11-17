@@ -3,13 +3,16 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
 @using Microsoft.AspNetCore.WebUtilities
 @using ConfidentialBox.Core.DTOs
 @using System.Globalization
 @using System.Linq
+@using System.Text.Json
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <PageTitle>Alertas de Seguridad - ConfidentialBox</PageTitle>
 
@@ -51,6 +54,15 @@
     </div>
     <div class="card-body">
         <div class="row g-3 align-items-end">
+            <div class="col-12">
+                <label class="form-label">Búsqueda rápida</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                    <InputText class="form-control" @bind-Value="filterKeyword" placeholder="Buscar por usuario, archivo, descripción o nota" />
+                    <button class="btn btn-outline-primary" @onclick="ApplyFilters"><i class="fas fa-magnifying-glass"></i> Buscar</button>
+                </div>
+                <small class="text-muted">Vuelve el filtro de búsqueda: combina coincidencias sobre usuario, archivo, descripción y notas.</small>
+            </div>
             <div class="col-md-3">
                 <label class="form-label">Severidad</label>
                 <InputSelect class="form-select" @bind-Value="filterSeverity">
@@ -220,6 +232,26 @@
                     }
                     else if (alertDetail is not null)
                     {
+                        <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+                            <i class="fas fa-bolt text-danger"></i>
+                            <div class="flex-fill">
+                                <div class="fw-semibold">Centro de respuesta</div>
+                                <small>Ejecuta acciones directas sin salir del modal: bloquear usuarios o archivos, escalar monitoreo o enviar mensajes inmediatos.</small>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockUser')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
+                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Ver archivo</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
+                            </div>
+                        </div>
+
                         <div class="row g-4">
                             <div class="col-lg-7">
                                 <div class="border rounded p-3 h-100">
@@ -237,6 +269,13 @@
                                     {
                                         <div class="alert alert-info py-2"><i class="fas fa-sticky-note me-1"></i>Notas previas: @alertDetail.Alert.ReviewNotes</div>
                                     }
+                                    <div class="bg-light rounded p-3 mt-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-4"><span class="badge text-bg-dark w-100"><i class="fas fa-id-badge me-1"></i>Ticket @alertDetail.Alert.Id</span></div>
+                                            <div class="col-md-4"><span class="badge text-bg-primary w-100"><i class="fas fa-stopwatch me-1"></i>@alertDetail.Alert.DetectedAt.ToLocalTime().ToString("dd/MM HH:mm")</span></div>
+                                            <div class="col-md-4"><span class="badge text-bg-success w-100"><i class="fas fa-crosshairs me-1"></i>@(alertDetail.Alert.ConfidenceScore >= 0.8 ? "Alta prioridad" : "Seguimiento")</span></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-lg-5">
@@ -261,6 +300,102 @@
                         </div>
 
                         <hr class="my-4" />
+
+                        <div class="row g-4 mb-3">
+                            <div class="col-lg-7">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <h6 class="fw-semibold mb-0">Archivo y evidencias</h6>
+                                            <small class="text-muted">Accede, descarga y reescanea el archivo directamente desde el ticket.</small>
+                                        </div>
+                                        @if (fileLoading)
+                                        {
+                                            <span class="badge text-bg-secondary">Cargando archivo…</span>
+                                        }
+                                        else if (fileMetadata != null && fileMetadata.IsBlocked)
+                                        {
+                                            <span class="badge text-bg-danger"><i class="fas fa-shield-virus me-1"></i>Archivo bloqueado</span>
+                                        }
+                                    </div>
+
+                                    @if (fileLoading)
+                                    {
+                                        <div class="text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Cargando metadatos…</div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(fileLoadError))
+                                    {
+                                        <div class="alert alert-danger">@fileLoadError</div>
+                                    }
+                                    else if (fileMetadata == null)
+                                    {
+                                        <p class="text-muted mb-2">No hay archivo asociado o no se pudo recuperar.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="row g-2">
+                                            <div class="col-sm-8">
+                                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                                    <span class="badge bg-light text-dark border">@fileMetadata.OriginalFileName</span>
+                                                    <span class="badge text-bg-primary">@fileMetadata.FileExtension</span>
+                                                    <span class="badge text-bg-info text-dark">@((fileMetadata.FileSizeBytes / 1024.0).ToString("N1")) KB</span>
+                                                    @if (fileMetadata.AimMonitoringEnabled)
+                                                    {
+                                                        <span class="badge text-bg-success"><i class="fas fa-robot me-1"></i>IA activa</span>
+                                                    }
+                                                </div>
+                                                <small class="text-muted">Subido @fileMetadata.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") • Enlace seguro: @fileMetadata.ShareLink</small>
+                                            </div>
+                                            <div class="col-sm-4 text-sm-end d-flex flex-wrap gap-2 justify-content-sm-end">
+                                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails"><i class="fas fa-up-right-from-square me-1"></i>Ver ficha</button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@downloadInProgress"><i class="fas fa-cloud-arrow-down me-1"></i>Descargar</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear</button>
+                                            </div>
+                                        </div>
+                                        @if (lastScanResult != null)
+                                        {
+                                            <div class="alert @(lastScanResult.ThreatScore >= 0.8 ? "alert-danger" : "alert-warning") mt-3 mb-1">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <div class="fw-semibold">Último escaneo IA: @(lastScanResult.ThreatScore:P0)</div>
+                                                        <small>@lastScanResult.Recommendation</small>
+                                                        @if (lastScanResult.Threats.Any())
+                                                        {
+                                                            <div class="mt-1 small">Amenazas: @string.Join(", ", lastScanResult.Threats)</div>
+                                                        }
+                                                    </div>
+                                                    <span class="badge text-bg-light text-dark">Evidencia viva</span>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="col-lg-5">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <h6 class="fw-semibold mb-2">Usuario involucrado</h6>
+                                    @if (alertDetail?.User is null)
+                                    {
+                                        <p class="text-muted mb-0">Sin datos de usuario.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div><strong>@alertDetail.User.FullName</strong> (@alertDetail.User.Email)</div>
+                                            <div><i class="fas fa-phone me-1"></i>@(string.IsNullOrWhiteSpace(alertDetail.User.PhoneNumber) ? "Teléfono no registrado" : alertDetail.User.PhoneNumber)</div>
+                                            <div><i class="fas fa-clock me-1"></i>Alta: @alertDetail.User.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                            <div><i class="fas fa-user-shield me-1"></i>Estado: @(alertDetail.User.IsBlocked ? "Bloqueado" : alertDetail.User.Status)</div>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="TriggerActionBlockUser" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-lock me-1"></i>Suspender ya</button>
+                                            <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-binoculars me-1"></i>Vigilar</button>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-envelope me-1"></i>Contactar</button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="row g-4">
                             <div class="col-lg-7">
@@ -290,49 +425,293 @@
                                 </div>
 
                                 <div class="mt-4">
-                                    <h6 class="fw-semibold mb-2">Acciones automáticas</h6>
-                                    <div class="form-check mb-2">
-                                        <InputCheckbox class="form-check-input" id="blockFileCheck" @bind-Value="blockFileAction" disabled="@(selectedAlert.FileId is null)" />
-                                        <label class="form-check-label" for="blockFileCheck">Bloquear archivo compartido</label>
-                                    </div>
-                                    @if (blockFileAction)
-                                    {
-                                        <InputTextArea class="form-control mb-3" @bind-Value="blockFileNotes" rows="2" placeholder="Motivo del bloqueo" />
-                                    }
-                                    <div class="form-check mb-2">
-                                        <InputCheckbox class="form-check-input" id="blockUserCheck" @bind-Value="blockUserAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
-                                        <label class="form-check-label" for="blockUserCheck">Desactivar usuario involucrado</label>
-                                    </div>
-                                    @if (blockUserAction)
-                                    {
-                                        <InputTextArea class="form-control mb-3" @bind-Value="blockUserNotes" rows="2" placeholder="Detalle para la auditoría" />
-                                    }
-                                    <div class="form-check mb-2">
-                                        <InputCheckbox class="form-check-input" id="escalateCheck" @bind-Value="escalateMonitoring" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
-                                        <label class="form-check-label" for="escalateCheck">Aumentar nivel de seguimiento del usuario</label>
-                                    </div>
-                                    @if (escalateMonitoring)
-                                    {
-                                        <div class="row g-2 mb-3">
-                                            <div class="col-sm-6">
-                                                <label class="form-label">Nuevo nivel</label>
-                                                <InputNumber class="form-control" @bind-Value="monitoringLevel" Min="1" />
-                                            </div>
-                                            <div class="col-sm-6">
-                                                <label class="form-label">Notas</label>
-                                                <InputText class="form-control" @bind-Value="escalationNotes" />
+                                    <h6 class="fw-semibold mb-2">Centro de acciones (modo tickets)</h6>
+                                    <p class="text-muted small mb-3">Activa o combina acciones y deja trazabilidad clara para el equipo SOC.</p>
+                                    <div class="row row-cols-1 row-cols-lg-3 g-3 mb-3">
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-warning text-dark mb-1"><i class="fas fa-user-shield me-1"></i>Usuario</span>
+                                                        <h6 class="mb-0">Suspender usuario</h6>
+                                                        <small class="text-muted">Bloquea el acceso y registra el motivo.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(blockUserAction ? "btn-danger" : "btn-outline-danger")" @onclick="TriggerActionBlockUser"><i class="fas fa-user-lock"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="blockUserCheck" @bind-Value="blockUserAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="blockUserCheck">Desactivar usuario involucrado</label>
+                                                </div>
+                                                @if (blockUserAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="blockUserNotes" rows="2" placeholder="Detalle para la auditoría" />
+                                                    <small class="text-muted">Se actualizará el estado a Escalada.</small>
+                                                }
                                             </div>
                                         </div>
-                                    }
-                                    <label class="form-label">Mensaje interno al usuario</label>
-                                    <InputTextArea class="form-control" @bind-Value="chatMessage" rows="2" placeholder="Consulta o aviso para el usuario (opcional)" />
-                                </div>
-                            </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-dark mb-1"><i class="fas fa-key me-1"></i>Sesiones</span>
+                                                        <h6 class="mb-0">Revocar sesiones activas</h6>
+                                                        <small class="text-muted">Cierra sesiones y limpia tokens del usuario.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(revokeSessionsAction ? "btn-dark" : "btn-outline-dark")" @onclick="TriggerRevokeSessions"><i class="fas fa-door-closed"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="revokeSessionsCheck" @bind-Value="revokeSessionsAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="revokeSessionsCheck">Cerrar sesiones y revocar tokens</label>
+                                                </div>
+                                                @if (revokeSessionsAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="revokeSessionNotes" rows="2" placeholder="Contexto para el cierre de sesión" />
+                                                    <small class="text-muted">Incluye la caducidad de tokens sincronizada con bloqueo.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-danger mb-1"><i class="fas fa-file-shield"></i> Archivo</span>
+                                                        <h6 class="mb-0">Bloquear archivo</h6>
+                                                        <small class="text-muted">Congela el archivo y notifica a los propietarios.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(blockFileAction ? "btn-danger" : "btn-outline-danger")" @onclick="TriggerActionBlockFile"><i class="fas fa-ban"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="blockFileCheck" @bind-Value="blockFileAction" disabled="@(selectedAlert.FileId is null)" />
+                                                    <label class="form-check-label" for="blockFileCheck">Bloquear archivo compartido</label>
+                                                </div>
+                                                @if (blockFileAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="blockFileNotes" rows="2" placeholder="Motivo del bloqueo" />
+                                                    <small class="text-muted">Se notificará en el resumen como archivo aislado.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-info text-dark mb-1"><i class="fas fa-satellite-dish me-1"></i>Monitoreo</span>
+                                                        <h6 class="mb-0">Escalar seguimiento</h6>
+                                                        <small class="text-muted">Aumenta la sensibilidad y asigna nivel.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(escalateMonitoring ? "btn-info" : "btn-outline-info") text-dark" @onclick="TriggerActionEscalate"><i class="fas fa-arrow-up"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="escalateCheck" @bind-Value="escalateMonitoring" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="escalateCheck">Aumentar nivel de seguimiento del usuario</label>
+                                                </div>
+                                                @if (escalateMonitoring)
+                                                {
+                                                    <div class="row g-2 mb-2">
+                                                        <div class="col-sm-6">
+                                                            <label class="form-label">Nuevo nivel</label>
+                                                            <InputNumber class="form-control" @bind-Value="monitoringLevel" Min="1" />
+                                                        </div>
+                                                        <div class="col-sm-6">
+                                                            <label class="form-label">Notas</label>
+                                                            <InputText class="form-control" @bind-Value="escalationNotes" />
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Perfecto para casos críticos o reincidencias.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-success mb-1"><i class="fas fa-comment-dots me-1"></i>Usuario</span>
+                                                        <h6 class="mb-0">Enviar mensaje</h6>
+                                                        <small class="text-muted">Pide aclaraciones o da instrucciones.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(string.IsNullOrWhiteSpace(chatMessage) ? "btn-outline-success" : "btn-success")" @onclick="PresetMessage"><i class="fas fa-paper-plane"></i></button>
+                                                </div>
+                                                <label class="form-label">Mensaje interno al usuario</label>
+                                                <InputTextArea class="form-control" @bind-Value="chatMessage" rows="2" placeholder="Consulta o aviso para el usuario (opcional)" />
+                                                <small class="text-muted">Se deja como ticket y se envía a través del canal interno.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-primary mb-1"><i class="fas fa-fingerprint me-1"></i>Identidad</span>
+                                                        <h6 class="mb-0">Forzar MFA + reset</h6>
+                                                        <small class="text-muted">Solicita MFA inmediato y reinicio de clave.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(forceMfaAction ? "btn-primary" : "btn-outline-primary")" @onclick="TriggerForceMfa"><i class="fas fa-lock"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="forceMfaCheck" @bind-Value="forceMfaAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="forceMfaCheck">Forzar reautenticación segura</label>
+                                                </div>
+                                                @if (forceMfaAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="forceMfaNotes" placeholder="Mensaje para el usuario / auditoría" />
+                                                    <small class="text-muted">Acción combinada: MFA + reset de contraseña + cierre de sesiones persistentes.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-secondary mb-1"><i class="fas fa-link-slash me-1"></i>Compartición</span>
+                                                        <h6 class="mb-0">Purgar enlaces y accesos</h6>
+                                                        <small class="text-muted">Revoca enlaces compartidos del archivo.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(purgeShareLinksAction ? "btn-secondary" : "btn-outline-secondary")" @onclick="TriggerPurgeLinks" disabled="@(selectedAlert.FileId is null)"><i class="fas fa-scissors"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="purgeLinksCheck" @bind-Value="purgeShareLinksAction" disabled="@(selectedAlert.FileId is null)" />
+                                                    <label class="form-check-label" for="purgeLinksCheck">Eliminar enlaces públicos y revocar compartidos</label>
+                                                </div>
+                                                @if (purgeShareLinksAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="purgeLinksNotes" placeholder="Notas de purga" />
+                                                    <small class="text-muted">Se documenta en el ticket como limpieza de exposición.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-info text-dark mb-1"><i class="fas fa-eye me-1"></i>Seguimiento</span>
+                                                        <h6 class="mb-0">Lista de observación</h6>
+                                                        <small class="text-muted">Suma al usuario a la watchlist con caducidad.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(watchlistAction ? "btn-info" : "btn-outline-info") text-dark" @onclick="TriggerWatchlist"><i class="fas fa-user-secret"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="watchlistCheck" @bind-Value="watchlistAction" disabled="@(string.IsNullOrEmpty(selectedAlert.UserId))" />
+                                                    <label class="form-check-label" for="watchlistCheck">Añadir a observación reforzada</label>
+                                                </div>
+                                                @if (watchlistAction)
+                                                {
+                                                    <InputText class="form-control mb-2" @bind-Value="watchlistReason" placeholder="Motivo / duración" />
+                                                    <small class="text-muted">Ideal para reincidencias o actividad lateral sospechosa.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-success mb-1"><i class="fas fa-shield-halved me-1"></i>Evidencia</span>
+                                                        <h6 class="mb-0">Preservar evidencia</h6>
+                                                        <small class="text-muted">Activa snapshot y retención para forense.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(preserveEvidenceAction ? "btn-success" : "btn-outline-success")" @onclick="TriggerPreserveEvidence"><i class="fas fa-hard-drive"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="preserveEvidenceCheck" @bind-Value="preserveEvidenceAction" />
+                                                    <label class="form-check-label" for="preserveEvidenceCheck">Solicitar retención de evidencia</label>
+                                                </div>
+                                                @if (preserveEvidenceAction)
+                                                {
+                                                    <InputTextArea class="form-control mb-2" @bind-Value="preserveEvidenceNotes" rows="2" placeholder="Qué preservar y por cuánto tiempo" />
+                                                    <small class="text-muted">Genera ticket de cadena de custodia en el backend.</small>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            <div class="col-lg-5">
-                                <h6 class="fw-semibold mb-3">Historial de acciones</h6>
-                                @if (alertDetail.Actions.Count == 0)
-                                {
+                                    <div class="row row-cols-1 row-cols-lg-2 g-3 mt-2">
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-dark mb-1"><i class="fas fa-briefcase"></i> Caso</span>
+                                                        <h6 class="mb-0">Ticket y propietario</h6>
+                                                        <small class="text-muted">Abre un caso formal, asigna responsable y deja notas visibles.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(openCaseAction ? "btn-dark" : "btn-outline-dark")" @onclick="ToggleCaseAction"><i class="fas fa-clipboard-check"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="openCaseCheck" @bind-Value="openCaseAction" />
+                                                    <label class="form-check-label" for="openCaseCheck">Generar ticket interno</label>
+                                                </div>
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Asignar a</label>
+                                                        <InputSelect class="form-select" @bind-Value="followUpOwnerId">
+                                                            <option value="">Seleccionar analista</option>
+                                                            @foreach (var user in availableUsers)
+                                                            {
+                                                                <option value="@user.Id">@user.FullName (@user.Email)</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Responsable externo</label>
+                                                        <InputText class="form-control" @bind-Value="followUpOwnerName" placeholder="Nombre si no está en la lista" />
+                                                    </div>
+                                                </div>
+                                                <label class="form-label">Notas del caso</label>
+                                                <InputTextArea class="form-control" @bind-Value="followUpNotes" rows="2" placeholder="Contexto compartido con el SOC" />
+                                                <small class="text-muted">Se adjunta al ticket y viaja con el historial de acciones.</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-primary mb-1"><i class="fas fa-business-time"></i> Seguimiento</span>
+                                                        <h6 class="mb-0">SLA y tareas</h6>
+                                                        <small class="text-muted">Define vencimiento, prioridad y alertas para que nadie lo deje pasar.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(scheduleFollowUpAction ? "btn-primary" : "btn-outline-primary")" @onclick="ToggleFollowUp"><i class="fas fa-stopwatch"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="followUpCheck" @bind-Value="scheduleFollowUpAction" />
+                                                    <label class="form-check-label" for="followUpCheck">Crear recordatorio y tarea de seguimiento</label>
+                                                </div>
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label">Vence</label>
+                                                        <InputDate class="form-control" @bind-Value="followUpDueDate" TValue="DateTime?" />
+                                                    </div>
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label">Prioridad</label>
+                                                        <InputSelect class="form-select" @bind-Value="followUpPriority">
+                                                            <option value="">Seleccione prioridad</option>
+                                                            <option>Crítica</option>
+                                                            <option>Alta</option>
+                                                            <option>Media</option>
+                                                            <option>Baja</option>
+                                                        </InputSelect>
+                                                    </div>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="notifyCheck" @bind-Value="notifySecOpsAction" />
+                                                    <label class="form-check-label" for="notifyCheck">Notificar a SecOps / IR automáticamente</label>
+                                                </div>
+                                                <small class="text-muted">Se registra como una tarea del caso y dispara alertas de SLA.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MarkAsFalsePositive"><i class="fas fa-thumbs-up me-1"></i>Marcar como falso positivo</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="MarkAsResolved"><i class="fas fa-check me-1"></i>Cerrar como resuelta</button>
+                                <button type="button" class="btn btn-outline-dark btn-sm" @onclick="ResetActionDeck"><i class="fas fa-rotate-left me-1"></i>Reiniciar acciones</button>
+                                <button type="button" class="btn btn-outline-success btn-sm" @onclick="TriggerCaseworkPreset"><i class="fas fa-ticket-alt me-1"></i>Crear ticket y asignar</button>
+                            </div>
+                            <p class="small text-muted mb-0"><i class="fas fa-ticket-alt me-1"></i>Usa este tablero como un sistema de tickets: define estado, acciones automáticas y mensajes sin salir del modal.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <h6 class="fw-semibold mb-3">Historial de acciones</h6>
+                        @if (alertDetail.Actions.Count == 0)
+                        {
                                     <p class="text-muted">Aún no se registraron acciones sobre esta alerta.</p>
                                 }
                                 else
@@ -379,6 +758,21 @@
     <div class="modal-backdrop fade show"></div>
 }
 
+<script>
+    window.confidentialBox = window.confidentialBox || {};
+    window.confidentialBox.downloadFile = (fileName, contentType, bytes) => {
+        const blob = new Blob([new Uint8Array(bytes)], { type: contentType || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || 'evidencia.bin';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+</script>
+
 @code {
     private const int PageSize = 20;
     private readonly Dictionary<string, string> StatusTabs = new(StringComparer.OrdinalIgnoreCase)
@@ -404,6 +798,7 @@
     private string? filterUserId;
     private string? filterFileName;
     private string? filterDescription;
+    private string? filterKeyword;
     private DateTime? filterFrom;
     private DateTime? filterTo;
 
@@ -421,11 +816,36 @@
     private bool blockFileAction;
     private bool blockUserAction;
     private bool escalateMonitoring;
+    private bool revokeSessionsAction;
+    private bool forceMfaAction;
+    private bool purgeShareLinksAction;
+    private bool watchlistAction;
+    private bool preserveEvidenceAction;
+    private bool openCaseAction;
+    private bool scheduleFollowUpAction;
+    private bool notifySecOpsAction;
     private int? monitoringLevel;
     private string? blockFileNotes;
     private string? blockUserNotes;
     private string? escalationNotes;
+    private string? revokeSessionNotes;
+    private string? forceMfaNotes;
+    private string? purgeLinksNotes;
+    private string? watchlistReason;
+    private string? preserveEvidenceNotes;
+    private string? followUpOwnerId;
+    private string? followUpOwnerName;
+    private string? followUpPriority;
+    private DateTime? followUpDueDate;
+    private string? followUpNotes;
     private string? chatMessage;
+    private FileDto? fileMetadata;
+    private bool fileLoading;
+    private string? fileLoadError;
+    private bool downloadInProgress;
+    private bool rescanFileAction;
+    private string? rescanNotes;
+    private FileThreatAnalysisDto? lastScanResult;
     private string? reviewError;
 
     protected override async Task OnInitializedAsync()
@@ -513,7 +933,7 @@
                 ["userId"] = string.IsNullOrWhiteSpace(filterUserId) ? null : filterUserId,
                 ["alertType"] = string.IsNullOrWhiteSpace(filterType) ? null : filterType,
                 ["fileName"] = string.IsNullOrWhiteSpace(filterFileName) ? null : filterFileName,
-                ["search"] = string.IsNullOrWhiteSpace(filterDescription) ? null : filterDescription,
+                ["search"] = BuildSearchTerm(),
                 ["from"] = filterFrom.HasValue ? filterFrom.Value.ToString("o", CultureInfo.InvariantCulture) : null,
                 ["to"] = filterTo.HasValue ? filterTo.Value.ToString("o", CultureInfo.InvariantCulture) : null
             };
@@ -549,6 +969,7 @@
         filterUserId = null;
         filterFileName = null;
         filterDescription = null;
+        filterKeyword = null;
         filterFrom = null;
         filterTo = null;
         activeStatusTab = "all";
@@ -588,10 +1009,27 @@
         blockFileAction = false;
         blockUserAction = false;
         escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
+        rescanFileAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
         blockUserNotes = null;
         escalationNotes = null;
+        revokeSessionNotes = null;
+        forceMfaNotes = null;
+        purgeLinksNotes = null;
+        watchlistReason = null;
+        preserveEvidenceNotes = null;
+        rescanNotes = null;
+        fileMetadata = null;
+        fileLoadError = null;
+        fileLoading = false;
+        downloadInProgress = false;
+        lastScanResult = null;
         chatMessage = null;
         reviewError = null;
         showReviewModal = true;
@@ -600,6 +1038,11 @@
         try
         {
             alertDetail = await Http.GetFromJsonAsync<SecurityAlertDetailDto>($"api/aisecurity/alerts/{alert.Id}");
+            if (alert.FileId.HasValue)
+            {
+                _ = LoadFileMetadataAsync(alert.FileId.Value);
+            }
+            TryPopulateLastScan();
         }
         catch (Exception ex)
         {
@@ -667,6 +1110,92 @@
         }
     }
 
+    private async Task ExecuteQuickAction(string action)
+    {
+        if (selectedAlert is null || reviewSubmitting)
+        {
+            return;
+        }
+
+        ResetActionDeck();
+
+        switch (action)
+        {
+            case "blockUser":
+                blockUserAction = true;
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Usuario bloqueado por actividad riesgosa";
+                actionTaken = "Cuenta suspendida desde el centro de alertas";
+                blockUserNotes = "Se ejecutó bloqueo inmediato";
+                reviewNotes = reviewNotes ?? "Bloqueo automático desde el panel";
+                break;
+
+            case "blockFile":
+                blockFileAction = true;
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Archivo aislado preventivamente";
+                actionTaken = "Archivo bloqueado y accesos revocados";
+                blockFileNotes = "Aislamiento inmediato desde alerta";
+                reviewNotes = reviewNotes ?? "Aislamiento ejecutado desde el modal";
+                break;
+
+            case "escalate":
+                escalateMonitoring = true;
+                monitoringLevel = (alertDetail?.Alert.EscalationLevel ?? 0) + 1;
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Monitoreo reforzado activado";
+                actionTaken = "Se sube nivel de seguimiento para el usuario";
+                escalationNotes = "Escalamiento rápido desde panel";
+                reviewNotes = reviewNotes ?? "Se incrementó el monitoreo para la cuenta";
+                break;
+
+            case "message":
+                chatMessage = "Detectamos actividad inusual. ¿Puedes confirmar si reconoces esta acción?";
+                selectedStatusForReview = "Investigating";
+                reviewVerdict = "Contacto al usuario para aclaración";
+                actionTaken = "Mensaje enviado solicitando confirmación";
+                reviewNotes = reviewNotes ?? "Se abrió comunicación con la persona involucrada";
+                break;
+
+            case "resolve":
+                MarkAsResolved();
+                reviewNotes = reviewNotes ?? "Caso resuelto con acciones aplicadas";
+                break;
+
+            case "falsePositive":
+                MarkAsFalsePositive();
+                reviewNotes = reviewNotes ?? "Marcado como falso positivo después de revisión";
+                break;
+
+            case "lockdown":
+                blockUserAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                blockFileAction = selectedAlert?.FileId != null;
+                revokeSessionsAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                forceMfaAction = !string.IsNullOrEmpty(selectedAlert?.UserId);
+                purgeShareLinksAction = selectedAlert?.FileId != null;
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Modo contención activado";
+                actionTaken = "Bloqueo inmediato + purga de sesiones y enlaces";
+                blockUserNotes = "Cuenta bloqueada y sesiones revocadas desde el dashboard";
+                blockFileNotes = "Archivo aislado y enlaces eliminados";
+                revokeSessionNotes = "Revocación forzada por incidente crítico";
+                purgeLinksNotes = "Purgado automático por riesgo de exfiltración";
+                forceMfaNotes = "Se requiere MFA y reset tras contención";
+                reviewNotes = reviewNotes ?? "Se ejecutó contención total para evitar propagación";
+                break;
+
+            case "scan":
+                rescanFileAction = selectedAlert?.FileId != null;
+                rescanNotes = "Reanálisis manual solicitado por el analista";
+                selectedStatusForReview = "Investigating";
+                reviewVerdict = "Archivo enviado a reescaneo IA";
+                actionTaken = "Se vuelve a escanear el archivo con IA";
+                break;
+        }
+
+        await SubmitReview();
+    }
+
     private List<AlertActionCommand> BuildActionsForRequest()
     {
         var actions = new List<AlertActionCommand>();
@@ -702,6 +1231,109 @@
             });
         }
 
+        if (revokeSessionsAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "RevokeSessions",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = revokeSessionNotes
+            });
+        }
+
+        if (forceMfaAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ForceMfaReset",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = forceMfaNotes
+            });
+        }
+
+        if (purgeShareLinksAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "PurgeShareLinks",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = purgeLinksNotes
+            });
+        }
+
+        if (watchlistAction && !string.IsNullOrEmpty(selectedAlert?.UserId))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "AddToWatchlist",
+                TargetUserId = selectedAlert?.UserId,
+                Notes = watchlistReason
+            });
+        }
+
+        if (preserveEvidenceAction)
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "PreserveEvidence",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = preserveEvidenceNotes
+            });
+        }
+
+        if (rescanFileAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ScanFile",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = rescanNotes ?? "Reanálisis con IA desde el centro de alertas"
+            });
+        }
+
+        if (openCaseAction)
+        {
+            var metadata = JsonSerializer.Serialize(new
+            {
+                ownerId = followUpOwnerId,
+                owner = followUpOwnerName,
+                priority = followUpPriority,
+                due = followUpDueDate?.ToString("o", CultureInfo.InvariantCulture),
+                notify = notifySecOpsAction
+            });
+
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "OpenCase",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = followUpNotes ?? actionTaken ?? "Caso abierto desde el centro de alertas",
+                Metadata = metadata
+            });
+        }
+
+        if (scheduleFollowUpAction)
+        {
+            var metadata = JsonSerializer.Serialize(new
+            {
+                due = followUpDueDate?.ToString("o", CultureInfo.InvariantCulture),
+                priority = followUpPriority,
+                notify = notifySecOpsAction,
+                ownerId = followUpOwnerId,
+                owner = followUpOwnerName
+            });
+
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ScheduleFollowUp",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = followUpNotes ?? "Seguimiento programado",
+                Metadata = metadata
+            });
+        }
+
         if (!string.IsNullOrWhiteSpace(chatMessage) && !string.IsNullOrEmpty(selectedAlert?.UserId))
         {
             actions.Add(new AlertActionCommand
@@ -714,6 +1346,304 @@
         }
 
         return actions;
+    }
+
+    private string? BuildSearchTerm()
+    {
+        var combined = string.Join(" ", new[] { filterKeyword, filterDescription }
+            .Where(term => !string.IsNullOrWhiteSpace(term))
+            .Select(term => term!.Trim()));
+
+        return string.IsNullOrWhiteSpace(combined) ? null : combined;
+    }
+
+    private async Task LoadFileMetadataAsync(int fileId)
+    {
+        fileLoading = true;
+        fileLoadError = null;
+        try
+        {
+            fileMetadata = await Http.GetFromJsonAsync<FileDto>($"api/files/{fileId}");
+        }
+        catch (Exception ex)
+        {
+            fileLoadError = $"No se pudo cargar la información del archivo: {ex.Message}";
+        }
+        finally
+        {
+            fileLoading = false;
+        }
+    }
+
+    private async Task DownloadFileAsync()
+    {
+        if (fileMetadata == null || downloadInProgress)
+        {
+            return;
+        }
+
+        try
+        {
+            downloadInProgress = true;
+            var content = await Http.GetFromJsonAsync<FileContentResponse>($"api/files/content/{fileMetadata.ShareLink}");
+            if (content == null || !content.Success)
+            {
+                reviewError = content?.ErrorMessage ?? "No se pudo descargar el archivo asociado.";
+                return;
+            }
+
+            var bytes = Convert.FromBase64String(content.EncryptedContent);
+            await JS.InvokeVoidAsync("confidentialBox.downloadFile", content.FileName ?? fileMetadata.OriginalFileName, "application/octet-stream", bytes);
+        }
+        catch (Exception ex)
+        {
+            reviewError = $"Error al descargar el archivo: {ex.Message}";
+        }
+        finally
+        {
+            downloadInProgress = false;
+        }
+    }
+
+    private void OpenFileDetails()
+    {
+        if (fileMetadata != null)
+        {
+            NavigationManager.NavigateTo($"/files/{fileMetadata.Id}", true);
+        }
+    }
+
+    private void TryPopulateLastScan()
+    {
+        lastScanResult = null;
+        var scanAction = alertDetail?.Actions?.FirstOrDefault(a => a.ActionType?.Equals("ScanFile", StringComparison.OrdinalIgnoreCase) == true);
+        if (scanAction?.Metadata is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(scanAction.Metadata);
+            var score = doc.RootElement.TryGetProperty("ThreatScore", out var scoreElement) && scoreElement.TryGetDouble(out var parsedScore)
+                ? parsedScore
+                : 0;
+            var recommendation = doc.RootElement.TryGetProperty("Recommendation", out var recElement)
+                ? recElement.GetString()
+                : null;
+            var threats = doc.RootElement.TryGetProperty("Threats", out var threatsElement) && threatsElement.ValueKind == JsonValueKind.Array
+                ? threatsElement.EnumerateArray().Select(t => t.GetString() ?? string.Empty).Where(t => !string.IsNullOrWhiteSpace(t)).ToList()
+                : new List<string>();
+
+            lastScanResult = new FileThreatAnalysisDto
+            {
+                ThreatScore = score,
+                Recommendation = recommendation ?? string.Empty,
+                Threats = threats
+            };
+        }
+        catch
+        {
+            lastScanResult = null;
+        }
+    }
+
+    private void TriggerActionBlockUser()
+    {
+        blockUserAction = !blockUserAction;
+        if (blockUserAction)
+        {
+            selectedStatusForReview = "Escalated";
+            reviewVerdict ??= "Usuario bloqueado preventivamente";
+            actionTaken ??= "Cuenta suspendida mientras se investiga";
+            blockUserNotes ??= "Bloqueo inmediato desde el centro de alertas";
+        }
+    }
+
+    private void TriggerActionBlockFile()
+    {
+        blockFileAction = !blockFileAction;
+        if (blockFileAction)
+        {
+            reviewVerdict ??= "Archivo aislado";
+            actionTaken ??= "Archivo bloqueado y acceso revocado";
+            blockFileNotes ??= "Se aísla el archivo sospechoso";
+        }
+    }
+
+    private void TriggerActionEscalate()
+    {
+        escalateMonitoring = !escalateMonitoring;
+        if (escalateMonitoring)
+        {
+            selectedStatusForReview = "Escalated";
+            monitoringLevel ??= (alertDetail?.Alert.EscalationLevel ?? 0) + 1;
+            escalationNotes ??= "Seguimiento reforzado activado";
+            reviewVerdict ??= "Escalado a monitoreo reforzado";
+        }
+    }
+
+    private void TriggerRevokeSessions()
+    {
+        revokeSessionsAction = !revokeSessionsAction;
+        if (revokeSessionsAction)
+        {
+            actionTaken ??= "Sesiones revocadas y tokens invalidados";
+            revokeSessionNotes ??= "Cierre forzado por actividad sospechosa";
+        }
+    }
+
+    private void TriggerForceMfa()
+    {
+        forceMfaAction = !forceMfaAction;
+        if (forceMfaAction)
+        {
+            actionTaken ??= "Se exige MFA y restablecimiento de contraseña";
+            forceMfaNotes ??= "Reautenticación requerida tras alerta";
+            selectedStatusForReview = "Escalated";
+        }
+    }
+
+    private void TriggerPurgeLinks()
+    {
+        purgeShareLinksAction = !purgeShareLinksAction;
+        if (purgeShareLinksAction)
+        {
+            actionTaken ??= "Enlaces compartidos eliminados";
+            purgeLinksNotes ??= "Se revocaron enlaces públicos y compartidos";
+        }
+    }
+
+    private void TriggerWatchlist()
+    {
+        watchlistAction = !watchlistAction;
+        if (watchlistAction)
+        {
+            selectedStatusForReview = "Investigating";
+            watchlistReason ??= "Observación reforzada por patrón de riesgo";
+        }
+    }
+
+    private void TriggerPreserveEvidence()
+    {
+        preserveEvidenceAction = !preserveEvidenceAction;
+        if (preserveEvidenceAction)
+        {
+            preserveEvidenceNotes ??= "Retener logs, snapshots y accesos relacionados";
+            actionTaken ??= "Cadena de custodia activada";
+        }
+    }
+
+    private void PresetMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage))
+        {
+            chatMessage = "Detectamos actividad inusual. ¿Puedes confirmar si reconoces esta acción?";
+        }
+
+        actionTaken ??= "Se solicitó aclaración al usuario";
+    }
+
+    private void ToggleCaseAction()
+    {
+        openCaseAction = !openCaseAction;
+        if (openCaseAction)
+        {
+            selectedStatusForReview = "Investigating";
+            reviewVerdict ??= "Caso abierto y asignado";
+            actionTaken ??= "Caso creado en mesa de tickets";
+            followUpNotes ??= "Se abre caso interno desde el centro de alertas";
+            followUpDueDate ??= DateTime.UtcNow.AddDays(1);
+        }
+    }
+
+    private void ToggleFollowUp()
+    {
+        scheduleFollowUpAction = !scheduleFollowUpAction;
+        if (scheduleFollowUpAction)
+        {
+            followUpDueDate ??= DateTime.UtcNow.AddHours(8);
+            followUpPriority ??= "Alta";
+            selectedStatusForReview = "Investigating";
+            actionTaken ??= "Seguimiento calendarizado";
+        }
+    }
+
+    private void TriggerCaseworkPreset()
+    {
+        ResetActionDeck();
+        openCaseAction = true;
+        scheduleFollowUpAction = true;
+        notifySecOpsAction = true;
+        followUpPriority = "Alta";
+        followUpDueDate = DateTime.UtcNow.AddHours(4);
+        followUpNotes = "Caso formal abierto con SLA acelerado y notificación a SecOps.";
+        reviewVerdict = "Caso en gestión activa";
+        selectedStatusForReview = "Investigating";
+        actionTaken = "Ticket creado, propietario asignado, SLA en curso";
+        reviewNotes = "Se abre ticket interno para seguimiento coordinado.";
+    }
+
+    private void MarkAsFalsePositive()
+    {
+        blockUserAction = false;
+        blockFileAction = false;
+        escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
+        openCaseAction = false;
+        scheduleFollowUpAction = false;
+        notifySecOpsAction = false;
+        selectedStatusForReview = "Dismissed";
+        reviewVerdict = "Falso positivo confirmado";
+        actionTaken = "Se documenta como excepción aprobada";
+    }
+
+    private void MarkAsResolved()
+    {
+        selectedStatusForReview = "Resolved";
+        reviewVerdict ??= "Resuelto con acciones correctivas";
+        actionTaken = string.IsNullOrWhiteSpace(actionTaken)
+            ? "Caso resuelto y monitoreo continuo"
+            : actionTaken;
+    }
+
+    private void ResetActionDeck()
+    {
+        blockFileAction = false;
+        blockUserAction = false;
+        escalateMonitoring = false;
+        revokeSessionsAction = false;
+        forceMfaAction = false;
+        purgeShareLinksAction = false;
+        watchlistAction = false;
+        preserveEvidenceAction = false;
+        rescanFileAction = false;
+        openCaseAction = false;
+        scheduleFollowUpAction = false;
+        notifySecOpsAction = false;
+        monitoringLevel = null;
+        blockFileNotes = null;
+        blockUserNotes = null;
+        escalationNotes = null;
+        revokeSessionNotes = null;
+        forceMfaNotes = null;
+        purgeLinksNotes = null;
+        watchlistReason = null;
+        preserveEvidenceNotes = null;
+        rescanNotes = null;
+        followUpOwnerId = null;
+        followUpOwnerName = null;
+        followUpPriority = null;
+        followUpDueDate = null;
+        followUpNotes = null;
+        chatMessage = null;
+        selectedStatusForReview = string.IsNullOrWhiteSpace(selectedAlert?.Status) ? "Pending" : NormalizeStatusKey(selectedAlert?.Status);
+        reviewVerdict = selectedAlert?.Verdict;
+        actionTaken = selectedAlert?.ActionTaken ?? string.Empty;
     }
 
     private string RenderStatusBadge(string? status)
