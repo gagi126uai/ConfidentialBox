@@ -3,6 +3,7 @@ using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
 using ConfidentialBox.Infrastructure.Repositories;
 using ConfidentialBox.Infrastructure.Services;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -236,6 +237,50 @@ public class AISecurityController : ControllerBase
                 latestAccess = await _fileAccessRepository.GetLatestAccessForUserAsync(alert.UserId, alert.FileId);
             }
 
+            var fileDto = alert.File == null
+                ? null
+                : new FileDto
+                {
+                    Id = alert.File.Id,
+                    OriginalFileName = alert.File.OriginalFileName,
+                    FileExtension = alert.File.FileExtension,
+                    FileSizeBytes = alert.File.FileSizeBytes,
+                    ShareLink = alert.File.ShareLink,
+                    UploadedAt = alert.File.UploadedAt,
+                    ExpiresAt = alert.File.ExpiresAt,
+                    MaxAccessCount = alert.File.MaxAccessCount,
+                    CurrentAccessCount = alert.File.CurrentAccessCount,
+                    IsBlocked = alert.File.IsBlocked,
+                    BlockReason = alert.File.BlockReason,
+                    UploadedByUserId = alert.File.UploadedByUserId,
+                    UploadedByUserName = alert.File.UploadedByUser != null ? $"{alert.File.UploadedByUser.FirstName} {alert.File.UploadedByUser.LastName}" : string.Empty,
+                    HasMasterPassword = !string.IsNullOrWhiteSpace(alert.File.MasterPassword),
+                    IsPdf = alert.File.IsPDF,
+                    HasWatermark = alert.File.HasWatermark,
+                    ScreenshotProtectionEnabled = alert.File.ScreenshotProtectionEnabled,
+                    AimMonitoringEnabled = alert.File.AIMonitoringEnabled,
+                    IsDeleted = alert.File.IsDeleted,
+                    DeletedAt = alert.File.DeletedAt
+                };
+
+            var userDto = alert.User == null
+                ? null
+                : new UserDto
+                {
+                    Id = alert.User.Id,
+                    Email = alert.User.Email ?? string.Empty,
+                    FirstName = alert.User.FirstName ?? string.Empty,
+                    LastName = alert.User.LastName ?? string.Empty,
+                    FullName = $"{alert.User.FirstName} {alert.User.LastName}",
+                    PhoneNumber = alert.User.PhoneNumber,
+                    IsActive = alert.User.IsActive,
+                    IsBlocked = !alert.User.IsActive,
+                    BlockReason = alert.User.BlockReason,
+                    CreatedAt = alert.User.CreatedAt,
+                    LastLoginAt = alert.User.LastLoginAt,
+                    Roles = new List<string>()
+                };
+
             var dto = new SecurityAlertDetailDto
             {
                 Alert = new SecurityAlertDto
@@ -274,6 +319,8 @@ public class AISecurityController : ControllerBase
                     TargetFileName = a.TargetFile?.OriginalFileName,
                     StatusAfterAction = a.StatusAfterAction
                 }).ToList(),
+                File = fileDto,
+                User = userDto,
                 CanBlockFile = true,
                 CanBlockUser = true,
                 CanEscalateMonitoring = true,
@@ -452,6 +499,42 @@ public class AISecurityController : ControllerBase
                                 TargetFileId = command.TargetFileId,
                                 StatusAfterAction = alert.Status
                             });
+                            break;
+                        }
+
+                        case "scanfile":
+                        {
+                            var targetFileId = command.TargetFileId ?? alert.FileId;
+                            if (targetFileId.HasValue)
+                            {
+                                var file = await _fileRepository.GetByIdAsync(targetFileId.Value);
+                                if (file != null)
+                                {
+                                    var analysis = await _aiSecurityService.AnalyzeFileAsync(file, reviewerId ?? string.Empty);
+                                    if (analysis.IsThreat || analysis.ThreatScore >= 0.8)
+                                    {
+                                        file.IsBlocked = true;
+                                        file.BlockReason = string.IsNullOrWhiteSpace(command.Notes)
+                                            ? $"Bloqueado tras reanálisis: {analysis.Recommendation}"
+                                            : command.Notes;
+                                        await _fileRepository.UpdateAsync(file);
+                                    }
+
+                                    actions.Add(new SecurityAlertAction
+                                    {
+                                        AlertId = alert.Id,
+                                        ActionType = "ScanFile",
+                                        Notes = string.IsNullOrWhiteSpace(command.Notes)
+                                            ? analysis.Recommendation
+                                            : command.Notes,
+                                        Metadata = JsonSerializer.Serialize(new { analysis.ThreatScore, analysis.Recommendation, analysis.Threats }),
+                                        CreatedAt = DateTime.UtcNow,
+                                        CreatedByUserId = reviewerId,
+                                        TargetFileId = targetFileId,
+                                        StatusAfterAction = alert.Status
+                                    });
+                                }
+                            }
                             break;
                         }
 

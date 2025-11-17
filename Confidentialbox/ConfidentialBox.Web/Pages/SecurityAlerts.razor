@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
 @using Microsoft.AspNetCore.WebUtilities
 @using ConfidentialBox.Core.DTOs
 @using System.Globalization
@@ -11,6 +12,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <PageTitle>Alertas de Seguridad - ConfidentialBox</PageTitle>
 
@@ -237,44 +239,16 @@
                                 <small>Ejecuta acciones directas sin salir del modal: bloquear usuarios o archivos, escalar monitoreo o enviar mensajes inmediatos.</small>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-danger"
-                                        @onclick='() => ExecuteQuickAction("blockUser")'
-                                        disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))">
-                                    <i class="fas fa-user-slash me-1"></i>Bloquear usuario
-                                </button>
-
-                                <button class="btn btn-sm btn-outline-danger"
-                                        @onclick='() => ExecuteQuickAction("blockFile")'
-                                        disabled="@(selectedAlert?.FileId is null)">
-                                    <i class="fas fa-file-shield me-1"></i>Aislar archivo
-                                </button>
-
-                                <button class="btn btn-sm btn-outline-warning"
-                                        @onclick='() => ExecuteQuickAction("escalate")'>
-                                    <i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento
-                                </button>
-
-                                <button class="btn btn-sm btn-outline-primary"
-                                        @onclick='() => ExecuteQuickAction("message")'
-                                        disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))">
-                                    <i class="fas fa-comment-dots me-1"></i>Contactar usuario
-                                </button>
-
-                                <button class="btn btn-sm btn-outline-success"
-                                        @onclick='() => ExecuteQuickAction("resolve")'>
-                                    <i class="fas fa-check me-1"></i>Resolver
-                                </button>
-
-                                <button class="btn btn-sm btn-outline-secondary"
-                                        @onclick='() => ExecuteQuickAction("falsePositive")'>
-                                    <i class="fas fa-ban me-1"></i>Falso positivo
-                                </button>
-
-                                <button class="btn btn-sm btn-dark"
-                                        @onclick='() => ExecuteQuickAction("lockdown")'
-                                        disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)">
-                                    <i class="fas fa-robot me-1"></i>Modo contención total
-                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockUser')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
+                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Ver archivo</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
                             </div>
                         </div>
 
@@ -328,6 +302,102 @@
                         </div>
 
                         <hr class="my-4" />
+
+                        <div class="row g-4 mb-3">
+                            <div class="col-lg-7">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <h6 class="fw-semibold mb-0">Archivo y evidencias</h6>
+                                            <small class="text-muted">Accede, descarga y reescanea el archivo directamente desde el ticket.</small>
+                                        </div>
+                                        @if (fileLoading)
+                                        {
+                                            <span class="badge text-bg-secondary">Cargando archivo…</span>
+                                        }
+                                        else if (fileMetadata != null && fileMetadata.IsBlocked)
+                                        {
+                                            <span class="badge text-bg-danger"><i class="fas fa-shield-virus me-1"></i>Archivo bloqueado</span>
+                                        }
+                                    </div>
+
+                                    @if (fileLoading)
+                                    {
+                                        <div class="text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Cargando metadatos…</div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(fileLoadError))
+                                    {
+                                        <div class="alert alert-danger">@fileLoadError</div>
+                                    }
+                                    else if (fileMetadata == null)
+                                    {
+                                        <p class="text-muted mb-2">No hay archivo asociado o no se pudo recuperar.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="row g-2">
+                                            <div class="col-sm-8">
+                                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                                    <span class="badge bg-light text-dark border">@fileMetadata.OriginalFileName</span>
+                                                    <span class="badge text-bg-primary">@fileMetadata.FileExtension</span>
+                                                    <span class="badge text-bg-info text-dark">@((fileMetadata.FileSizeBytes / 1024.0).ToString("N1")) KB</span>
+                                                    @if (fileMetadata.AimMonitoringEnabled)
+                                                    {
+                                                        <span class="badge text-bg-success"><i class="fas fa-robot me-1"></i>IA activa</span>
+                                                    }
+                                                </div>
+                                                <small class="text-muted">Subido @fileMetadata.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") • Enlace seguro: @fileMetadata.ShareLink</small>
+                                            </div>
+                                            <div class="col-sm-4 text-sm-end d-flex flex-wrap gap-2 justify-content-sm-end">
+                                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails"><i class="fas fa-up-right-from-square me-1"></i>Ver ficha</button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@downloadInProgress"><i class="fas fa-cloud-arrow-down me-1"></i>Descargar</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear</button>
+                                            </div>
+                                        </div>
+                                        @if (lastScanResult != null)
+                                        {
+                                            <div class="alert @(lastScanResult.ThreatScore >= 0.8 ? "alert-danger" : "alert-warning") mt-3 mb-1">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <div class="fw-semibold">Último escaneo IA: @(lastScanResult.ThreatScore:P0)</div>
+                                                        <small>@lastScanResult.Recommendation</small>
+                                                        @if (lastScanResult.Threats.Any())
+                                                        {
+                                                            <div class="mt-1 small">Amenazas: @string.Join(", ", lastScanResult.Threats)</div>
+                                                        }
+                                                    </div>
+                                                    <span class="badge text-bg-light text-dark">Evidencia viva</span>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="col-lg-5">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <h6 class="fw-semibold mb-2">Usuario involucrado</h6>
+                                    @if (alertDetail?.User is null)
+                                    {
+                                        <p class="text-muted mb-0">Sin datos de usuario.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div><strong>@alertDetail.User.FullName</strong> (@alertDetail.User.Email)</div>
+                                            <div><i class="fas fa-phone me-1"></i>@(string.IsNullOrWhiteSpace(alertDetail.User.PhoneNumber) ? "Teléfono no registrado" : alertDetail.User.PhoneNumber)</div>
+                                            <div><i class="fas fa-clock me-1"></i>Alta: @alertDetail.User.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                            <div><i class="fas fa-user-shield me-1"></i>Estado: @(alertDetail.User.IsBlocked ? "Bloqueado" : alertDetail.User.Status)</div>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="TriggerActionBlockUser" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-lock me-1"></i>Suspender ya</button>
+                                            <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-binoculars me-1"></i>Vigilar</button>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-envelope me-1"></i>Contactar</button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="row g-4">
                             <div class="col-lg-7">
@@ -690,6 +760,21 @@
     <div class="modal-backdrop fade show"></div>
 }
 
+<script>
+    window.confidentialBox = window.confidentialBox || {};
+    window.confidentialBox.downloadFile = (fileName, contentType, bytes) => {
+        const blob = new Blob([new Uint8Array(bytes)], { type: contentType || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || 'evidencia.bin';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+</script>
+
 @code {
     private const int PageSize = 20;
     private readonly Dictionary<string, string> StatusTabs = new(StringComparer.OrdinalIgnoreCase)
@@ -756,6 +841,13 @@
     private DateTime? followUpDueDate;
     private string? followUpNotes;
     private string? chatMessage;
+    private FileDto? fileMetadata;
+    private bool fileLoading;
+    private string? fileLoadError;
+    private bool downloadInProgress;
+    private bool rescanFileAction;
+    private string? rescanNotes;
+    private FileThreatAnalysisDto? lastScanResult;
     private string? reviewError;
 
     protected override async Task OnInitializedAsync()
@@ -924,6 +1016,7 @@
         purgeShareLinksAction = false;
         watchlistAction = false;
         preserveEvidenceAction = false;
+        rescanFileAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
         blockUserNotes = null;
@@ -933,6 +1026,12 @@
         purgeLinksNotes = null;
         watchlistReason = null;
         preserveEvidenceNotes = null;
+        rescanNotes = null;
+        fileMetadata = null;
+        fileLoadError = null;
+        fileLoading = false;
+        downloadInProgress = false;
+        lastScanResult = null;
         chatMessage = null;
         reviewError = null;
         showReviewModal = true;
@@ -941,6 +1040,11 @@
         try
         {
             alertDetail = await Http.GetFromJsonAsync<SecurityAlertDetailDto>($"api/aisecurity/alerts/{alert.Id}");
+            if (alert.FileId.HasValue)
+            {
+                _ = LoadFileMetadataAsync(alert.FileId.Value);
+            }
+            TryPopulateLastScan();
         }
         catch (Exception ex)
         {
@@ -1081,6 +1185,14 @@
                 forceMfaNotes = "Se requiere MFA y reset tras contención";
                 reviewNotes = reviewNotes ?? "Se ejecutó contención total para evitar propagación";
                 break;
+
+            case "scan":
+                rescanFileAction = selectedAlert?.FileId != null;
+                rescanNotes = "Reanálisis manual solicitado por el analista";
+                selectedStatusForReview = "Investigating";
+                reviewVerdict = "Archivo enviado a reescaneo IA";
+                actionTaken = "Se vuelve a escanear el archivo con IA";
+                break;
         }
 
         await SubmitReview();
@@ -1172,6 +1284,16 @@
             });
         }
 
+        if (rescanFileAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ScanFile",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = rescanNotes ?? "Reanálisis con IA desde el centro de alertas"
+            });
+        }
+
         if (openCaseAction)
         {
             var metadata = JsonSerializer.Serialize(new
@@ -1235,6 +1357,97 @@
             .Select(term => term!.Trim()));
 
         return string.IsNullOrWhiteSpace(combined) ? null : combined;
+    }
+
+    private async Task LoadFileMetadataAsync(int fileId)
+    {
+        fileLoading = true;
+        fileLoadError = null;
+        try
+        {
+            fileMetadata = await Http.GetFromJsonAsync<FileDto>($"api/files/{fileId}");
+        }
+        catch (Exception ex)
+        {
+            fileLoadError = $"No se pudo cargar la información del archivo: {ex.Message}";
+        }
+        finally
+        {
+            fileLoading = false;
+        }
+    }
+
+    private async Task DownloadFileAsync()
+    {
+        if (fileMetadata == null || downloadInProgress)
+        {
+            return;
+        }
+
+        try
+        {
+            downloadInProgress = true;
+            var content = await Http.GetFromJsonAsync<FileContentResponse>($"api/files/content/{fileMetadata.ShareLink}");
+            if (content == null || !content.Success)
+            {
+                reviewError = content?.ErrorMessage ?? "No se pudo descargar el archivo asociado.";
+                return;
+            }
+
+            var bytes = Convert.FromBase64String(content.EncryptedContent);
+            await JS.InvokeVoidAsync("confidentialBox.downloadFile", content.FileName ?? fileMetadata.OriginalFileName, "application/octet-stream", bytes);
+        }
+        catch (Exception ex)
+        {
+            reviewError = $"Error al descargar el archivo: {ex.Message}";
+        }
+        finally
+        {
+            downloadInProgress = false;
+        }
+    }
+
+    private void OpenFileDetails()
+    {
+        if (fileMetadata != null)
+        {
+            NavigationManager.NavigateTo($"/files/{fileMetadata.Id}", true);
+        }
+    }
+
+    private void TryPopulateLastScan()
+    {
+        lastScanResult = null;
+        var scanAction = alertDetail?.Actions?.FirstOrDefault(a => a.ActionType?.Equals("ScanFile", StringComparison.OrdinalIgnoreCase) == true);
+        if (scanAction?.Metadata is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(scanAction.Metadata);
+            var score = doc.RootElement.TryGetProperty("ThreatScore", out var scoreElement) && scoreElement.TryGetDouble(out var parsedScore)
+                ? parsedScore
+                : 0;
+            var recommendation = doc.RootElement.TryGetProperty("Recommendation", out var recElement)
+                ? recElement.GetString()
+                : null;
+            var threats = doc.RootElement.TryGetProperty("Threats", out var threatsElement) && threatsElement.ValueKind == JsonValueKind.Array
+                ? threatsElement.EnumerateArray().Select(t => t.GetString() ?? string.Empty).Where(t => !string.IsNullOrWhiteSpace(t)).ToList()
+                : new List<string>();
+
+            lastScanResult = new FileThreatAnalysisDto
+            {
+                ThreatScore = score,
+                Recommendation = recommendation ?? string.Empty,
+                Threats = threats
+            };
+        }
+        catch
+        {
+            lastScanResult = null;
+        }
     }
 
     private void TriggerActionBlockUser()
@@ -1410,6 +1623,7 @@
         purgeShareLinksAction = false;
         watchlistAction = false;
         preserveEvidenceAction = false;
+        rescanFileAction = false;
         openCaseAction = false;
         scheduleFollowUpAction = false;
         notifySecOpsAction = false;
@@ -1422,6 +1636,7 @@
         purgeLinksNotes = null;
         watchlistReason = null;
         preserveEvidenceNotes = null;
+        rescanNotes = null;
         followUpOwnerId = null;
         followUpOwnerName = null;
         followUpPriority = null;
