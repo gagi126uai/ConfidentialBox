@@ -7,6 +7,7 @@
 @using ConfidentialBox.Core.DTOs
 @using System.Globalization
 @using System.Linq
+@using System.Text.Json
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -553,19 +554,96 @@
                                         </div>
                                     </div>
 
-                                    <div class="d-flex flex-wrap gap-2 mb-3">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MarkAsFalsePositive"><i class="fas fa-thumbs-up me-1"></i>Marcar como falso positivo</button>
-                                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="MarkAsResolved"><i class="fas fa-check me-1"></i>Cerrar como resuelta</button>
-                                        <button type="button" class="btn btn-outline-dark btn-sm" @onclick="ResetActionDeck"><i class="fas fa-rotate-left me-1"></i>Reiniciar acciones</button>
-                                    </div>
-                                    <p class="small text-muted mb-0"><i class="fas fa-ticket-alt me-1"></i>Usa este tablero como un sistema de tickets: define estado, acciones automáticas y mensajes sin salir del modal.</p>
-                                </div>
-                            </div>
+                                    <div class="row row-cols-1 row-cols-lg-2 g-3 mt-2">
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-dark mb-1"><i class="fas fa-briefcase"></i> Caso</span>
+                                                        <h6 class="mb-0">Ticket y propietario</h6>
+                                                        <small class="text-muted">Abre un caso formal, asigna responsable y deja notas visibles.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(openCaseAction ? "btn-dark" : "btn-outline-dark")" @onclick="ToggleCaseAction"><i class="fas fa-clipboard-check"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="openCaseCheck" @bind-Value="openCaseAction" />
+                                                    <label class="form-check-label" for="openCaseCheck">Generar ticket interno</label>
+                                                </div>
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Asignar a</label>
+                                                        <InputSelect class="form-select" @bind-Value="followUpOwnerId">
+                                                            <option value="">Seleccionar analista</option>
+                                                            @foreach (var user in availableUsers)
+                                                            {
+                                                                <option value="@user.Id">@user.FullName (@user.Email)</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Responsable externo</label>
+                                                        <InputText class="form-control" @bind-Value="followUpOwnerName" placeholder="Nombre si no está en la lista" />
+                                                    </div>
+                                                </div>
+                                                <label class="form-label">Notas del caso</label>
+                                                <InputTextArea class="form-control" @bind-Value="followUpNotes" rows="2" placeholder="Contexto compartido con el SOC" />
+                                                <small class="text-muted">Se adjunta al ticket y viaja con el historial de acciones.</small>
+                                            </div>
+                                        </div>
 
-                            <div class="col-lg-5">
-                                <h6 class="fw-semibold mb-3">Historial de acciones</h6>
-                                @if (alertDetail.Actions.Count == 0)
-                                {
+                                        <div class="col">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <span class="badge text-bg-primary mb-1"><i class="fas fa-business-time"></i> Seguimiento</span>
+                                                        <h6 class="mb-0">SLA y tareas</h6>
+                                                        <small class="text-muted">Define vencimiento, prioridad y alertas para que nadie lo deje pasar.</small>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm @(scheduleFollowUpAction ? "btn-primary" : "btn-outline-primary")" @onclick="ToggleFollowUp"><i class="fas fa-stopwatch"></i></button>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="followUpCheck" @bind-Value="scheduleFollowUpAction" />
+                                                    <label class="form-check-label" for="followUpCheck">Crear recordatorio y tarea de seguimiento</label>
+                                                </div>
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label">Vence</label>
+                                                        <InputDate class="form-control" @bind-Value="followUpDueDate" TValue="DateTime?" />
+                                                    </div>
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label">Prioridad</label>
+                                                        <InputSelect class="form-select" @bind-Value="followUpPriority">
+                                                            <option value="">Seleccione prioridad</option>
+                                                            <option>Crítica</option>
+                                                            <option>Alta</option>
+                                                            <option>Media</option>
+                                                            <option>Baja</option>
+                                                        </InputSelect>
+                                                    </div>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <InputCheckbox class="form-check-input" id="notifyCheck" @bind-Value="notifySecOpsAction" />
+                                                    <label class="form-check-label" for="notifyCheck">Notificar a SecOps / IR automáticamente</label>
+                                                </div>
+                                                <small class="text-muted">Se registra como una tarea del caso y dispara alertas de SLA.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MarkAsFalsePositive"><i class="fas fa-thumbs-up me-1"></i>Marcar como falso positivo</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="MarkAsResolved"><i class="fas fa-check me-1"></i>Cerrar como resuelta</button>
+                                <button type="button" class="btn btn-outline-dark btn-sm" @onclick="ResetActionDeck"><i class="fas fa-rotate-left me-1"></i>Reiniciar acciones</button>
+                                <button type="button" class="btn btn-outline-success btn-sm" @onclick="TriggerCaseworkPreset"><i class="fas fa-ticket-alt me-1"></i>Crear ticket y asignar</button>
+                            </div>
+                            <p class="small text-muted mb-0"><i class="fas fa-ticket-alt me-1"></i>Usa este tablero como un sistema de tickets: define estado, acciones automáticas y mensajes sin salir del modal.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <h6 class="fw-semibold mb-3">Historial de acciones</h6>
+                        @if (alertDetail.Actions.Count == 0)
+                        {
                                     <p class="text-muted">Aún no se registraron acciones sobre esta alerta.</p>
                                 }
                                 else
@@ -660,6 +738,9 @@
     private bool purgeShareLinksAction;
     private bool watchlistAction;
     private bool preserveEvidenceAction;
+    private bool openCaseAction;
+    private bool scheduleFollowUpAction;
+    private bool notifySecOpsAction;
     private int? monitoringLevel;
     private string? blockFileNotes;
     private string? blockUserNotes;
@@ -669,6 +750,11 @@
     private string? purgeLinksNotes;
     private string? watchlistReason;
     private string? preserveEvidenceNotes;
+    private string? followUpOwnerId;
+    private string? followUpOwnerName;
+    private string? followUpPriority;
+    private DateTime? followUpDueDate;
+    private string? followUpNotes;
     private string? chatMessage;
     private string? reviewError;
 
@@ -1086,6 +1172,48 @@
             });
         }
 
+        if (openCaseAction)
+        {
+            var metadata = JsonSerializer.Serialize(new
+            {
+                ownerId = followUpOwnerId,
+                owner = followUpOwnerName,
+                priority = followUpPriority,
+                due = followUpDueDate?.ToString("o", CultureInfo.InvariantCulture),
+                notify = notifySecOpsAction
+            });
+
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "OpenCase",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = followUpNotes ?? actionTaken ?? "Caso abierto desde el centro de alertas",
+                Metadata = metadata
+            });
+        }
+
+        if (scheduleFollowUpAction)
+        {
+            var metadata = JsonSerializer.Serialize(new
+            {
+                due = followUpDueDate?.ToString("o", CultureInfo.InvariantCulture),
+                priority = followUpPriority,
+                notify = notifySecOpsAction,
+                ownerId = followUpOwnerId,
+                owner = followUpOwnerName
+            });
+
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "ScheduleFollowUp",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                TargetUserId = selectedAlert?.UserId,
+                Notes = followUpNotes ?? "Seguimiento programado",
+                Metadata = metadata
+            });
+        }
+
         if (!string.IsNullOrWhiteSpace(chatMessage) && !string.IsNullOrEmpty(selectedAlert?.UserId))
         {
             actions.Add(new AlertActionCommand
@@ -1205,6 +1333,46 @@
         actionTaken ??= "Se solicitó aclaración al usuario";
     }
 
+    private void ToggleCaseAction()
+    {
+        openCaseAction = !openCaseAction;
+        if (openCaseAction)
+        {
+            selectedStatusForReview = "Investigating";
+            reviewVerdict ??= "Caso abierto y asignado";
+            actionTaken ??= "Caso creado en mesa de tickets";
+            followUpNotes ??= "Se abre caso interno desde el centro de alertas";
+            followUpDueDate ??= DateTime.UtcNow.AddDays(1);
+        }
+    }
+
+    private void ToggleFollowUp()
+    {
+        scheduleFollowUpAction = !scheduleFollowUpAction;
+        if (scheduleFollowUpAction)
+        {
+            followUpDueDate ??= DateTime.UtcNow.AddHours(8);
+            followUpPriority ??= "Alta";
+            selectedStatusForReview = "Investigating";
+            actionTaken ??= "Seguimiento calendarizado";
+        }
+    }
+
+    private void TriggerCaseworkPreset()
+    {
+        ResetActionDeck();
+        openCaseAction = true;
+        scheduleFollowUpAction = true;
+        notifySecOpsAction = true;
+        followUpPriority = "Alta";
+        followUpDueDate = DateTime.UtcNow.AddHours(4);
+        followUpNotes = "Caso formal abierto con SLA acelerado y notificación a SecOps.";
+        reviewVerdict = "Caso en gestión activa";
+        selectedStatusForReview = "Investigating";
+        actionTaken = "Ticket creado, propietario asignado, SLA en curso";
+        reviewNotes = "Se abre ticket interno para seguimiento coordinado.";
+    }
+
     private void MarkAsFalsePositive()
     {
         blockUserAction = false;
@@ -1215,6 +1383,9 @@
         purgeShareLinksAction = false;
         watchlistAction = false;
         preserveEvidenceAction = false;
+        openCaseAction = false;
+        scheduleFollowUpAction = false;
+        notifySecOpsAction = false;
         selectedStatusForReview = "Dismissed";
         reviewVerdict = "Falso positivo confirmado";
         actionTaken = "Se documenta como excepción aprobada";
@@ -1239,6 +1410,9 @@
         purgeShareLinksAction = false;
         watchlistAction = false;
         preserveEvidenceAction = false;
+        openCaseAction = false;
+        scheduleFollowUpAction = false;
+        notifySecOpsAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
         blockUserNotes = null;
@@ -1248,6 +1422,11 @@
         purgeLinksNotes = null;
         watchlistReason = null;
         preserveEvidenceNotes = null;
+        followUpOwnerId = null;
+        followUpOwnerName = null;
+        followUpPriority = null;
+        followUpDueDate = null;
+        followUpNotes = null;
         chatMessage = null;
         selectedStatusForReview = string.IsNullOrWhiteSpace(selectedAlert?.Status) ? "Pending" : NormalizeStatusKey(selectedAlert?.Status);
         reviewVerdict = selectedAlert?.Verdict;
