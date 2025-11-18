@@ -38,4 +38,11 @@ public class AIScoringSettings
     public double RiskLevelMediumThreshold { get; set; } = 0.4;
     public List<string> SuspiciousExtensions { get; set; } = new() { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".js" };
     public string PlatformTimeZone { get; set; } = TimeZoneInfo.Utc.Id;
+
+    public bool AdminBypassEnabled { get; set; } = true;
+    public List<string> WhitelistedUserIds { get; set; } = new();
+
+    public List<string> AlertCenterSeverities { get; set; } = new() { "Critical", "High", "Medium" };
+    public List<string> AlertCenterStatuses { get; set; } = new() { "PendingReview", "Escalated", "New" };
+    public string AlertCenterSort { get; set; } = "SeverityThenRecency";
 }
