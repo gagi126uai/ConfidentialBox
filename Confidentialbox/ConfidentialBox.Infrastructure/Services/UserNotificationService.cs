@@ -46,4 +46,9 @@ public class UserNotificationService : IUserNotificationService
     {
         return _repository.MarkAsReadAsync(userId, notificationIds, cancellationToken);
     }
+
+    public Task<bool> DeleteAsync(string userId, int notificationId, CancellationToken cancellationToken = default)
+    {
+        return _repository.DeleteAsync(userId, notificationId, cancellationToken);
+    }
 }
