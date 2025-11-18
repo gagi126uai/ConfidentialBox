@@ -406,7 +406,7 @@
                                 <div class="mt-4">
                                     <h6 class="fw-semibold mb-2">Centro de acciones (modo tickets)</h6>
                                     <p class="text-muted small mb-3">Activa o combina acciones y deja trazabilidad clara para el equipo SOC.</p>
-                                    <div class="row row-cols-1 row-cols-lg-3 g-3 mb-3">
+                                    <div class="row row-cols-1 row-cols-md-2 g-3 mb-3">
                                         <div class="col">
                                             <div class="border rounded p-3 h-100">
                                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -524,7 +524,7 @@
                                                 </div>
                                                 <label class="form-label">Mensaje interno al usuario</label>
                                                 <InputTextArea class="form-control" @bind-Value="chatMessage" rows="2" placeholder="Consulta o aviso para el usuario (opcional)" />
-                                                <small class="text-muted">Se deja como ticket y se envía a través del canal interno.</small>
+                                                <small class="text-muted">Se notifica al usuario en su perfil y podrá responder desde su centro de mensajes.</small>
                                             </div>
                                         </div>
                                         <div class="col">
@@ -613,7 +613,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="row row-cols-1 row-cols-lg-2 g-3 mt-2">
+                                    <div class="row row-cols-1 row-cols-md-2 g-3 mt-2">
                                         <div class="col">
                                             <div class="border rounded p-3 h-100 bg-light">
                                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -837,6 +837,7 @@
     private string? filterKeyword;
     private DateTime? filterFrom;
     private DateTime? filterTo;
+    private int? deepLinkAlertId;
 
     private int currentPage = 1;
     private bool isLoading = true;
@@ -896,12 +897,53 @@
         ParseQueryFilters();
         await LoadSummaryAsync();
         await SearchAlertsAsync();
+        await TryOpenDeepLinkedAlertAsync();
     }
 
     private async Task RefreshAsync()
     {
         await LoadSummaryAsync();
         await SearchAlertsAsync();
+    }
+
+    private async Task TryOpenDeepLinkedAlertAsync()
+    {
+        if (deepLinkAlertId is null)
+        {
+            return;
+        }
+
+        SecurityAlertDto? alertFromDetail = null;
+        alertDetail = null;
+        detailLoading = true;
+        reviewError = null;
+        showReviewModal = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            alertDetail = await Http.GetFromJsonAsync<SecurityAlertDetailDto>($"api/aisecurity/alerts/{deepLinkAlertId}");
+            alertFromDetail = alertDetail?.Alert;
+        }
+        catch (Exception ex)
+        {
+            reviewError = $"No se pudo abrir la alerta solicitada: {ex.Message}";
+        }
+        finally
+        {
+            detailLoading = false;
+        }
+
+        var alertToUse = alertFromDetail ?? new SecurityAlertDto { Id = deepLinkAlertId.Value };
+        InitializeReviewState(alertToUse);
+        if (alertToUse.FileId.HasValue)
+        {
+            _ = LoadFileMetadataAsync(alertToUse.FileId.Value);
+        }
+        TryPopulateLastScan();
+        deepLinkAlertId = null;
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private void ParseQueryFilters()
@@ -922,6 +964,11 @@
             filterSeverity = SeverityOptions.Any(level => level.Equals(severity, StringComparison.OrdinalIgnoreCase))
                 ? severity
                 : null;
+        }
+
+        if (query.TryGetValue("alertId", out var alertIdValue) && int.TryParse(alertIdValue, out var parsedAlertId))
+        {
+            deepLinkAlertId = parsedAlertId;
         }
     }
 
@@ -1041,7 +1088,7 @@
         await SearchAlertsAsync();
     }
 
-    private async Task ShowReviewModal(SecurityAlertDto alert)
+    private void InitializeReviewState(SecurityAlertDto alert)
     {
         selectedAlert = alert;
         reviewNotes = alert.ReviewNotes ?? string.Empty;
@@ -1082,6 +1129,11 @@
         escalationNotes = null;
         reviewError = null;
         showReviewModal = true;
+    }
+
+    private async Task ShowReviewModal(SecurityAlertDto alert)
+    {
+        InitializeReviewState(alert);
         detailLoading = true;
 
         try
@@ -1415,12 +1467,20 @@
 
         if (!string.IsNullOrWhiteSpace(chatMessage) && !string.IsNullOrEmpty(selectedAlert?.UserId))
         {
+            var messageMetadata = JsonSerializer.Serialize(new
+            {
+                channel = "user-notification",
+                allowReply = true,
+                alertId = selectedAlert?.Id,
+                origin = "security-alert-center"
+            });
+
             actions.Add(new AlertActionCommand
             {
                 ActionType = "Message",
                 TargetUserId = selectedAlert?.UserId,
                 Notes = chatMessage,
-                Metadata = "{\"channel\":\"internal\"}"
+                Metadata = messageMetadata
             });
         }
 
