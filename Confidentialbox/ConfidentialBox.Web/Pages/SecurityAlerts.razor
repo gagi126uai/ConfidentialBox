@@ -245,14 +245,14 @@
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
                                 <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('deleteFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-trash-can me-1"></i>Eliminar archivo</button>
+                                <button class="btn btn-sm btn-outline-dark" @onclick="() => ExecuteQuickAction('escalateToOwner')" disabled="@(availableUsers.Count == 0)"><i class="fas fa-share-from-square me-1"></i>Escalar a responsable</button>
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
                                 <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
                                 <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
                             </div>
                         </div>
-
-
 
                         <div class="row g-4">
                             <div class="col-lg-7">
@@ -480,7 +480,10 @@
                                                         <h6 class="mb-0">Bloquear archivo</h6>
                                                         <small class="text-muted">Congela el archivo y notifica a los propietarios.</small>
                                                     </div>
-                                                    <button type="button" class="btn btn-sm @(blockFileAction ? "btn-danger" : "btn-outline-danger")" @onclick="TriggerActionBlockFile"><i class="fas fa-ban"></i></button>
+                                                    <div class="btn-group">
+                                                        <button type="button" class="btn btn-sm @(blockFileAction ? "btn-danger" : "btn-outline-danger")" @onclick="TriggerActionBlockFile" title="Bloquear"><i class="fas fa-ban"></i></button>
+                                                        <button type="button" class="btn btn-sm @(deleteFileAction ? "btn-danger" : "btn-outline-secondary")" @onclick="TriggerDeleteFile" title="Eliminar archivo"><i class="fas fa-trash"></i></button>
+                                                    </div>
                                                 </div>
                                                 <div class="form-check mb-2">
                                                     <InputCheckbox class="form-check-input" id="blockFileCheck" @bind-Value="blockFileAction" disabled="@(selectedAlert.FileId is null)" />
@@ -490,6 +493,15 @@
                                                 {
                                                     <InputTextArea class="form-control mb-2" @bind-Value="blockFileNotes" rows="2" placeholder="Motivo del bloqueo" />
                                                     <small class="text-muted">Se notificará en el resumen como archivo aislado.</small>
+                                                }
+                                                <div class="form-check mt-2">
+                                                    <InputCheckbox class="form-check-input" id="deleteFileCheck" @bind-Value="deleteFileAction" disabled="@(selectedAlert.FileId is null)" />
+                                                    <label class="form-check-label" for="deleteFileCheck">Eliminar y purgar el archivo</label>
+                                                </div>
+                                                @if (deleteFileAction)
+                                                {
+                                                    <InputTextArea class="form-control mt-2" @bind-Value="deleteFileNotes" rows="2" placeholder="Motivo de la eliminación definitiva" />
+                                                    <small class="text-muted">Se eliminará el archivo y se registrará en la auditoría.</small>
                                                 }
                                             </div>
                                         </div>
@@ -691,11 +703,56 @@
                                                         </InputSelect>
                                                     </div>
                                                 </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Responsable / Escalamiento</label>
+                                                    <InputSelect class="form-select" @bind-Value="followUpOwnerId" @onchange="OnOwnerChanged">
+                                                        <option value="">Sin asignar</option>
+                                                        @foreach (var user in availableUsers)
+                                                        {
+                                                            <option value="@user.Id">@user.FullName (@user.Email)</option>
+                                                        }
+                                                    </InputSelect>
+                                                </div>
                                                 <div class="form-check mb-2">
                                                     <InputCheckbox class="form-check-input" id="notifyCheck" @bind-Value="notifySecOpsAction" />
                                                     <label class="form-check-label" for="notifyCheck">Notificar a SecOps / IR automáticamente</label>
                                                 </div>
                                                 <small class="text-muted">Se registra como una tarea del caso y dispara alertas de SLA.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-lg-6">
+                                            <div class="border rounded p-3 h-100 bg-white">
+                                                <h6 class="fw-semibold mb-2">Mensajes al usuario</h6>
+                                                <small class="text-muted">Envía instrucciones, advertencias o solicitudes de confirmación.</small>
+                                                <InputTextArea class="form-control mt-2" rows="3" @bind-Value="chatMessage" placeholder="Escribe el mensaje que recibirá el usuario" />
+                                                <div class="d-flex gap-2 mt-2">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="PresetMessage" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-wand-magic-sparkles me-1"></i>Sugerir texto</button>
+                                                    <button class="btn btn-sm btn-primary" @onclick="SendMessage" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-paper-plane me-1"></i>Enviar y registrar</button>
+                                                </div>
+                                                <small class="text-muted d-block mt-1">Queda auditado como acción Message en el ticket.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-6">
+                                            <div class="border rounded p-3 h-100 bg-white">
+                                                <h6 class="fw-semibold mb-2">Escalamiento a responsables</h6>
+                                                <small class="text-muted">Deriva el caso a un analista o jefe de turno sin salir del modal.</small>
+                                                <InputSelect class="form-select mb-2" @bind-Value="escalationTargetUserId" @onchange="OnEscalationChanged">
+                                                    <option value="">Selecciona responsable</option>
+                                                    @foreach (var user in availableUsers)
+                                                    {
+                                                        <option value="@user.Id">@user.FullName (@user.Email)</option>
+                                                    }
+                                                </InputSelect>
+                                                <InputText class="form-control mb-2" @bind-Value="escalationChannel" placeholder="Canal: SecOps, IR, Legal, Manager" />
+                                                <InputTextArea class="form-control mb-2" rows="2" @bind-Value="escalationNotes" placeholder="Notas para el responsable" />
+                                                <div class="form-check">
+                                                    <InputCheckbox class="form-check-input" id="escalateCheck" @bind-Value="escalateToOwnerAction" />
+                                                    <label class="form-check-label" for="escalateCheck">Crear acción de escalamiento en el ticket</label>
+                                                </div>
+                                                <small class="text-muted d-block mt-1">Incluye datos del responsable, canal y notas para que quede trazabilidad.</small>
                                             </div>
                                         </div>
                                     </div>
@@ -823,6 +880,8 @@
     private bool purgeShareLinksAction;
     private bool watchlistAction;
     private bool preserveEvidenceAction;
+    private bool deleteFileAction;
+    private string? deleteFileNotes;
     private bool openCaseAction;
     private bool scheduleFollowUpAction;
     private bool notifySecOpsAction;
@@ -835,6 +894,11 @@
     private string? purgeLinksNotes;
     private string? watchlistReason;
     private string? preserveEvidenceNotes;
+    private bool escalateToOwnerAction;
+    private string? escalationTargetUserId;
+    private string? escalationTargetName;
+    private string? escalationChannel;
+    private string? escalationNotes;
     private string? followUpOwnerId;
     private string? followUpOwnerName;
     private string? followUpPriority;
@@ -1016,6 +1080,7 @@
         purgeShareLinksAction = false;
         watchlistAction = false;
         preserveEvidenceAction = false;
+        deleteFileAction = false;
         rescanFileAction = false;
         monitoringLevel = null;
         blockFileNotes = null;
@@ -1027,12 +1092,18 @@
         watchlistReason = null;
         preserveEvidenceNotes = null;
         rescanNotes = null;
+        deleteFileNotes = null;
         fileMetadata = null;
         fileLoadError = null;
         fileLoading = false;
         downloadInProgress = false;
         lastScanResult = null;
         chatMessage = null;
+        escalateToOwnerAction = false;
+        escalationTargetUserId = null;
+        escalationTargetName = null;
+        escalationChannel = null;
+        escalationNotes = null;
         reviewError = null;
         showReviewModal = true;
         detailLoading = true;
@@ -1159,6 +1230,18 @@
                 reviewNotes = reviewNotes ?? "Se abrió comunicación con la persona involucrada";
                 break;
 
+            case "escalateToOwner":
+                escalationTargetUserId = availableUsers.FirstOrDefault()?.Id;
+                escalationTargetName = availableUsers.FirstOrDefault()?.FullName;
+                escalationChannel = escalationChannel ?? "SecOps";
+                escalationNotes = "Escalamiento automático desde el modal";
+                escalateToOwnerAction = true;
+                openCaseAction = true;
+                selectedStatusForReview = "Investigating";
+                reviewVerdict = "Escalado a responsable";
+                actionTaken = "Caso derivado y asignado";
+                break;
+
             case "resolve":
                 MarkAsResolved();
                 reviewNotes = reviewNotes ?? "Caso resuelto con acciones aplicadas";
@@ -1192,6 +1275,14 @@
                 selectedStatusForReview = "Investigating";
                 reviewVerdict = "Archivo enviado a reescaneo IA";
                 actionTaken = "Se vuelve a escanear el archivo con IA";
+                break;
+
+            case "deleteFile":
+                deleteFileAction = selectedAlert?.FileId != null;
+                deleteFileNotes = "Eliminación urgente desde acción rápida";
+                selectedStatusForReview = "Escalated";
+                reviewVerdict = "Archivo eliminado y purgado";
+                actionTaken = "Archivo removido desde el centro de alertas";
                 break;
         }
 
@@ -1294,6 +1385,16 @@
             });
         }
 
+        if (deleteFileAction && (selectedAlert?.FileId != null || alertDetail?.Alert.FileId != null))
+        {
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "DeleteFile",
+                TargetFileId = selectedAlert?.FileId ?? alertDetail?.Alert.FileId,
+                Notes = deleteFileNotes ?? "Eliminación definitiva solicitada desde el modal"
+            });
+        }
+
         if (openCaseAction)
         {
             var metadata = JsonSerializer.Serialize(new
@@ -1344,6 +1445,25 @@
                 TargetUserId = selectedAlert?.UserId,
                 Notes = chatMessage,
                 Metadata = "{\"channel\":\"internal\"}"
+            });
+        }
+
+        if (escalateToOwnerAction && !string.IsNullOrWhiteSpace(escalationTargetUserId))
+        {
+            var metadata = JsonSerializer.Serialize(new
+            {
+                ownerId = escalationTargetUserId,
+                owner = escalationTargetName,
+                channel = escalationChannel,
+                notes = escalationNotes
+            });
+
+            actions.Add(new AlertActionCommand
+            {
+                ActionType = "EscalateToUser",
+                TargetUserId = escalationTargetUserId,
+                Notes = escalationNotes ?? "Escalado desde el centro de alertas",
+                Metadata = metadata
             });
         }
 
@@ -1473,6 +1593,19 @@
         }
     }
 
+    private void TriggerDeleteFile()
+    {
+        deleteFileAction = !deleteFileAction;
+        if (deleteFileAction)
+        {
+            blockFileAction = false;
+            deleteFileNotes ??= "Eliminación y purga desde el modal de alerta";
+            reviewVerdict ??= "Archivo eliminado por riesgo";
+            actionTaken ??= "Archivo purgado y enlaces invalidados";
+            selectedStatusForReview = "Escalated";
+        }
+    }
+
     private void TriggerActionEscalate()
     {
         escalateMonitoring = !escalateMonitoring;
@@ -1483,6 +1616,24 @@
             escalationNotes ??= "Seguimiento reforzado activado";
             reviewVerdict ??= "Escalado a monitoreo reforzado";
         }
+    }
+
+    private void OnOwnerChanged(ChangeEventArgs _)
+    {
+        if (!string.IsNullOrWhiteSpace(followUpOwnerId))
+        {
+            var owner = availableUsers.FirstOrDefault(u => u.Id == followUpOwnerId);
+            followUpOwnerName = owner?.FullName ?? followUpOwnerName;
+            openCaseAction = true;
+            actionTaken ??= "Caso asignado a responsable";
+        }
+    }
+
+    private void OnEscalationChanged(ChangeEventArgs _)
+    {
+        escalationTargetName = availableUsers.FirstOrDefault(u => u.Id == escalationTargetUserId)?.FullName;
+        escalateToOwnerAction = !string.IsNullOrWhiteSpace(escalationTargetUserId);
+        escalationChannel ??= "SecOps";
     }
 
     private void TriggerRevokeSessions()
@@ -1544,6 +1695,19 @@
         }
 
         actionTaken ??= "Se solicitó aclaración al usuario";
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage) || selectedAlert is null)
+        {
+            return;
+        }
+
+        selectedStatusForReview = NormalizeStatusKey(selectedStatusForReview);
+        reviewVerdict ??= "Mensaje enviado al usuario";
+        actionTaken ??= "Se envió comunicación desde el modal";
+        await SubmitReview();
     }
 
     private void ToggleCaseAction()
@@ -1624,6 +1788,7 @@
         watchlistAction = false;
         preserveEvidenceAction = false;
         rescanFileAction = false;
+        deleteFileAction = false;
         openCaseAction = false;
         scheduleFollowUpAction = false;
         notifySecOpsAction = false;
@@ -1637,12 +1802,18 @@
         watchlistReason = null;
         preserveEvidenceNotes = null;
         rescanNotes = null;
+        deleteFileNotes = null;
         followUpOwnerId = null;
         followUpOwnerName = null;
         followUpPriority = null;
         followUpDueDate = null;
         followUpNotes = null;
         chatMessage = null;
+        escalateToOwnerAction = false;
+        escalationTargetUserId = null;
+        escalationTargetName = null;
+        escalationChannel = null;
+        escalationNotes = null;
         selectedStatusForReview = string.IsNullOrWhiteSpace(selectedAlert?.Status) ? "Pending" : NormalizeStatusKey(selectedAlert?.Status);
         reviewVerdict = selectedAlert?.Verdict;
         actionTaken = selectedAlert?.ActionTaken ?? string.Empty;
