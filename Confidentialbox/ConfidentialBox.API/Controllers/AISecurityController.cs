@@ -538,6 +538,30 @@ public class AISecurityController : ControllerBase
                             break;
                         }
 
+                        case "deletefile":
+                        {
+                            var targetFileId = command.TargetFileId ?? alert.FileId;
+                            if (targetFileId.HasValue)
+                            {
+                                await _fileRepository.DeleteAsync(targetFileId.Value);
+                                actions.Add(new SecurityAlertAction
+                                {
+                                    AlertId = alert.Id,
+                                    ActionType = "DeleteFile",
+                                    Notes = string.IsNullOrWhiteSpace(command.Notes)
+                                        ? "Archivo purgado desde el centro de alertas"
+                                        : command.Notes,
+                                    CreatedAt = DateTime.UtcNow,
+                                    CreatedByUserId = reviewerId,
+                                    TargetFileId = targetFileId,
+                                    StatusAfterAction = alert.Status
+                                });
+
+                                await RegisterAuditAsync(reviewerId, "AlertDeleteFile", "SharedFile", targetFileId.Value, command.Notes, clientContext);
+                            }
+                            break;
+                        }
+
                         case "escalate":
                         {
                             alert.EscalationLevel = Math.Max(alert.EscalationLevel + 1, command.MonitoringLevel ?? (alert.EscalationLevel + 1));
@@ -549,6 +573,22 @@ public class AISecurityController : ControllerBase
                                 Metadata = JsonSerializer.Serialize(new { alert.EscalationLevel }),
                                 CreatedAt = DateTime.UtcNow,
                                 CreatedByUserId = reviewerId,
+                                StatusAfterAction = alert.Status
+                            });
+                            break;
+                        }
+
+                        case "escalatetouser":
+                        {
+                            actions.Add(new SecurityAlertAction
+                            {
+                                AlertId = alert.Id,
+                                ActionType = "EscalateToUser",
+                                Notes = command.Notes,
+                                Metadata = command.Metadata,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByUserId = reviewerId,
+                                TargetUserId = command.TargetUserId,
                                 StatusAfterAction = alert.Status
                             });
                             break;
