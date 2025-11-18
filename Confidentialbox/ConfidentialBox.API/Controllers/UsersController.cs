@@ -547,17 +547,17 @@ public class UsersController : ControllerBase
 
         var replyBody = request.Body.Trim();
 
-        foreach (var recipient in recipients)
-        {
-            await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
-            await _userNotificationService.CreateAsync(
-                recipient,
-                "Nueva respuesta recibida",
-                $"{senderName} respondió: {subject}",
-                "info",
-                $"/users/{recipient}?tab=messages",
-                userId);
-        }
+            foreach (var recipient in recipients)
+            {
+                var replyMessage = await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
+                await _userNotificationService.CreateAsync(
+                    recipient,
+                    "Nueva respuesta recibida",
+                    $"{senderName} respondió: {subject}",
+                    "info",
+                    $"/profile?tab=messages&messageId={replyMessage.Id}",
+                    userId);
+            }
 
         message.RequiresResponse = false;
         message.IsRead = true;
@@ -589,8 +589,14 @@ public class UsersController : ControllerBase
             ? "Tienes un nuevo mensaje del equipo administrador."
             : request.Body.Trim();
 
-        await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
-        await _userNotificationService.CreateAsync(user.Id, "Nuevo mensaje del administrador", subject, "info", null, actorId);
+        var message = await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
+        await _userNotificationService.CreateAsync(
+            user.Id,
+            "Nuevo mensaje del administrador",
+            subject,
+            "info",
+            $"/profile?tab=messages&messageId={message.Id}",
+            actorId);
 
         return Ok(new OperationResultDto { Success = true });
     }

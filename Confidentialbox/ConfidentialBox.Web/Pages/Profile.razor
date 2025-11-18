@@ -1,8 +1,10 @@
 @page "/profile"
 @attribute [Authorize]
 @inject IUserService UserService
+@inject NavigationManager NavigationManager
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>Mi perfil - ConfidentialBox</PageTitle>
 
@@ -252,6 +254,14 @@
 </div>
 
 @code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "messageId")]
+    public int? MessageId { get; set; }
+
     private UserProfileDto? profile;
     private ProfileForm profileForm = new();
     private ChangePasswordForm passwordForm = new();
@@ -276,7 +286,22 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var normalizedTab = NormalizeTab(Tab);
+        if (MessageId.HasValue)
+        {
+            activeTab = "messages";
+        }
+        else if (!string.IsNullOrEmpty(normalizedTab))
+        {
+            activeTab = normalizedTab;
+        }
+
         await LoadProfileAsync();
+
+        if (activeTab == "messages" && !messagesLoaded)
+        {
+            await LoadMessagesAsync();
+        }
     }
 
     private async Task LoadProfileAsync()
@@ -314,16 +339,48 @@
 
     private void SwitchTab(string tab)
     {
-        if (activeTab == tab)
+        var normalizedTab = NormalizeTab(tab);
+        if (normalizedTab == null || activeTab == normalizedTab)
         {
             return;
         }
 
-        activeTab = tab;
-        if (tab == "messages" && !messagesLoaded)
+        activeTab = normalizedTab;
+        UpdateTabInUrl(normalizedTab);
+
+        if (normalizedTab == "messages" && !messagesLoaded)
         {
             _ = LoadMessagesAsync();
         }
+    }
+
+    private void UpdateTabInUrl(string tab)
+    {
+        var target = tab == "profile"
+            ? "/profile"
+            : $"/profile?tab={tab}";
+
+        if (tab == "messages" && MessageId.HasValue)
+        {
+            target += $"&messageId={MessageId.Value}";
+        }
+        else if (tab != "messages" && MessageId.HasValue)
+        {
+            MessageId = null;
+        }
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private static string? NormalizeTab(string? tab)
+    {
+        if (string.IsNullOrWhiteSpace(tab))
+        {
+            return null;
+        }
+
+        var normalized = tab.Trim().ToLowerInvariant();
+        return normalized is "profile" or "password" or "messages" ? normalized : null;
     }
 
     private async Task SaveProfileAsync()
@@ -481,6 +538,15 @@
             var items = await UserService.GetMyMessagesAsync();
             messages.AddRange(items.OrderByDescending(m => m.CreatedAt));
             messagesLoaded = true;
+
+            if (MessageId.HasValue)
+            {
+                var target = messages.FirstOrDefault(m => m.Id == MessageId.Value);
+                if (target != null)
+                {
+                    await ToggleMessageAsync(target);
+                }
+            }
         }
         catch (Exception ex)
         {
