@@ -107,9 +107,11 @@ public class UserService : IUserService
             ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
     }
 
-    public async Task<List<UserMessageDto>> GetMyMessagesAsync()
+    public async Task<List<UserMessageDto>> GetMyMessagesAsync(bool includeArchived = false)
     {
-        return await _httpClient.GetFromJsonAsync<List<UserMessageDto>>("api/users/me/messages")
+        var url = includeArchived ? "api/users/me/messages?includeArchived=true" : "api/users/me/messages";
+
+        return await _httpClient.GetFromJsonAsync<List<UserMessageDto>>(url)
             ?? new List<UserMessageDto>();
     }
 
@@ -126,6 +128,16 @@ public class UserService : IUserService
 
         return await response.Content.ReadFromJsonAsync<OperationResultDto>()
             ?? new OperationResultDto { Success = response.IsSuccessStatusCode };
+    }
+
+    public async Task ArchiveMessageAsync(int messageId)
+    {
+        await _httpClient.PostAsync($"api/users/me/messages/{messageId}/archive", null);
+    }
+
+    public async Task UnarchiveMessageAsync(int messageId)
+    {
+        await _httpClient.PostAsync($"api/users/me/messages/{messageId}/unarchive", null);
     }
 
     public async Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request)

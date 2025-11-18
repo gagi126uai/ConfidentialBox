@@ -18,6 +18,8 @@ public class UserMessageService : IUserMessageService
 
     public async Task<UserMessage> CreateAsync(string userId, string subject, string body, string? senderId = null, bool requiresResponse = false, CancellationToken cancellationToken = default)
     {
+        await _repository.UnarchiveAllAsync(userId, cancellationToken);
+
         var message = new UserMessage
         {
             UserId = userId,
@@ -31,9 +33,9 @@ public class UserMessageService : IUserMessageService
         return await _repository.AddAsync(message, cancellationToken);
     }
 
-    public Task<List<UserMessage>> GetRecentAsync(string userId, int take = 25, CancellationToken cancellationToken = default)
+    public Task<List<UserMessage>> GetRecentAsync(string userId, int take = 25, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
-        return _repository.GetRecentAsync(userId, take, cancellationToken);
+        return _repository.GetRecentAsync(userId, take, includeArchived, cancellationToken);
     }
 
     public Task MarkAsReadAsync(string userId, int messageId, CancellationToken cancellationToken = default)
@@ -49,5 +51,15 @@ public class UserMessageService : IUserMessageService
     public Task UpdateAsync(UserMessage message, CancellationToken cancellationToken = default)
     {
         return _repository.UpdateAsync(message, cancellationToken);
+    }
+
+    public Task SetArchivedAsync(string userId, int messageId, bool archived, CancellationToken cancellationToken = default)
+    {
+        return _repository.SetArchivedAsync(userId, messageId, archived, cancellationToken);
+    }
+
+    public Task UnarchiveAllAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return _repository.UnarchiveAllAsync(userId, cancellationToken);
     }
 }

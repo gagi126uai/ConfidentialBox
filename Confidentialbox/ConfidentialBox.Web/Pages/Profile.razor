@@ -162,6 +162,20 @@
                     break;
                 case "messages":
                     <div>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div class="text-muted small">
+                                Gestiona tus mensajes y responde directamente desde aquí. Los archivados se ocultarán hasta que los vuelvas a abrir o recibas un mensaje nuevo.
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm @(showArchived ? "btn-secondary" : "btn-outline-secondary")" @onclick="ToggleArchivedFilterAsync">
+                                    <i class="fas fa-box-archive me-1"></i>@(showArchived ? "Ocultar archivados" : "Mostrar archivados")
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="LoadMessagesAsync" disabled="@messagesLoading">
+                                    <i class="fas fa-rotate"></i> Actualizar
+                                </button>
+                            </div>
+                        </div>
+
                         @if (messagesLoading)
                         {
                             <div class="text-center py-4">
@@ -188,16 +202,38 @@
                                 {
                                     var isExpanded = expandedMessages.Contains(message.Id);
                                     <div class="list-group-item list-group-item-action @(message.IsRead ? string.Empty : "unread")">
-                                        <div class="d-flex justify-content-between align-items-center" role="button" @onclick="() => ToggleMessageAsync(message)">
+                                        <div class="d-flex justify-content-between align-items-start gap-3" role="button" @onclick="() => ToggleMessageAsync(message)">
                                             <div>
-                                                <div class="fw-semibold">@message.Subject</div>
+                                                <div class="fw-semibold">
+                                                    @message.Subject
+                                                    @if (message.RequiresResponse)
+                                                    {
+                                                        <span class="badge bg-warning text-dark ms-2">Requiere respuesta</span>
+                                                    }
+                                                    @if (message.IsArchived)
+                                                    {
+                                                        <span class="badge bg-secondary ms-2">Archivado</span>
+                                                    }
+                                                </div>
                                                 <div class="small text-muted">@message.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                                                @if (message.RequiresResponse)
-                                                {
-                                                    <span class="badge bg-warning text-dark mt-1">Requiere respuesta</span>
-                                                }
                                             </div>
-                                            <i class="fas @(isExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <button class="btn btn-sm btn-outline-secondary" title="@(message.IsArchived ? "Desarchivar" : "Archivar")" @onclick="(args) => ToggleArchiveAsync(message, !message.IsArchived)" @onclick:stopPropagation="true" disabled="@archivingMessages.Contains(message.Id)">
+                                                    @if (archivingMessages.Contains(message.Id))
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm"></span>
+                                                    }
+                                                    else if (message.IsArchived)
+                                                    {
+                                                        <span><i class="fas fa-box-open me-1"></i>Desarchivar</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span><i class="fas fa-box-archive me-1"></i>Archivar</span>
+                                                    }
+                                                </button>
+                                                <i class="fas @(isExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                                            </div>
                                         </div>
                                         @if (isExpanded)
                                         {
@@ -270,6 +306,7 @@
     private readonly Dictionary<int, string> replyDrafts = new();
     private readonly HashSet<int> sendingReplies = new();
     private readonly Dictionary<int, ReplyStatus> replyStatuses = new();
+    private readonly HashSet<int> archivingMessages = new();
 
     private string activeTab = "profile";
     private bool isLoadingProfile = true;
@@ -277,6 +314,7 @@
     private bool changingPassword;
     private bool messagesLoading;
     private bool messagesLoaded;
+    private bool showArchived;
 
     private string? profileError;
     private string? passwordError;
@@ -299,6 +337,28 @@
         await LoadProfileAsync();
 
         if (activeTab == "messages" && !messagesLoaded)
+        {
+            await LoadMessagesAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var normalizedTab = NormalizeTab(Tab);
+        if (MessageId.HasValue)
+        {
+            activeTab = "messages";
+        }
+        else if (!string.IsNullOrEmpty(normalizedTab))
+        {
+            activeTab = normalizedTab;
+        }
+
+        if (activeTab == "messages" && messagesLoaded && MessageId.HasValue)
+        {
+            await ExpandMessageFromQueryAsync();
+        }
+        else if (activeTab == "messages" && !messagesLoaded)
         {
             await LoadMessagesAsync();
         }
@@ -535,18 +595,15 @@
         try
         {
             messages.Clear();
-            var items = await UserService.GetMyMessagesAsync();
-            messages.AddRange(items.OrderByDescending(m => m.CreatedAt));
-            messagesLoaded = true;
+            var includeArchived = showArchived || MessageId.HasValue;
+            var items = await UserService.GetMyMessagesAsync(includeArchived);
+            var filtered = showArchived
+                ? items
+                : items.Where(m => !m.IsArchived || (MessageId.HasValue && m.Id == MessageId.Value));
 
-            if (MessageId.HasValue)
-            {
-                var target = messages.FirstOrDefault(m => m.Id == MessageId.Value);
-                if (target != null)
-                {
-                    await ToggleMessageAsync(target);
-                }
-            }
+            messages.AddRange(filtered.OrderByDescending(m => m.CreatedAt));
+            messagesLoaded = true;
+            await ExpandMessageFromQueryAsync();
         }
         catch (Exception ex)
         {
@@ -556,6 +613,20 @@
         {
             messagesLoading = false;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ExpandMessageFromQueryAsync()
+    {
+        if (!MessageId.HasValue)
+        {
+            return;
+        }
+
+        var target = messages.FirstOrDefault(m => m.Id == MessageId.Value);
+        if (target != null && !expandedMessages.Contains(target.Id))
+        {
+            await ToggleMessageAsync(target);
         }
     }
 
@@ -580,6 +651,49 @@
             {
                 messagesError = ex.Message;
             }
+        }
+    }
+
+    private async Task ToggleArchivedFilterAsync()
+    {
+        showArchived = !showArchived;
+        await LoadMessagesAsync();
+    }
+
+    private async Task ToggleArchiveAsync(UserMessageDto message, bool archive)
+    {
+        if (archivingMessages.Contains(message.Id))
+        {
+            return;
+        }
+
+        archivingMessages.Add(message.Id);
+        try
+        {
+            if (archive)
+            {
+                await UserService.ArchiveMessageAsync(message.Id);
+            }
+            else
+            {
+                await UserService.UnarchiveMessageAsync(message.Id);
+            }
+
+            message.IsArchived = archive;
+
+            if (archive && !showArchived && (!MessageId.HasValue || MessageId.Value != message.Id))
+            {
+                messages.Remove(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            messagesError = ex.Message;
+        }
+        finally
+        {
+            archivingMessages.Remove(message.Id);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
