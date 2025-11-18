@@ -239,16 +239,16 @@
                                 <small>Ejecuta acciones directas sin salir del modal: bloquear usuarios o archivos, escalar monitoreo o enviar mensajes inmediatos.</small>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockUser')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('blockFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockUser")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
                                 <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Ver archivo</button>
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
-                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
-                                <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("scan")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick='() => ExecuteQuickAction("escalate")'><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick='() => ExecuteQuickAction("message")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("resolve")'><i class="fas fa-check me-1"></i>Resolver</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => ExecuteQuickAction("falsePositive")'><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                <button class="btn btn-sm btn-dark" @onclick='() => ExecuteQuickAction("lockdown")' disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
                             </div>
                         </div>
 
@@ -351,7 +351,7 @@
                                             <div class="col-sm-4 text-sm-end d-flex flex-wrap gap-2 justify-content-sm-end">
                                                 <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails"><i class="fas fa-up-right-from-square me-1"></i>Ver ficha</button>
                                                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@downloadInProgress"><i class="fas fa-cloud-arrow-down me-1"></i>Descargar</button>
-                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("scan")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear</button>
                                             </div>
                                         </div>
                                         @if (lastScanResult != null)
@@ -359,7 +359,7 @@
                                             <div class="alert @(lastScanResult.ThreatScore >= 0.8 ? "alert-danger" : "alert-warning") mt-3 mb-1">
                                                 <div class="d-flex justify-content-between align-items-start">
                                                     <div>
-                                                        <div class="fw-semibold">Último escaneo IA: @(lastScanResult.ThreatScore:P0)</div>
+                                                        <div class="fw-semibold">Último escaneo IA: @lastScanResult.ThreatScore.ToString("P0")</div>
                                                         <small>@lastScanResult.Recommendation</small>
                                                         @if (lastScanResult.Threats.Any())
                                                         {
@@ -373,31 +373,8 @@
                                     }
                                 </div>
                             </div>
-
-                            <div class="col-lg-5">
-                                <div class="border rounded p-3 h-100 bg-light">
-                                    <h6 class="fw-semibold mb-2">Usuario involucrado</h6>
-                                    @if (alertDetail?.User is null)
-                                    {
-                                        <p class="text-muted mb-0">Sin datos de usuario.</p>
-                                    }
-                                    else
-                                    {
-                                        <div class="d-flex flex-column gap-1 small">
-                                            <div><strong>@alertDetail.User.FullName</strong> (@alertDetail.User.Email)</div>
-                                            <div><i class="fas fa-phone me-1"></i>@(string.IsNullOrWhiteSpace(alertDetail.User.PhoneNumber) ? "Teléfono no registrado" : alertDetail.User.PhoneNumber)</div>
-                                            <div><i class="fas fa-clock me-1"></i>Alta: @alertDetail.User.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                                            <div><i class="fas fa-user-shield me-1"></i>Estado: @(alertDetail.User.IsBlocked ? "Bloqueado" : alertDetail.User.Status)</div>
-                                        </div>
-                                        <div class="d-flex flex-wrap gap-2 mt-3">
-                                            <button class="btn btn-sm btn-outline-danger" @onclick="TriggerActionBlockUser" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-lock me-1"></i>Suspender ya</button>
-                                            <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-binoculars me-1"></i>Vigilar</button>
-                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-envelope me-1"></i>Contactar</button>
-                                        </div>
-                                    }
-                                </div>
-                            </div>
                         </div>
+
 
                         <div class="row g-4">
                             <div class="col-lg-7">

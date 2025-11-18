@@ -5594,6 +5594,12 @@
             },
             "nullable": true
           },
+          "file": {
+            "$ref": "#/components/schemas/FileDto"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          },
           "canBlockFile": {
             "type": "boolean"
           },
