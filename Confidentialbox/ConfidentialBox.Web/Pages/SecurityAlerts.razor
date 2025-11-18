@@ -163,7 +163,7 @@
                         @foreach (var alert in alerts.Items)
                         {
                             <tr class="@(alert.IsReviewed ? string.Empty : "table-warning")">
-                                <td><span class="badge bg-secondary">@alert.AlertType</span></td>
+                                <td><span class="badge bg-secondary">@GetAlertTypeLabel(alert.AlertType)</span></td>
                                 <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
                                 <td>@(RenderStatusBadgeMarkup(alert.Status))</td>
                                 <td>@(string.IsNullOrWhiteSpace(alert.UserName) ? "-" : alert.UserName)</td>
@@ -232,25 +232,48 @@
                     }
                     else if (alertDetail is not null)
                     {
-                        <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
-                            <i class="fas fa-bolt text-danger"></i>
-                            <div class="flex-fill">
-                                <div class="fw-semibold">Centro de respuesta</div>
-                                <small>Ejecuta acciones directas sin salir del modal: bloquear usuarios o archivos, escalar monitoreo o enviar mensajes inmediatos.</small>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockUser")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
-                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
-                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Ver archivo</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("scan")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
-                                <button class="btn btn-sm btn-outline-warning" @onclick='() => ExecuteQuickAction("escalate")'><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
-                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("deleteFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-trash-can me-1"></i>Eliminar archivo</button>
-                                <button class="btn btn-sm btn-outline-dark" @onclick='() => ExecuteQuickAction("escalateToOwner")' disabled="@(availableUsers.Count == 0)"><i class="fas fa-share-from-square me-1"></i>Escalar a responsable</button>
-                                <button class="btn btn-sm btn-outline-primary" @onclick='() => ExecuteQuickAction("message")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("resolve")'><i class="fas fa-check me-1"></i>Resolver</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => ExecuteQuickAction("falsePositive")'><i class="fas fa-ban me-1"></i>Falso positivo</button>
-                                <button class="btn btn-sm btn-dark" @onclick='() => ExecuteQuickAction("lockdown")' disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
+                        <div class="alert alert-warning" role="alert">
+                            <div class="d-flex align-items-start gap-3">
+                                <i class="fas fa-bolt text-danger"></i>
+                                <div class="flex-fill">
+                                    <div class="fw-semibold">Centro de respuesta</div>
+                                    <small>Acciona sin salir del ticket: contención, evidencias, IA y comunicación.</small>
+                                    <div class="row row-cols-1 row-cols-md-2 g-2 mt-2">
+                                        <div class="col">
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockUser")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-user-slash me-1"></i>Bloquear usuario</button>
+                                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Evidencia</button>
+                                                <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Vista previa</button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear</button>
+                                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar</button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('deleteFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-trash-can me-1"></i>Eliminar</button>
+                                                <button class="btn btn-sm btn-outline-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Contención total</button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <button class="btn btn-sm btn-outline-primary w-100" @onclick="() => ExecuteQuickAction('escalateToOwner')" disabled="@(availableUsers.Count == 0)"><i class="fas fa-share-from-square me-1"></i>Escalar a responsable</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -259,7 +282,7 @@
                                 <div class="border rounded p-3 h-100">
                                     <h6 class="fw-semibold mb-3">Resumen de la alerta</h6>
                                     <div class="d-flex flex-wrap gap-2 mb-3">
-                                        <span class="badge bg-secondary"><i class="fas fa-tag me-1"></i>@alertDetail.Alert.AlertType</span>
+                                        <span class="badge bg-secondary"><i class="fas fa-tag me-1"></i>@GetAlertTypeLabel(alertDetail.Alert.AlertType)</span>
                                         <span class="badge bg-@GetSeverityColor(alertDetail.Alert.Severity)">@alertDetail.Alert.Severity</span>
                                         @(RenderStatusBadgeMarkup(alertDetail.Alert.Status))
                                         <span class="badge bg-info text-dark">Confianza @($"{alertDetail.Alert.ConfidenceScore * 100:F0}%")</span>
@@ -1920,4 +1943,22 @@
         "Low" => 1,
         _ => 0
     };
+
+    private string GetAlertTypeLabel(string? alertType)
+    {
+        if (string.IsNullOrWhiteSpace(alertType))
+        {
+            return "Alerta";
+        }
+
+        return alertType switch
+        {
+            "SuspiciousFile" => "Archivo sospechoso",
+            "UnauthorizedAccess" => "Acceso no autorizado",
+            "UnusualBehavior" => "Comportamiento inusual",
+            "DataExfiltration" => "Posible exfiltración",
+            "Malware" => "Posible malware",
+            _ => alertType
+        };
+    }
 }
