@@ -243,14 +243,14 @@
                                 <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("blockFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-file-shield me-1"></i>Aislar archivo</button>
                                 <button class="btn btn-sm btn-outline-info" @onclick="OpenFileDetails" disabled="@(fileMetadata is null)"><i class="fas fa-eye me-1"></i>Ver archivo</button>
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadFileAsync" disabled="@(fileMetadata is null || downloadInProgress)"><i class="fas fa-download me-1"></i>Descargar evidencia</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('scan')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
-                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ExecuteQuickAction('escalate')"><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ExecuteQuickAction('deleteFile')" disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-trash-can me-1"></i>Eliminar archivo</button>
-                                <button class="btn btn-sm btn-outline-dark" @onclick="() => ExecuteQuickAction('escalateToOwner')" disabled="@(availableUsers.Count == 0)"><i class="fas fa-share-from-square me-1"></i>Escalar a responsable</button>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ExecuteQuickAction('message')" disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
-                                <button class="btn btn-sm btn-outline-success" @onclick="() => ExecuteQuickAction('resolve')"><i class="fas fa-check me-1"></i>Resolver</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ExecuteQuickAction('falsePositive')"><i class="fas fa-ban me-1"></i>Falso positivo</button>
-                                <button class="btn btn-sm btn-dark" @onclick="() => ExecuteQuickAction('lockdown')" disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("scan")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-microchip me-1"></i>Re-escanear con IA</button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick='() => ExecuteQuickAction("escalate")'><i class="fas fa-satellite-dish me-1"></i>Escalar seguimiento</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecuteQuickAction("deleteFile")' disabled="@(selectedAlert?.FileId is null)"><i class="fas fa-trash-can me-1"></i>Eliminar archivo</button>
+                                <button class="btn btn-sm btn-outline-dark" @onclick='() => ExecuteQuickAction("escalateToOwner")' disabled="@(availableUsers.Count == 0)"><i class="fas fa-share-from-square me-1"></i>Escalar a responsable</button>
+                                <button class="btn btn-sm btn-outline-primary" @onclick='() => ExecuteQuickAction("message")' disabled="@(string.IsNullOrEmpty(selectedAlert?.UserId))"><i class="fas fa-comment-dots me-1"></i>Contactar usuario</button>
+                                <button class="btn btn-sm btn-outline-success" @onclick='() => ExecuteQuickAction("resolve")'><i class="fas fa-check me-1"></i>Resolver</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => ExecuteQuickAction("falsePositive")'><i class="fas fa-ban me-1"></i>Falso positivo</button>
+                                <button class="btn btn-sm btn-dark" @onclick='() => ExecuteQuickAction("lockdown")' disabled="@(selectedAlert?.UserId is null && selectedAlert?.FileId is null)"><i class="fas fa-robot me-1"></i>Modo contención total</button>
                             </div>
                         </div>
 
@@ -875,7 +875,6 @@
     private string? escalationTargetUserId;
     private string? escalationTargetName;
     private string? escalationChannel;
-    private string? escalationNotes;
     private string? followUpOwnerId;
     private string? followUpOwnerName;
     private string? followUpPriority;
@@ -1790,7 +1789,6 @@
         escalationTargetUserId = null;
         escalationTargetName = null;
         escalationChannel = null;
-        escalationNotes = null;
         selectedStatusForReview = string.IsNullOrWhiteSpace(selectedAlert?.Status) ? "Pending" : NormalizeStatusKey(selectedAlert?.Status);
         reviewVerdict = selectedAlert?.Verdict;
         actionTaken = selectedAlert?.ActionTaken ?? string.Empty;
