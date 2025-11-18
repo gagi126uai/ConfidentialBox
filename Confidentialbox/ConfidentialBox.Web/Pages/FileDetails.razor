@@ -1,0 +1,151 @@
+@page "/files/{id:int}"
+@attribute [Authorize]
+@inject IFileService FileService
+@inject NavigationManager NavigationManager
+@using ConfidentialBox.Core.DTOs
+
+<PageTitle>Detalle del archivo - ConfidentialBox</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h3 mb-0"><i class="fas fa-file-alt me-2"></i>Detalle del archivo</h1>
+        <p class="text-muted mb-0">Revisa el estado, propietario y configuración de seguridad.</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="NavigateBack">
+        <i class="fas fa-arrow-left me-1"></i>Volver a mis archivos
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border" role="status"></div>
+        <div class="mt-2">Cargando información del archivo…</div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-triangle-exclamation me-2"></i>@error
+    </div>
+}
+else if (file == null)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-circle-exclamation me-2"></i>No encontramos este archivo o no tienes permiso para verlo.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-light text-dark border">ID: @file.Id</span>
+                        <span class="badge bg-primary-subtle text-primary border">@file.FileExtension.ToUpperInvariant()</span>
+                        <span class="badge @(file.IsBlocked ? "bg-danger text-white" : "bg-success-subtle text-success border")">
+                            @(file.IsBlocked ? "Bloqueado" : "Disponible")
+                        </span>
+                    </div>
+                    <h3 class="h5 mb-1">@file.OriginalFileName</h3>
+                    <div class="text-muted small">Subido el @file.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") por @file.UploadedByUserName</div>
+                </div>
+                <div class="text-end text-muted">
+                    <div><i class="fas fa-database me-1"></i>@FormatSize(file.FileSizeBytes)</div>
+                    @if (file.ExpiresAt != null)
+                    {
+                        <div><i class="fas fa-hourglass-half me-1"></i>Vence el @file.ExpiresAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                    }
+                </div>
+            </div>
+
+            @if (file.IsBlocked && !string.IsNullOrWhiteSpace(file.BlockReason))
+            {
+                <div class="alert alert-danger d-flex align-items-center gap-2 mt-3" role="alert">
+                    <i class="fas fa-ban"></i>
+                    <div>
+                        <div class="fw-semibold">Este archivo está bloqueado</div>
+                        <div class="mb-0">@file.BlockReason</div>
+                    </div>
+                </div>
+            }
+
+            <div class="row mt-3 g-3">
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <div class="fw-semibold mb-2">Seguridad</div>
+                        <ul class="list-unstyled mb-0 small">
+                            <li><i class="fas fa-shield-alt me-2 text-primary"></i>Contraseña maestra: @(file.HasMasterPassword ? "Sí" : "No")</li>
+                            <li><i class="fas fa-droplet me-2 text-primary"></i>Marca de agua: @(file.HasWatermark ? "Activa" : "No")</li>
+                            <li><i class="fas fa-eye-slash me-2 text-primary"></i>Protección de capturas: @(file.ScreenshotProtectionEnabled ? "Activa" : "No")</li>
+                            <li><i class="fas fa-robot me-2 text-primary"></i>Monitor AI: @(file.AimMonitoringEnabled ? "Activo" : "No")</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <div class="fw-semibold mb-2">Accesos</div>
+                        <ul class="list-unstyled mb-0 small">
+                            <li><i class="fas fa-link me-2 text-primary"></i>Link para compartir: <code>@file.ShareLink</code></li>
+                            <li><i class="fas fa-chart-line me-2 text-primary"></i>Accesos actuales: @file.CurrentAccessCount</li>
+                            @if (file.MaxAccessCount != null)
+                            {
+                                <li><i class="fas fa-gauge me-2 text-primary"></i>Límite de accesos: @file.MaxAccessCount</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private FileDto? file;
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            file = await FileService.GetFileByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            file = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/files", true);
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        var unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return $"{size:0.##} {units[unitIndex]}";
+    }
+}

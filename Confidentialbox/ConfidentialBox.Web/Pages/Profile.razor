@@ -1,8 +1,10 @@
 @page "/profile"
 @attribute [Authorize]
 @inject IUserService UserService
+@inject NavigationManager NavigationManager
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>Mi perfil - ConfidentialBox</PageTitle>
 
@@ -252,6 +254,10 @@
 </div>
 
 @code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
+
     private UserProfileDto? profile;
     private ProfileForm profileForm = new();
     private ChangePasswordForm passwordForm = new();
@@ -276,7 +282,18 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var normalizedTab = NormalizeTab(Tab);
+        if (!string.IsNullOrEmpty(normalizedTab))
+        {
+            activeTab = normalizedTab;
+        }
+
         await LoadProfileAsync();
+
+        if (activeTab == "messages" && !messagesLoaded)
+        {
+            await LoadMessagesAsync();
+        }
     }
 
     private async Task LoadProfileAsync()
@@ -314,16 +331,39 @@
 
     private void SwitchTab(string tab)
     {
-        if (activeTab == tab)
+        var normalizedTab = NormalizeTab(tab);
+        if (normalizedTab == null || activeTab == normalizedTab)
         {
             return;
         }
 
-        activeTab = tab;
-        if (tab == "messages" && !messagesLoaded)
+        activeTab = normalizedTab;
+        UpdateTabInUrl(normalizedTab);
+
+        if (normalizedTab == "messages" && !messagesLoaded)
         {
             _ = LoadMessagesAsync();
         }
+    }
+
+    private void UpdateTabInUrl(string tab)
+    {
+        var target = tab == "profile"
+            ? "/profile"
+            : $"/profile?tab={tab}";
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private static string? NormalizeTab(string? tab)
+    {
+        if (string.IsNullOrWhiteSpace(tab))
+        {
+            return null;
+        }
+
+        var normalized = tab.Trim().ToLowerInvariant();
+        return normalized is "profile" or "password" or "messages" ? normalized : null;
     }
 
     private async Task SaveProfileAsync()
