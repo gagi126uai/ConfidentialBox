@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace ConfidentialBox.Core.DTOs;
@@ -108,4 +109,15 @@ public class AIScoringSettingsDto
 
     [Required]
     public string PlatformTimeZone { get; set; } = TimeZoneInfo.Utc.Id;
+
+    public bool AdminBypassEnabled { get; set; } = true;
+
+    public List<string> WhitelistedUserIds { get; set; } = new();
+
+    public List<string> AlertCenterSeverities { get; set; } = new() { "Critical", "High", "Medium" };
+
+    public List<string> AlertCenterStatuses { get; set; } = new() { "PendingReview", "Escalated", "New" };
+
+    [Required]
+    public string AlertCenterSort { get; set; } = "SeverityThenRecency";
 }

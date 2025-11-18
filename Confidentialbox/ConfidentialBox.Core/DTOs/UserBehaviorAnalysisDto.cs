@@ -15,4 +15,5 @@ public class UserBehaviorAnalysisDto
     public bool HasUnusualUploadPattern { get; set; }
     public bool HasUnusualAccessPattern { get; set; }
     public bool AccessingOutsideHours { get; set; }
+    public bool IsWhitelisted { get; set; }
 }

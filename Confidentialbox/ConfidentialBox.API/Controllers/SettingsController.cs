@@ -280,7 +280,14 @@ public class SettingsController : ControllerBase
             RiskLevelHighThreshold = request.RiskLevelHighThreshold,
             RiskLevelMediumThreshold = request.RiskLevelMediumThreshold,
             SuspiciousExtensions = ParseExtensions(request.SuspiciousExtensions),
-            PlatformTimeZone = request.PlatformTimeZone
+            PlatformTimeZone = request.PlatformTimeZone,
+            AdminBypassEnabled = request.AdminBypassEnabled,
+            WhitelistedUserIds = NormalizeUserIds(request.WhitelistedUserIds),
+            AlertCenterSeverities = NormalizeUserIds(request.AlertCenterSeverities),
+            AlertCenterStatuses = NormalizeUserIds(request.AlertCenterStatuses),
+            AlertCenterSort = string.IsNullOrWhiteSpace(request.AlertCenterSort)
+                ? "SeverityThenRecency"
+                : request.AlertCenterSort.Trim()
         };
 
         await _systemSettingsService.UpdateAIScoringSettingsAsync(settings, GetUserId(), cancellationToken);
@@ -362,7 +369,14 @@ public class SettingsController : ControllerBase
             RiskLevelHighThreshold = settings.RiskLevelHighThreshold,
             RiskLevelMediumThreshold = settings.RiskLevelMediumThreshold,
             SuspiciousExtensions = string.Join(", ", settings.SuspiciousExtensions),
-            PlatformTimeZone = settings.PlatformTimeZone
+            PlatformTimeZone = settings.PlatformTimeZone,
+            AdminBypassEnabled = settings.AdminBypassEnabled,
+            WhitelistedUserIds = NormalizeUserIds(settings.WhitelistedUserIds),
+            AlertCenterSeverities = NormalizeUserIds(settings.AlertCenterSeverities),
+            AlertCenterStatuses = NormalizeUserIds(settings.AlertCenterStatuses),
+            AlertCenterSort = string.IsNullOrWhiteSpace(settings.AlertCenterSort)
+                ? "SeverityThenRecency"
+                : settings.AlertCenterSort
         };
     }
 
@@ -456,5 +470,14 @@ public class SettingsController : ControllerBase
             .Select(e => e.ToLowerInvariant())
             .Distinct()
             .ToList();
+    }
+
+    private static System.Collections.Generic.List<string> NormalizeUserIds(IEnumerable<string>? values)
+    {
+        return (values ?? Array.Empty<string>())
+            .Select(v => v?.Trim())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()!;
     }
 }

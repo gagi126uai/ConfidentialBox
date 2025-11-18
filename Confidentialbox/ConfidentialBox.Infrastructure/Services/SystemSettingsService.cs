@@ -414,6 +414,15 @@ public class SystemSettingsService : ISystemSettingsService
 
         settings.SuspiciousExtensions = NormalizeExtensions(settings.SuspiciousExtensions);
 
+        settings.WhitelistedUserIds = NormalizeIds(settings.WhitelistedUserIds);
+        settings.AlertCenterSeverities = NormalizeIds(settings.AlertCenterSeverities, new[] { "critical", "high", "medium", "low" });
+        settings.AlertCenterStatuses = NormalizeIds(settings.AlertCenterStatuses);
+        settings.AlertCenterSort = string.IsNullOrWhiteSpace(settings.AlertCenterSort)
+            ? "SeverityThenRecency"
+            : settings.AlertCenterSort.Trim();
+
+        settings.AdminBypassEnabled = settings.AdminBypassEnabled;
+
         if (string.IsNullOrWhiteSpace(settings.PlatformTimeZone))
         {
             settings.PlatformTimeZone = TimeZoneInfo.Utc.Id;
@@ -435,6 +444,27 @@ public class SystemSettingsService : ISystemSettingsService
         }
 
         return settings;
+    }
+
+    private static List<string> NormalizeIds(IEnumerable<string>? input, IEnumerable<string>? allowed = null)
+    {
+        var normalized = (input ?? Array.Empty<string>())
+            .Select(v => v?.Trim())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!)
+            .ToList();
+
+        if (allowed != null)
+        {
+            var allowedSet = new HashSet<string>(allowed.Select(a => a.ToLowerInvariant()));
+            normalized = normalized
+                .Where(v => allowedSet.Contains(v.ToLowerInvariant()))
+                .ToList();
+        }
+
+        return normalized
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static PDFViewerSettings NormalizePdfViewerSettings(PDFViewerSettings settings)

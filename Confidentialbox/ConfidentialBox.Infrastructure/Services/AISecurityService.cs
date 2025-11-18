@@ -30,6 +30,67 @@ public class AISecurityService : IAISecurityService
         _systemSettingsService = systemSettingsService;
     }
 
+    private async Task<HashSet<string>> ResolveWhitelistedUsersAsync(AIScoringSettings scoring)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var id in scoring.WhitelistedUserIds ?? new List<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                ids.Add(id.Trim());
+            }
+        }
+
+        if (scoring.AdminBypassEnabled)
+        {
+            var adminIds = await _context.UserRoles
+                .Join(_context.Roles,
+                    ur => ur.RoleId,
+                    r => r.Id,
+                    (ur, r) => new { ur.UserId, r.Name })
+                .Where(x => x.Name == "Admin")
+                .Select(x => x.UserId)
+                .ToListAsync();
+
+            foreach (var adminId in adminIds)
+            {
+                ids.Add(adminId);
+            }
+        }
+
+        return ids;
+    }
+
+    private async Task<bool> IsUserWhitelistedAsync(string userId, AIScoringSettings scoring)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return false;
+        }
+
+        var whitelisted = await ResolveWhitelistedUsersAsync(scoring);
+        return whitelisted.Contains(userId);
+    }
+
+    private async Task RecordWhitelistBypassAsync(string userId, string category, string? entityId = null)
+    {
+        var audit = new AuditLog
+        {
+            UserId = userId,
+            Action = $"AI-Agent bypass ({category})",
+            EntityType = "AI-Agent",
+            EntityId = entityId,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = "ai-agent",
+            UserAgent = "AI-Agent whitelist",
+            DeviceType = "AI-Agent",
+            OperatingSystem = "AI-Agent"
+        };
+
+        await _auditLogRepository.AddAsync(audit);
+    }
+
     public async Task<FileThreatAnalysisDto> AnalyzeFileAsync(SharedFile file, string userId)
     {
         var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
@@ -37,6 +98,22 @@ public class AISecurityService : IAISecurityService
         var threats = new List<string>();
         var zone = ResolveTimeZone(scoring.PlatformTimeZone);
         var localNow = GetPlatformNow(zone);
+
+        if (await IsUserWhitelistedAsync(userId, scoring))
+        {
+            await RecordWhitelistBypassAsync(userId, "FileAnalysis", file.Id.ToString());
+            return new FileThreatAnalysisDto
+            {
+                FileId = file.Id,
+                FileName = file.OriginalFileName,
+                IsThreat = false,
+                ThreatScore = 0,
+                Threats = new List<string> { "AI-Agent en modo lista blanca para este usuario." },
+                MalwareProbability = 0,
+                DataExfiltrationProbability = 0,
+                Recommendation = "PERMITIR - Usuario en lista blanca"
+            };
+        }
 
         var normalizedExtension = NormalizeExtension(file.FileExtension);
         var suspiciousExtensions = new HashSet<string>(scoring.SuspiciousExtensions ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
@@ -140,6 +217,26 @@ public class AISecurityService : IAISecurityService
         var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
         var zone = ResolveTimeZone(scoring.PlatformTimeZone);
 
+        if (await IsUserWhitelistedAsync(userId, scoring))
+        {
+            await RecordWhitelistBypassAsync(userId, "UserBehavior");
+            return new UserBehaviorAnalysisDto
+            {
+                UserId = userId,
+                UserName = $"{user.FirstName} {user.LastName}",
+                RiskScore = 0,
+                RiskLevel = "Low",
+                AnomaliesDetected = new List<string> { "Usuario en lista blanca AI-Agent" },
+                LastAnalyzed = DateTime.UtcNow,
+                AverageFilesPerDay = 0,
+                CurrentFilesPerDay = 0,
+                HasUnusualUploadPattern = false,
+                HasUnusualAccessPattern = false,
+                AccessingOutsideHours = false,
+                IsWhitelisted = true
+            };
+        }
+
         var profile = await _context.UserBehaviorProfiles
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
@@ -215,7 +312,8 @@ public class AISecurityService : IAISecurityService
             CurrentFilesPerDay = filesToday,
             HasUnusualUploadPattern = hasUnusualUploadPattern,
             HasUnusualAccessPattern = hasUnusualFileSize,
-            AccessingOutsideHours = accessingOutsideHours
+            AccessingOutsideHours = accessingOutsideHours,
+            IsWhitelisted = false
         };
     }
 
@@ -237,12 +335,13 @@ public class AISecurityService : IAISecurityService
         }
 
         var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
+        var whitelisted = await ResolveWhitelistedUsersAsync(scoring);
         var newAlerts = await _context.SecurityAlerts
             .Where(a => a.DetectedAt >= scanStarted)
             .CountAsync();
 
         var highRiskProfiles = await _context.UserBehaviorProfiles
-            .Where(p => p.RiskScore >= scoring.HighRiskThreshold)
+            .Where(p => p.RiskScore >= scoring.HighRiskThreshold && !whitelisted.Contains(p.UserId))
             .CountAsync();
 
         return new AIScanSummaryDto
@@ -264,28 +363,37 @@ public class AISecurityService : IAISecurityService
         var today = localNow.Date;
         var dayStartUtc = ConvertToUtc(zone, today);
         var nextDayUtc = dayStartUtc.AddDays(1);
+        var whitelisted = await ResolveWhitelistedUsersAsync(scoring);
         var alerts = await _context.SecurityAlerts
             .Include(a => a.User)
             .Include(a => a.File)
             .OrderByDescending(a => a.DetectedAt)
             .ToListAsync();
 
-        var alertsToday = alerts.Count(a => ConvertToPlatformTime(zone, a.DetectedAt).Date == today);
-        var criticalUnreviewed = alerts.Count(a => a.Severity == "Critical" && !a.IsReviewed);
+        bool AlertVisible(SecurityAlert alert) => string.IsNullOrWhiteSpace(alert.UserId) || !whitelisted.Contains(alert.UserId);
 
-        var highRiskUsers = await _context.UserBehaviorProfiles
-            .Where(p => p.RiskScore >= scoring.HighRiskThreshold)
-            .CountAsync();
+        var visibleAlerts = alerts.Where(AlertVisible).ToList();
 
-        var highRiskProfiles = await _context.UserBehaviorProfiles
+        var alertsToday = visibleAlerts.Count(a => ConvertToPlatformTime(zone, a.DetectedAt).Date == today);
+        var criticalUnreviewed = visibleAlerts.Count(a => a.Severity == "Critical" && !a.IsReviewed);
+
+        var highRiskProfilesRaw = await _context.UserBehaviorProfiles
             .Include(p => p.User)
             .Where(p => p.RiskScore >= scoring.HighRiskThreshold)
             .OrderByDescending(p => p.RiskScore)
-            .Take(5)
             .ToListAsync();
 
+        var highRiskProfiles = highRiskProfilesRaw
+            .Where(p => !whitelisted.Contains(p.UserId))
+            .ToList();
+        var highRiskUsers = highRiskProfiles.Count;
+        var highRiskProfilesTop = highRiskProfiles
+            .OrderByDescending(p => p.RiskScore)
+            .Take(5)
+            .ToList();
+
         var highRiskDetails = new List<UserBehaviorAnalysisDto>();
-        foreach (var profile in highRiskProfiles)
+        foreach (var profile in highRiskProfilesTop)
         {
             var userFiles = await _fileRepository.GetByUserIdAsync(profile.UserId);
             var todaysFiles = userFiles.Count(f => ConvertToPlatformTime(zone, f.UploadedAt).Date == today);
@@ -304,7 +412,8 @@ public class AISecurityService : IAISecurityService
                 HasUnusualAccessPattern = profile.UnusualActivityCount > 0,
                 AccessingOutsideHours = false,
                 AnomaliesDetected = anomalies,
-                LastAnalyzed = ConvertToPlatformTime(zone, profile.LastUpdated)
+                LastAnalyzed = ConvertToPlatformTime(zone, profile.LastUpdated),
+                IsWhitelisted = false
             });
         }
 
@@ -313,7 +422,7 @@ public class AISecurityService : IAISecurityService
             .CountAsync();
 
         var last24HoursStartUtc = ConvertToUtc(zone, localNow.AddHours(-24));
-        var last24Hours = alerts
+        var last24Hours = visibleAlerts
             .Where(a => a.DetectedAt >= last24HoursStartUtc)
             .ToList();
 
@@ -321,7 +430,7 @@ public class AISecurityService : IAISecurityService
             ? last24Hours.Average(a => a.ConfidenceScore)
             : 0.0;
 
-        var recentAlerts = alerts.Take(10).Select(a => new SecurityAlertDto
+        var recentAlerts = visibleAlerts.Take(10).Select(a => new SecurityAlertDto
         {
             Id = a.Id,
             AlertType = a.AlertType,
@@ -335,7 +444,7 @@ public class AISecurityService : IAISecurityService
             ActionTaken = a.ActionTaken
         }).ToList();
 
-        var alertsByType = alerts
+        var alertsByType = visibleAlerts
             .Where(a => a.DetectedAt >= dayStartUtc && a.DetectedAt < nextDayUtc)
             .GroupBy(a => a.AlertType)
             .ToDictionary(g => g.Key, g => g.Count());
@@ -413,6 +522,12 @@ public class AISecurityService : IAISecurityService
     public async Task UpdateUserBehaviorProfileAsync(string userId)
     {
         var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
+        if (await IsUserWhitelistedAsync(userId, scoring))
+        {
+            await RecordWhitelistBypassAsync(userId, "BehaviorProfile");
+            return;
+        }
+
         var zone = ResolveTimeZone(scoring.PlatformTimeZone);
         var localNow = GetPlatformNow(zone);
 
