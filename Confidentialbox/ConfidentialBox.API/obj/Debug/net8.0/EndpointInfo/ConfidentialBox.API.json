@@ -4134,6 +4134,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "myFiles": {
+            "type": "integer",
+            "format": "int32"
+          },
           "totalUsers": {
             "type": "integer",
             "format": "int32"
@@ -4143,6 +4147,10 @@
             "format": "int32"
           },
           "totalStorageBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "myStorageBytes": {
             "type": "integer",
             "format": "int64"
           },
