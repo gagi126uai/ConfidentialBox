@@ -1,5 +1,6 @@
 @inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
 @using System
 @using System.Linq
 
@@ -55,7 +56,7 @@
                     <ul class="notification-list">
                         @foreach (var notification in notifications)
                         {
-                            <li class="notification-card @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")" role="listitem">
+                            <li class="notification-card @GetSeverityClass(notification) @(notification.IsRead ? string.Empty : "unread")" role="listitem" @onclick="() => OnNotificationClicked(notification)">
                                 <div class="notification-card__icon">
                                     <i class="fas fa-shield-alt"></i>
                                 </div>
@@ -68,12 +69,17 @@
                                         <span class="notification-card__relative">@GetRelativeTime(notification.CreatedAt)</span>
                                     </div>
                                 </div>
-                                @if (!string.IsNullOrWhiteSpace(notification.Link))
-                                {
-                                    <a class="notification-card__action" href="@notification.Link" title="Ver detalle">
-                                        <i class="fas fa-arrow-up-right-from-square"></i>
-                                    </a>
-                                }
+                                <div class="notification-card__actions">
+                                    @if (!string.IsNullOrWhiteSpace(notification.Link))
+                                    {
+                                        <button type="button" class="notification-card__action" @onclick="(args) => OnNotificationClicked(notification)" @onclick:stopPropagation="true" title="Ver detalle">
+                                            <i class="fas fa-arrow-up-right-from-square"></i>
+                                        </button>
+                                    }
+                                    <button type="button" class="notification-card__dismiss" @onclick="(args) => DeleteNotificationAsync(notification)" @onclick:stopPropagation="true" title="Eliminar notificación" aria-label="Eliminar notificación">
+                                        <i class="fas fa-xmark"></i>
+                                    </button>
+                                </div>
                             </li>
                         }
                     </ul>
@@ -160,6 +166,39 @@
                         : ex.Message;
                 }
             }
+        }
+    }
+
+    private void OnNotificationClicked(UserNotificationDto notification)
+    {
+        if (string.IsNullOrWhiteSpace(notification.Link))
+        {
+            return;
+        }
+
+        showDropdown = false;
+        NavigationManager.NavigateTo(notification.Link);
+    }
+
+    private async Task DeleteNotificationAsync(UserNotificationDto notification)
+    {
+        try
+        {
+            await NotificationService.DeleteAsync(notification.Id);
+            notifications.Remove(notification);
+
+            if (!notification.IsRead && unreadCount > 0)
+            {
+                unreadCount = Math.Max(0, unreadCount - 1);
+            }
+
+            loadError = null;
+        }
+        catch (Exception ex)
+        {
+            loadError = string.IsNullOrWhiteSpace(ex.Message)
+                ? "No se pudo eliminar la notificación."
+                : ex.Message;
         }
     }
 

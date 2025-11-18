@@ -60,4 +60,19 @@ public class UserNotificationRepository : IUserNotificationRepository
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> DeleteAsync(string userId, int notificationId, CancellationToken cancellationToken = default)
+    {
+        var notification = await _context.UserNotifications
+            .FirstOrDefaultAsync(n => n.UserId == userId && n.Id == notificationId, cancellationToken);
+
+        if (notification is null)
+        {
+            return false;
+        }
+
+        _context.UserNotifications.Remove(notification);
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

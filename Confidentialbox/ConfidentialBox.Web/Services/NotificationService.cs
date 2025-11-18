@@ -42,4 +42,14 @@ public class NotificationService : INotificationService
             throw new HttpRequestException($"No se pudieron actualizar las notificaciones (código {(int)response.StatusCode}). {detail}");
         }
     }
+
+    public async Task DeleteAsync(int notificationId)
+    {
+        var response = await _httpClient.DeleteAsync($"api/notifications/{notificationId}");
+        if (!response.IsSuccessStatusCode)
+        {
+            var detail = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException($"No se pudo eliminar la notificación (código {(int)response.StatusCode}). {detail}");
+        }
+    }
 }
