@@ -549,13 +549,13 @@ public class UsersController : ControllerBase
 
             foreach (var recipient in recipients)
             {
-                await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
+                var replyMessage = await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
                 await _userNotificationService.CreateAsync(
                     recipient,
                     "Nueva respuesta recibida",
                     $"{senderName} respondió: {subject}",
                     "info",
-                    "/profile?tab=messages",
+                    $"/profile?tab=messages&messageId={replyMessage.Id}",
                     userId);
             }
 
@@ -589,13 +589,13 @@ public class UsersController : ControllerBase
             ? "Tienes un nuevo mensaje del equipo administrador."
             : request.Body.Trim();
 
-        await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
+        var message = await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
         await _userNotificationService.CreateAsync(
             user.Id,
             "Nuevo mensaje del administrador",
             subject,
             "info",
-            "/profile?tab=messages",
+            $"/profile?tab=messages&messageId={message.Id}",
             actorId);
 
         return Ok(new OperationResultDto { Success = true });

@@ -258,6 +258,10 @@
     [SupplyParameterFromQuery(Name = "tab")]
     public string? Tab { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "messageId")]
+    public int? MessageId { get; set; }
+
     private UserProfileDto? profile;
     private ProfileForm profileForm = new();
     private ChangePasswordForm passwordForm = new();
@@ -283,7 +287,11 @@
     protected override async Task OnInitializedAsync()
     {
         var normalizedTab = NormalizeTab(Tab);
-        if (!string.IsNullOrEmpty(normalizedTab))
+        if (MessageId.HasValue)
+        {
+            activeTab = "messages";
+        }
+        else if (!string.IsNullOrEmpty(normalizedTab))
         {
             activeTab = normalizedTab;
         }
@@ -351,6 +359,15 @@
         var target = tab == "profile"
             ? "/profile"
             : $"/profile?tab={tab}";
+
+        if (tab == "messages" && MessageId.HasValue)
+        {
+            target += $"&messageId={MessageId.Value}";
+        }
+        else if (tab != "messages" && MessageId.HasValue)
+        {
+            MessageId = null;
+        }
 
         NavigationManager.NavigateTo(target, replace: true);
     }
@@ -521,6 +538,15 @@
             var items = await UserService.GetMyMessagesAsync();
             messages.AddRange(items.OrderByDescending(m => m.CreatedAt));
             messagesLoaded = true;
+
+            if (MessageId.HasValue)
+            {
+                var target = messages.FirstOrDefault(m => m.Id == MessageId.Value);
+                if (target != null)
+                {
+                    await ToggleMessageAsync(target);
+                }
+            }
         }
         catch (Exception ex)
         {
