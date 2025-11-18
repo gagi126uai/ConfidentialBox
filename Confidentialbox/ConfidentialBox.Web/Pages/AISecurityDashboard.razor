@@ -75,6 +75,13 @@
             </li>
             <li class="nav-item">
                 <button type="button"
+                        class="nav-link @(activeTab == "securityList" ? "active" : string.Empty)"
+                        @onclick='() => SetActiveTab("securityList")'>
+                    <i class="fas fa-list"></i> Alertas de seguridad
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button"
                         class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
                         @onclick='() => SetActiveTab("settings")'>
                     <i class="fas fa-sliders-h"></i> Configuración de IA
@@ -400,7 +407,7 @@
                                             @foreach (var alert in dashboard.RecentAlerts.Take(12))
                                             {
                                                 <tr>
-                                                    <td>@alert.AlertType</td>
+                                                    <td>@GetAlertTypeLabel(alert.AlertType)</td>
                                                     <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
                                                     <td>@(string.IsNullOrWhiteSpace(alert.UserName) ? "Usuario desconocido" : alert.UserName)</td>
                                                     <td>@(string.IsNullOrWhiteSpace(alert.FileName) ? "-" : alert.FileName)</td>
@@ -608,7 +615,102 @@
                 </div>
             </div>
         }
-        else
+        else if (activeTab == "securityList")
+        {
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h5 class="mb-0">Alertas de seguridad</h5>
+                        <small class="text-muted">Lista completa sin pasar por el centro de casos.</small>
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSecurityAlertListAsync" disabled="@securityListLoading">
+                        <i class="fas fa-sync"></i> Actualizar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Severidad</label>
+                            <InputSelect class="form-select" @bind-Value="securityListSeverity">
+                                <option value="">Todas</option>
+                                <option value="Critical">Crítica</option>
+                                <option value="High">Alta</option>
+                                <option value="Medium">Media</option>
+                                <option value="Low">Baja</option>
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Estado</label>
+                            <InputSelect class="form-select" @bind-Value="securityListStatus">
+                                <option value="">Todos</option>
+                                <option value="PendingReview">Pendiente</option>
+                                <option value="New">Nuevo</option>
+                                <option value="Escalated">Escalado</option>
+                                <option value="Resolved">Resuelto</option>
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button class="btn btn-primary flex-fill" @onclick="LoadSecurityAlertListAsync" disabled="@securityListLoading">
+                                @if (securityListLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                <span>Aplicar</span>
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="ResetSecurityListFilters" disabled="@securityListLoading">Limpiar</button>
+                        </div>
+                    </div>
+
+                    @if (securityListLoading)
+                    {
+                        <div class="text-center text-muted py-4"><div class="spinner-border me-2"></div>Cargando alertas...</div>
+                    }
+                    else if (!string.IsNullOrEmpty(securityListError))
+                    {
+                        <div class="alert alert-danger">@securityListError</div>
+                    }
+                    else if (securityAlertList?.Items?.Any() != true)
+                    {
+                        <div class="alert alert-info">No hay alertas que coincidan con los filtros.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Severidad</th>
+                                        <th>Estado</th>
+                                        <th>Usuario</th>
+                                        <th>Archivo</th>
+                                        <th>Detectada</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var alert in securityAlertList!.Items)
+                                    {
+                                        <tr>
+                                            <td><span class="badge bg-secondary">@GetAlertTypeLabel(alert.AlertType)</span></td>
+                                            <td><span class="badge bg-@GetSeverityColor(alert.Severity)">@alert.Severity</span></td>
+                                            <td>@FormatAlertStatus(alert)</td>
+                                            <td>@(string.IsNullOrWhiteSpace(alert.UserName) ? "-" : alert.UserName)</td>
+                                            <td>@(string.IsNullOrWhiteSpace(alert.FileName) ? "-" : alert.FileName)</td>
+                                            <td>@alert.DetectedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenAlertDetailAsync(alert)"><i class="fas fa-eye"></i></button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (activeTab == "settings")
         {
             if (aiSettingsLoading)
             {
@@ -805,7 +907,7 @@
                         {
                             <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
                                 <span class="badge bg-@GetSeverityColor(detailAlert.Severity)">@detailAlert.Severity</span>
-                                <span class="badge bg-secondary">@detailAlert.AlertType</span>
+                                <span class="badge bg-secondary">@GetAlertTypeLabel(detailAlert.AlertType)</span>
                                 <span class="badge bg-light text-dark"><i class="fas fa-bolt me-1"></i>@FormatAlertStatus(detailAlert)</span>
                             </div>
                             <dl class="row mb-0">
@@ -942,12 +1044,18 @@
     private PagedResult<SecurityAlertDto>? alertPreview;
     private bool alertPreviewLoading;
     private string? alertPreviewError;
+    private PagedResult<SecurityAlertDto>? securityAlertList;
+    private bool securityListLoading;
+    private string? securityListError;
+    private string securityListSeverity = string.Empty;
+    private string securityListStatus = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await Task.WhenAll(LoadDashboard(), LoadAIScoringSettings(), LoadAlertSummary(), LoadUsersAsync());
         InitializeAlertFiltersFromSettings();
         await ApplyAlertPreviewAsync();
+        await LoadSecurityAlertListAsync();
     }
 
     private async Task LoadDashboard()
@@ -1016,6 +1124,11 @@
         if (showAlertDetail && !string.Equals(tab, "alerts", StringComparison.OrdinalIgnoreCase))
         {
             CloseAlertDetail();
+        }
+
+        if (string.Equals(tab, "securityList", StringComparison.OrdinalIgnoreCase) && securityAlertList is null && !securityListLoading)
+        {
+            _ = LoadSecurityAlertListAsync();
         }
     }
 
@@ -1154,6 +1267,51 @@
         }
     }
 
+    private async Task LoadSecurityAlertListAsync()
+    {
+        securityListLoading = true;
+        securityListError = null;
+        try
+        {
+            var preview = await Http.GetFromJsonAsync<PagedResult<SecurityAlertDto>>("api/aisecurity/alerts?pageNumber=1&pageSize=25");
+            var items = preview?.Items ?? new List<SecurityAlertDto>();
+
+            if (!string.IsNullOrWhiteSpace(securityListSeverity))
+            {
+                items = items.Where(a => string.Equals(a.Severity, securityListSeverity, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(securityListStatus))
+            {
+                items = items.Where(a => string.Equals(NormalizeStatus(a.Status), securityListStatus, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            securityAlertList = new PagedResult<SecurityAlertDto>
+            {
+                Items = items.Take(25).ToList(),
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = items.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            securityListError = string.IsNullOrWhiteSpace(ex.Message) ? "No se pudieron recuperar las alertas." : ex.Message;
+        }
+        finally
+        {
+            securityListLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ResetSecurityListFilters()
+    {
+        securityListSeverity = string.Empty;
+        securityListStatus = string.Empty;
+        _ = LoadSecurityAlertListAsync();
+    }
+
     private static string NormalizeStatus(string? status)
     {
         if (string.IsNullOrWhiteSpace(status))
@@ -1162,6 +1320,24 @@
         }
 
         return status.Trim();
+    }
+
+    private string GetAlertTypeLabel(string? alertType)
+    {
+        if (string.IsNullOrWhiteSpace(alertType))
+        {
+            return "Alerta";
+        }
+
+        return alertType switch
+        {
+            "SuspiciousFile" => "Archivo sospechoso",
+            "UnauthorizedAccess" => "Acceso no autorizado",
+            "UnusualBehavior" => "Comportamiento inusual",
+            "DataExfiltration" => "Posible exfiltración",
+            "Malware" => "Posible malware",
+            _ => alertType
+        };
     }
 
     private void ToggleWhitelistUser(string userId, bool isChecked)

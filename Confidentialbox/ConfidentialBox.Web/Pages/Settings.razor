@@ -46,6 +46,13 @@ else
                 </li>
                 <li class="nav-item">
                     <button type="button"
+                            class='@($"nav-link {(activeTab == "time" ? "active" : string.Empty)}")'
+                            @onclick='() => SetActiveTab("time")'>
+                        <i class="fas fa-clock"></i> Horario
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button"
                             class='@($"nav-link {(activeTab == "viewer" ? "active" : string.Empty)}")'
                             @onclick='() => SetActiveTab("viewer")'>
                         <i class="fas fa-file-pdf"></i> Visor PDF
@@ -353,6 +360,50 @@ else
                             {
                                 <span>Actualizar notificaciones</span>
                             }
+                        </button>
+                    </EditForm>
+                    break;
+                case "time":
+                    <EditForm Model="aiSettings" OnValidSubmit="UpdateTimeSettingsAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(timeMessage))
+                        {
+                            <div class="alert @(timeSuccess ? "alert-success" : "alert-danger")">@timeMessage</div>
+                        }
+
+                        <div class="row g-4">
+                            <div class="col-lg-6">
+                                <label class="form-label">Zona horaria de la plataforma</label>
+                                <InputSelect class="form-select" @bind-Value="aiSettings.PlatformTimeZone">
+                                    @foreach (var zone in availableTimeZones)
+                                    {
+                                        <option value="@zone.Id">@zone.Label</option>
+                                    }
+                                </InputSelect>
+                                <small class="text-muted">Afecta auditorías, IA-Agent y horarios protegidos.</small>
+                            </div>
+                            <div class="col-lg-6">
+                                <label class="form-label">Horario protegido (hora local)</label>
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <InputNumber class="form-control" @bind-Value="aiSettings.BusinessHoursStart" min="0" max="23" />
+                                    </div>
+                                    <div class="col">
+                                        <InputNumber class="form-control" @bind-Value="aiSettings.BusinessHoursEnd" min="0" max="23" />
+                                    </div>
+                                </div>
+                                <small class="text-muted">Determina cuándo un acceso se considera fuera de horario.</small>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-3" disabled="@timeSaving">
+                            @if (timeSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <span>Guardar horario</span>
                         </button>
                     </EditForm>
                     break;
@@ -721,6 +772,7 @@ else
     private bool registrationSaving;
     private bool tokenSaving;
     private bool pdfViewerSaving;
+    private bool timeSaving;
 
     private string? storageMessage;
     private bool storageSuccess;
@@ -734,6 +786,8 @@ else
     private bool tokenSuccess;
     private string? pdfViewerMessage;
     private bool pdfViewerSuccess;
+    private string? timeMessage;
+    private bool timeSuccess;
 
     private string activeTab = "storage";
 
@@ -971,6 +1025,26 @@ else
         finally
         {
             pdfViewerSaving = false;
+        }
+    }
+
+    private async Task UpdateTimeSettingsAsync()
+    {
+        timeMessage = null;
+        timeSaving = true;
+        try
+        {
+            var saved = await SettingsService.UpdateAIScoringSettingsAsync(aiSettings);
+            timeSuccess = saved;
+            timeMessage = saved ? "Horario actualizado correctamente." : "No se pudo guardar el horario.";
+            if (saved)
+            {
+                await LoadSettingsAsync();
+            }
+        }
+        finally
+        {
+            timeSaving = false;
         }
     }
 

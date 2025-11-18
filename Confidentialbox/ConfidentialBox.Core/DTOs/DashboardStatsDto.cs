@@ -12,9 +12,11 @@ namespace ConfidentialBox.Core.DTOs
         public int ActiveFiles { get; set; }
         public int ExpiredFiles { get; set; }
         public int BlockedFiles { get; set; }
+        public int MyFiles { get; set; }
         public int TotalUsers { get; set; }
         public int ActiveUsers { get; set; }
         public long TotalStorageBytes { get; set; }
+        public long MyStorageBytes { get; set; }
         public int TotalAccesses { get; set; }
         public int UnauthorizedAccesses { get; set; }
         public List<RecentActivityDto> RecentActivity { get; set; } = new();

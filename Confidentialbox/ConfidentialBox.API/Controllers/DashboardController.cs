@@ -4,6 +4,7 @@ using ConfidentialBox.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 
 namespace ConfidentialBox.API.Controllers;
@@ -33,11 +34,18 @@ public class DashboardController : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult<DashboardStatsDto>> GetStats()
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var totalFiles = await _fileRepository.GetTotalFilesCountAsync();
         var activeFiles = await _fileRepository.GetActiveFilesCountAsync();
         var expiredFiles = await _fileRepository.GetExpiredFilesCountAsync();
         var blockedFiles = await _fileRepository.GetBlockedFilesCountAsync();
         var totalStorage = await _fileRepository.GetTotalStorageBytesAsync();
+        var myFiles = string.IsNullOrWhiteSpace(userId)
+            ? 0
+            : (await _fileRepository.GetByUserIdAsync(userId)).Count;
+        var myStorage = string.IsNullOrWhiteSpace(userId)
+            ? 0
+            : await _fileRepository.GetTotalStorageBytesByUserAsync(userId);
         var totalAccesses = await _fileAccessRepository.GetTotalAccessesCountAsync();
         var unauthorizedAccesses = await _fileAccessRepository.GetUnauthorizedAccessesCountAsync();
         var totalUsers = _userManager.Users.Count();
@@ -58,9 +66,11 @@ public class DashboardController : ControllerBase
             ActiveFiles = activeFiles,
             ExpiredFiles = expiredFiles,
             BlockedFiles = blockedFiles,
+            MyFiles = myFiles,
             TotalUsers = totalUsers,
             ActiveUsers = activeUsers,
             TotalStorageBytes = totalStorage,
+            MyStorageBytes = myStorage,
             TotalAccesses = totalAccesses,
             UnauthorizedAccesses = unauthorizedAccesses,
             RecentActivity = recentActivity
