@@ -3,13 +3,14 @@ using ConfidentialBox.Core.Entities;
 using ConfidentialBox.Infrastructure.Data;
 using ConfidentialBox.Infrastructure.Repositories;
 using ConfidentialBox.Infrastructure.Services;
-using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using FileAccess = ConfidentialBox.Core.Entities.FileAccess;
 
@@ -557,7 +558,7 @@ public class AISecurityController : ControllerBase
                                     StatusAfterAction = alert.Status
                                 });
 
-                                await RegisterAuditAsync(reviewerId, "AlertDeleteFile", "SharedFile", targetFileId.Value, command.Notes, clientContext);
+                                await RegisterAuditAsync(reviewerId, "AlertDeleteFile", "SharedFile", targetFileId?.ToString(CultureInfo.InvariantCulture), command.Notes, clientContext);
                             }
                             break;
                         }
