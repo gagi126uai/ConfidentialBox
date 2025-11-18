@@ -16,9 +16,11 @@ public interface IUserService
     Task<UserProfileDto?> GetMyProfileAsync();
     Task<OperationResultDto> UpdateMyProfileAsync(SelfProfileUpdateRequest request);
     Task<OperationResultDto> ChangeMyPasswordAsync(ChangeOwnPasswordRequest request);
-    Task<List<UserMessageDto>> GetMyMessagesAsync();
+    Task<List<UserMessageDto>> GetMyMessagesAsync(bool includeArchived = false);
     Task MarkMyMessageAsReadAsync(int messageId);
     Task<OperationResultDto> ReplyToMessageAsync(int messageId, string body);
+    Task ArchiveMessageAsync(int messageId);
+    Task UnarchiveMessageAsync(int messageId);
     Task<OperationResultDto> SendMessageAsync(string userId, CreateUserMessageRequest request);
     Task<OperationResultDto> ChangeUserPasswordAsync(string id, ChangeUserPasswordRequest request);
 }

@@ -1061,6 +1061,9 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("RequiresResponse")
                         .HasColumnType("bit");
 
@@ -1081,6 +1084,8 @@ namespace ConfidentialBox.Infrastructure.Migrations
                     b.HasIndex("SenderId");
 
                     b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.HasIndex("UserId", "IsArchived", "CreatedAt");
 
                     b.ToTable("UserMessages");
                 });

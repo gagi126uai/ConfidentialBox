@@ -177,6 +177,7 @@
     background: linear-gradient(135deg, rgba(241, 245, 249, 0.7), rgba(226, 232, 240, 0.4));
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .notification-card__message {
@@ -264,6 +265,31 @@
 
 .notification-card__action:hover {
     background: #6366f1;
+    color: #fff;
+}
+
+.notification-card__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.notification-card__dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.75rem;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+    border: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.notification-card__dismiss:hover,
+.notification-card__dismiss:focus {
+    background: #ef4444;
     color: #fff;
 }
 
