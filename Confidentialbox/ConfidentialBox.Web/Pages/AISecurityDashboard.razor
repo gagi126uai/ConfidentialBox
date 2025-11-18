@@ -12,6 +12,7 @@
 @using ConfidentialBox.Core.Entities
 @attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
+@inject NavigationManager NavigationManager
 @inject ISettingsService SettingsService
 
 <PageTitle>AI Security Dashboard - ConfidentialBox</PageTitle>
@@ -411,7 +412,7 @@
                                                         </span>
                                                     </td>
                                                     <td class="text-end">
-                                                        <button class="btn btn-sm btn-outline-primary" @onclick="async () => await OpenAlertDetailAsync(alert)">
+                                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => NavigateToSecurityAlert(alert.Id)">
                                                             <i class="fas fa-eye"></i>
                                                         </button>
                                                     </td>
@@ -875,6 +876,12 @@
 
     private double GetSeverityPercentage(int value, int total)
         => total == 0 ? 0 : (value / (double)total) * 100;
+
+    private void NavigateToSecurityAlert(int alertId)
+    {
+        var url = $"/security-alerts?alertId={alertId}";
+        NavigationManager.NavigateTo(url, forceLoad: true);
+    }
 
     private async Task OpenAlertDetailAsync(SecurityAlertDto alert)
     {
