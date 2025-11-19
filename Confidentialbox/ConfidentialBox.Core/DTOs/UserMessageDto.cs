@@ -11,4 +11,5 @@ public class UserMessageDto
     public bool IsRead { get; set; }
     public string? SenderName { get; set; }
     public bool RequiresResponse { get; set; }
+    public bool IsArchived { get; set; }
 }

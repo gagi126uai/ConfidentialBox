@@ -32,10 +32,10 @@ public class UserMessageRepository : IUserMessageRepository
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public async Task<List<UserMessage>> GetRecentAsync(string userId, int take = 25, CancellationToken cancellationToken = default)
+    public async Task<List<UserMessage>> GetRecentAsync(string userId, int take = 25, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
         return await _context.UserMessages
-            .Where(m => m.UserId == userId)
+            .Where(m => m.UserId == userId && (includeArchived || !m.IsArchived))
             .OrderByDescending(m => m.CreatedAt)
             .Take(take)
             .Include(m => m.Sender)
@@ -61,5 +61,26 @@ public class UserMessageRepository : IUserMessageRepository
     {
         _context.UserMessages.Update(message);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetArchivedAsync(string userId, int messageId, bool archived, CancellationToken cancellationToken = default)
+    {
+        var message = await _context.UserMessages
+            .FirstOrDefaultAsync(m => m.Id == messageId && m.UserId == userId, cancellationToken);
+
+        if (message == null)
+        {
+            return;
+        }
+
+        message.IsArchived = archived;
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnarchiveAllAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        await _context.UserMessages
+            .Where(m => m.UserId == userId && m.IsArchived)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.IsArchived, false), cancellationToken);
     }
 }

@@ -11,4 +11,5 @@ public interface IUserNotificationService
     Task<List<UserNotification>> GetRecentAsync(string userId, int take = 10, CancellationToken cancellationToken = default);
     Task<int> GetUnreadCountAsync(string userId, CancellationToken cancellationToken = default);
     Task MarkAsReadAsync(string userId, IEnumerable<int> notificationIds, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(string userId, int notificationId, CancellationToken cancellationToken = default);
 }

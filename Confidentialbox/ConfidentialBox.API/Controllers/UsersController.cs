@@ -457,7 +457,7 @@ public class UsersController : ControllerBase
 
     [HttpGet("me/messages")]
     [Authorize]
-    public async Task<ActionResult<List<UserMessageDto>>> GetMyMessages()
+    public async Task<ActionResult<List<UserMessageDto>>> GetMyMessages([FromQuery] bool includeArchived = false)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userId))
@@ -465,7 +465,7 @@ public class UsersController : ControllerBase
             return Unauthorized();
         }
 
-        var messages = await _userMessageService.GetRecentAsync(userId, 50);
+        var messages = await _userMessageService.GetRecentAsync(userId, 50, includeArchived);
         var dtos = messages.Select(m => new UserMessageDto
         {
             Id = m.Id,
@@ -474,7 +474,8 @@ public class UsersController : ControllerBase
             CreatedAt = m.CreatedAt,
             IsRead = m.IsRead,
             SenderName = m.Sender != null ? $"{m.Sender.FirstName} {m.Sender.LastName}" : null,
-            RequiresResponse = m.RequiresResponse
+            RequiresResponse = m.RequiresResponse,
+            IsArchived = m.IsArchived
         }).ToList();
 
         return Ok(dtos);
@@ -491,6 +492,34 @@ public class UsersController : ControllerBase
         }
 
         await _userMessageService.MarkAsReadAsync(userId, messageId);
+        return NoContent();
+    }
+
+    [HttpPost("me/messages/{messageId}/archive")]
+    [Authorize]
+    public async Task<ActionResult> ArchiveMessage(int messageId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        await _userMessageService.SetArchivedAsync(userId, messageId, true);
+        return NoContent();
+    }
+
+    [HttpPost("me/messages/{messageId}/unarchive")]
+    [Authorize]
+    public async Task<ActionResult> UnarchiveMessage(int messageId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        await _userMessageService.SetArchivedAsync(userId, messageId, false);
         return NoContent();
     }
 
@@ -547,17 +576,17 @@ public class UsersController : ControllerBase
 
         var replyBody = request.Body.Trim();
 
-        foreach (var recipient in recipients)
-        {
-            await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
-            await _userNotificationService.CreateAsync(
-                recipient,
-                "Nueva respuesta recibida",
-                $"{senderName} respondió: {subject}",
-                "info",
-                $"/users/{recipient}?tab=messages",
-                userId);
-        }
+            foreach (var recipient in recipients)
+            {
+                var replyMessage = await _userMessageService.CreateAsync(recipient, subject, replyBody, userId);
+                await _userNotificationService.CreateAsync(
+                    recipient,
+                    "Nueva respuesta recibida",
+                    $"{senderName} respondió: {subject}",
+                    "info",
+                    $"/profile?tab=messages&messageId={replyMessage.Id}",
+                    userId);
+            }
 
         message.RequiresResponse = false;
         message.IsRead = true;
@@ -589,8 +618,14 @@ public class UsersController : ControllerBase
             ? "Tienes un nuevo mensaje del equipo administrador."
             : request.Body.Trim();
 
-        await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
-        await _userNotificationService.CreateAsync(user.Id, "Nuevo mensaje del administrador", subject, "info", null, actorId);
+        var message = await _userMessageService.CreateAsync(user.Id, subject, body, actorId, request.RequiresResponse);
+        await _userNotificationService.CreateAsync(
+            user.Id,
+            "Nuevo mensaje del administrador",
+            subject,
+            "info",
+            $"/profile?tab=messages&messageId={message.Id}",
+            actorId);
 
         return Ok(new OperationResultDto { Success = true });
     }

@@ -12,6 +12,7 @@ public class UserMessage
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsRead { get; set; }
     public bool RequiresResponse { get; set; }
+    public bool IsArchived { get; set; }
 
     public virtual ApplicationUser User { get; set; } = null!;
     public virtual ApplicationUser? Sender { get; set; }
