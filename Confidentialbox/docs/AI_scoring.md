@@ -77,6 +77,129 @@ stop
 @enduml
 ```
 
+## Diagrama de secuencia (PlantUML)
+```plantuml
+@startuml
+actor "Usuario" as User
+participant "PDF Viewer (frontend)" as Viewer
+participant "PDFViewerController" as Controller
+participant "PDFViewerAIService" as AI
+participant "AISecurityService" as Behavior
+database "DB FileAccess" as DB
+
+User -> Viewer : Interacciones (scroll, copiar, imprimir)
+Viewer -> Controller : POST /api/pdf/events
+Controller -> AI : CalculateSuspicionScoreAsync(events)
+AI -> Behavior : AnalyzeUserBehaviorAsync(ViewerUserId)
+Behavior -> DB : Leer FileAccess recientes
+Behavior --> AI : RiskScore + anomalías
+AI --> Controller : SuspicionScore + detalles
+Controller --> Viewer : JSON con score y recomendaciones
+Viewer -> User : Mostrar riesgo y acciones
+@enduml
+```
+
+## Diagrama de paquetes (PlantUML)
+```plantuml
+@startuml
+package "ConfidentialBox.Core" {
+  class AIScoringSettings
+}
+
+package "ConfidentialBox.Infrastructure" {
+  class PDFViewerAIService
+  class AISecurityService
+  class SystemSettingsService
+}
+
+package "ConfidentialBox.API" {
+  class PDFViewerController
+}
+
+package "ConfidentialBox.Web" {
+  class PDFViewerComponent
+}
+
+PDFViewerComponent --> PDFViewerController
+PDFViewerController --> PDFViewerAIService
+PDFViewerAIService --> AIScoringSettings
+PDFViewerAIService --> AISecurityService
+AISecurityService --> SystemSettingsService
+@enduml
+```
+
+## Diagrama de componentes (PlantUML)
+```plantuml
+@startuml
+component "PDF Viewer UI" as UI
+component "PDF Viewer API" as API
+component "AI Scoring Service" as Scoring
+component "User Behavior Analyzer" as Behavior
+component "Settings Provider" as Settings
+database "Security DB" as DB
+
+UI -- API : eventos de sesión
+API -- Scoring : calcular suspicion score
+Scoring -- Behavior : riesgo histórico
+Scoring -- Settings : pesos y umbrales
+Behavior -- DB : accesos recientes
+Scoring -- DB : guardar resultado/alerta
+API -- UI : score + recomendación
+@enduml
+```
+
+## Diagrama de despliegue (PlantUML)
+```plantuml
+@startuml
+node "Usuario" {
+  artifact "Navegador" as Browser
+}
+
+node "Front-end ConfidentialBox (Web)" {
+  artifact "PDF Viewer UI"
+}
+
+node "API ConfidentialBox" {
+  component "PDFViewerController"
+  component "AISecurityService"
+  component "PDFViewerAIService"
+  component "SystemSettingsService"
+}
+
+database "SQL DB" as SQL
+
+Browser --> "PDF Viewer UI" : HTTP
+"PDF Viewer UI" --> "PDFViewerController" : HTTPS /api/pdf
+"PDFViewerController" --> "PDFViewerAIService" : llamada interna
+"PDFViewerAIService" --> "AISecurityService" : consulta riesgo usuario
+"AISecurityService" --> SQL : FileAccess, perfiles, alertas
+"PDFViewerAIService" --> SQL : resultados y alertas
+"SystemSettingsService" --> SQL : leer configuraciones
+@enduml
+```
+
+## Diagrama de robustez (PlantUML)
+```plantuml
+@startuml
+actor "Usuario" as User
+boundary "PDF Viewer UI" as UI
+control "PDFViewerController" as Controller
+control "PDFViewerAIService" as AI
+entity "UserBehaviorProfile" as Profile
+entity "FileAccess" as Access
+entity "FileScanResult" as Scan
+
+User --> UI : interactúa con PDF
+UI --> Controller : envía eventos
+Controller --> AI : solicita cálculo
+AI --> Access : lee historial de accesos
+AI --> Profile : usa RiskScore
+AI --> Scan : registra resultado/alerta
+AI --> Controller : devuelve score
+Controller --> UI : muestra respuesta
+@enduml
+```
+
 # Caso de uso core #2: scoring de la IA para archivos compartidos y comportamiento del usuario
 
 La IA también calcula un **threat score** (0 a 1) para cada archivo subido antes de almacenarlo. La lógica vive en `AISecurityService.AnalyzeFileAsync` y combina señales del archivo, del contexto de subida y de probabilidades derivadas de malware y exfiltración de datos.
@@ -116,6 +239,38 @@ La ruta `AISecurityService.AnalyzeUserBehaviorAsync` ahora introduce señales ad
 - **Contador de actividades fuera de patrón**: cada evento previo incrementa el puntaje con `UnusualActivityIncrement`.
 
 El `RiskScore` alimenta alertas (`High` si supera `HighRiskThreshold`) y se inyecta en el cálculo del visor de PDF mediante `PdfUserBehaviorWeight`, para que ambos casos de uso compartan la misma señal de riesgo.
+
+## Cómo se proyecta el scoring en el AI Security Dashboard (núcleo de visualización del caso #2)
+El `RiskScore` y las señales de `AnalyzeFileAsync` se plasman en el panel `AISecurityDashboard` (endpoint `GET /api/aisecurity/dashboard`, página `AISecurityDashboard.razor`) para que el flujo de scoring se vea reflejado en tiempo real:
+
+- **Totales y severidad del día**: `TotalAlertsToday` y `CriticalAlertsUnreviewed` se calculan a partir de alertas visibles (no whitelisted) generadas por `AnalyzeFileAsync` y los disparadores de comportamiento del usuario.
+- **Perfiles de alto riesgo**: se enumeran con `HighRiskUsers` y el top 5 (`HighRiskUsersDetails`) toma los perfiles con `RiskScore >= HighRiskThreshold`, incorporando sus anomalías (`UnusualActivityCount`, últimos eventos, tipos frecuentes) y su conteo de archivos del día.
+- **Archivos sospechosos y nivel de amenaza**: `SuspiciousFilesDetected` cuenta los `FileScanResult` marcados en las últimas 24 horas y `SystemThreatLevel` promedia los `ConfidenceScore` de las alertas recientes.
+- **Distribución temporal**: `ThreatTrends` agrupa los últimos 7 días de alertas para visualizar picos, mientras `AlertsByType` segmenta por `AlertType` (e.g., `BehavioralAnomaly`, `MalwareDetected`, `DataExfiltration`).
+- **Sugerencias accionables**: `ActionRecommendations` resume qué hacer (revisar críticas pendientes, coordinar con perfiles de alto riesgo, monitorear picos de alertas) en función de los mismos umbrales de scoring.
+
+### Flujo de datos hacia el dashboard (PlantUML)
+```plantuml
+@startuml
+start
+:Escaneos por archivo -> AnalyzeFileAsync;
+:Escaneos por usuario -> AnalyzeUserBehaviorAsync;
+:Generar alerts + FileScanResult;
+:Actualizar UserBehaviorProfile (RiskScore, anomalías);
+:Invocar GetSecurityDashboardAsync;
+if (usuario en whitelist?) then (sí)
+  :filtrar alertas y perfiles;
+endif
+:Calcular métricas diarias (TotalAlertsToday, CriticalAlertsUnreviewed, SuspiciousFilesDetected);
+:Identificar HighRiskUsers (RiskScore >= HighRiskThreshold);
+:Construir HighRiskUsersDetails con anomalías y actividad del día;
+:Agrupar AlertsByType y ThreatTrends (últimos 7 días);
+:Derivar SystemThreatLevel del promedio de ConfidenceScore 24h;
+:Generar ActionRecommendations;
+:Devolver AISecurityDashboardDto al frontend;
+stop
+@enduml
+```
 
 ## Umbrales y recomendaciones
 - **SuspiciousThreshold** (0.50): a partir de este valor se marca el archivo como sospechoso y se guarda un `FileScanResult` con `IsSuspicious = true`.
@@ -206,5 +361,308 @@ if (threatScore >= SuspiciousThreshold?) then (sí)
 endif
 :Guardar FileScanResult;
 stop
+@enduml
+```
+
+## Diagrama de secuencia del caso #2 (PlantUML)
+```plantuml
+@startuml
+actor "Usuario" as User
+participant "Cliente Web" as Web
+participant "UploadController" as UploadApi
+participant "AISecurityService" as AI
+participant "SystemSettingsService" as Settings
+database "DB" as DB
+
+User -> Web : Selecciona archivo
+Web -> UploadApi : POST /api/files
+UploadApi -> Settings : Obtener reglas de horario/pesos
+UploadApi -> AI : AnalyzeFileAsync(file, metadata)
+AI -> DB : Leer historial de subidas y accesos
+AI -> AI : Calcular threatScore + RiskScore
+AI -> DB : Guardar FileScanResult + SecurityAlert
+AI --> UploadApi : threatScore + recomendación
+UploadApi --> Web : Respuesta con estado y sugerencias
+@enduml
+```
+
+## Diagrama de paquetes del caso #2 (PlantUML)
+```plantuml
+@startuml
+package "ConfidentialBox.Core" {
+  class AIScoringSettings
+}
+
+package "ConfidentialBox.Infrastructure" {
+  class AISecurityService
+  class SystemSettingsService
+}
+
+package "ConfidentialBox.API" {
+  class UploadController
+}
+
+package "ConfidentialBox.Web" {
+  class FileUploadComponent
+}
+
+FileUploadComponent --> UploadController
+UploadController --> AISecurityService
+AISecurityService --> SystemSettingsService
+AISecurityService --> AIScoringSettings
+@enduml
+```
+
+## Diagrama de componentes del caso #2 (PlantUML)
+```plantuml
+@startuml
+component "File Upload UI" as UploadUI
+component "Upload API" as UploadAPI
+component "AI Security Service" as AISec
+component "Settings Provider" as Settings
+component "User Behavior Analyzer" as Behavior
+database "Security Store" as Store
+
+UploadUI -- UploadAPI : archivos + metadatos
+UploadAPI -- AISec : solicitud de análisis
+AISec -- Settings : reglas y umbrales
+AISec -- Behavior : RiskScore y anomalías
+Behavior -- Store : lecturas de FileAccess
+AISec -- Store : FileScanResult, SecurityAlert
+UploadAPI -- UploadUI : decision + motivos
+@enduml
+```
+
+## Diagrama de despliegue del caso #2 (PlantUML)
+```plantuml
+@startuml
+node "Cliente" {
+  artifact "Navegador" as Browser
+}
+
+node "Front-end ConfidentialBox" {
+  artifact "UI de carga"
+}
+
+node "API ConfidentialBox" {
+  component "UploadController"
+  component "AISecurityService"
+  component "SystemSettingsService"
+}
+
+database "SQL DB" as SQL
+
+Browser --> "UI de carga" : HTTP
+"UI de carga" --> UploadController : HTTPS /api/files
+UploadController --> AISecurityService : análisis de seguridad
+AISecurityService --> SystemSettingsService : configuración
+AISecurityService --> SQL : FileAccess, FileScanResult, SecurityAlert
+SystemSettingsService --> SQL : configuraciones
+@enduml
+```
+
+## Diagrama de robustez del caso #2 (PlantUML)
+```plantuml
+@startuml
+actor "Usuario" as User
+boundary "File Upload UI" as UI
+control "UploadController" as Controller
+control "AISecurityService" as AI
+entity "FileAccess" as Access
+entity "FileScanResult" as Scan
+entity "SecurityAlert" as Alert
+entity "UserBehaviorProfile" as Profile
+
+User --> UI : selecciona y envía archivo
+UI --> Controller : postea archivo y metadatos
+Controller --> AI : solicita AnalyzeFileAsync
+AI --> Access : lee historial
+AI --> Profile : agrega anomalías + RiskScore
+AI --> Scan : guarda resultado y amenaza
+AI --> Alert : crea alerta si supera umbral
+AI --> Controller : devuelve threatScore + recomendación
+Controller --> UI : muestra decisión al usuario
+@enduml
+```
+
+## Diagrama de clases del sistema (PlantUML)
+```plantuml
+@startuml
+class AIScoringSettings {
+  +PdfBlockedEventScore : decimal
+  +PdfSuspiciousRateWeight : decimal
+  +PdfUserBehaviorWeight : decimal
+  +PdfBehaviorAnomalyBonus : decimal
+  +PdfIpReputationScore : decimal
+  +SuspiciousExtensionScore : decimal
+  +LargeFileScore : decimal
+  +OutsideBusinessHoursScore : decimal
+  +UnusualUploadsScore : decimal
+  +HighRiskThreshold : decimal
+}
+
+class PDFViewerAIService {
+  +CalculateSuspicionScoreAsync()
+}
+
+class AISecurityService {
+  +AnalyzeFileAsync()
+  +AnalyzeUserBehaviorAsync()
+}
+
+class SystemSettingsService {
+  +GetAIScoringSettingsAsync()
+}
+
+class FileAccess {
+  +UserId
+  +DeviceType
+  +Location
+  +CreatedAt
+}
+
+class UserBehaviorProfile {
+  +UserId
+  +RiskScore
+  +UnusualActivityCount
+}
+
+class FileScanResult {
+  +FileId
+  +ThreatScore
+  +ConfidenceScore
+  +IsSuspicious
+}
+
+class SecurityAlert {
+  +AlertType
+  +Severity
+  +Status
+}
+
+PDFViewerAIService --> AISecurityService
+PDFViewerAIService --> AIScoringSettings
+AISecurityService --> SystemSettingsService
+AISecurityService --> AIScoringSettings
+AISecurityService --> FileAccess
+AISecurityService --> UserBehaviorProfile
+AISecurityService --> FileScanResult
+FileScanResult --> SecurityAlert
+@enduml
+```
+
+## Modelo de dominio del sistema (PlantUML)
+```plantuml
+@startuml
+entity User {
+  *UserId
+  ..
+  IsActive
+}
+
+entity File {
+  *FileId
+  FileName
+  SizeMB
+  Extension
+}
+
+entity FileAccess {
+  *AccessId
+  UserId
+  FileId
+  DeviceType
+  Location
+  CreatedAt
+}
+
+entity UserBehaviorProfile {
+  *UserId
+  RiskScore
+  UnusualActivityCount
+}
+
+entity FileScanResult {
+  *ResultId
+  FileId
+  ThreatScore
+  ConfidenceScore
+  IsSuspicious
+}
+
+entity SecurityAlert {
+  *AlertId
+  UserId
+  FileId
+  AlertType
+  Severity
+  Status
+}
+
+User ||--o{ FileAccess
+User ||--o{ UserBehaviorProfile
+User ||--o{ SecurityAlert
+File ||--o{ FileAccess
+File ||--o{ FileScanResult
+FileScanResult ||--|| SecurityAlert
+@enduml
+```
+
+## Diagrama entidad-relación (PlantUML)
+```plantuml
+@startuml
+entity "Users" as Users {
+  *Id : guid
+  --
+  Email : string
+  IsActive : bool
+}
+
+entity "Files" as Files {
+  *Id : guid
+  Name : string
+  SizeMB : decimal
+  Extension : string
+}
+
+entity "FileAccess" as Access {
+  *Id : guid
+  UserId : guid
+  FileId : guid
+  DeviceType : string
+  Location : string
+  CreatedAt : datetime
+}
+
+entity "FileScanResults" as Scan {
+  *Id : guid
+  FileId : guid
+  ThreatScore : decimal
+  ConfidenceScore : decimal
+  IsSuspicious : bool
+}
+
+entity "UserBehaviorProfiles" as Profile {
+  *UserId : guid
+  RiskScore : decimal
+  UnusualActivityCount : int
+}
+
+entity "SecurityAlerts" as Alert {
+  *Id : guid
+  UserId : guid
+  FileId : guid
+  Severity : string
+  AlertType : string
+  Status : string
+}
+
+Users ||--o{ Access : "has"
+Files ||--o{ Access : "is read by"
+Files ||--o{ Scan : "produces"
+Users ||--o{ Alert : "triggers"
+Files ||--o{ Alert : "involves"
+Profile ||--|| Users : "profile of"
+Scan ||--|| Alert : "evidence for"
 @enduml
 ```
