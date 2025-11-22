@@ -10,6 +10,7 @@ public class PDFViewerAIService : IPDFViewerAIService
     private readonly ApplicationDbContext _context;
     private readonly IAISecurityService _aiSecurityService;
     private readonly ISecurePdfSessionPolicyStore _policyStore;
+    private readonly ISystemSettingsService _systemSettingsService;
 
     // Umbrales de detección
     private const int MAX_SCREENSHOT_ATTEMPTS = 3;
@@ -18,11 +19,16 @@ public class PDFViewerAIService : IPDFViewerAIService
     private const double SUSPICIOUS_SCORE_THRESHOLD = 0.6;
     private const double BLOCK_SCORE_THRESHOLD = 0.8;
 
-    public PDFViewerAIService(ApplicationDbContext context, IAISecurityService aiSecurityService, ISecurePdfSessionPolicyStore policyStore)
+    public PDFViewerAIService(
+        ApplicationDbContext context,
+        IAISecurityService aiSecurityService,
+        ISecurePdfSessionPolicyStore policyStore,
+        ISystemSettingsService systemSettingsService)
     {
         _context = context;
         _aiSecurityService = aiSecurityService;
         _policyStore = policyStore;
+        _systemSettingsService = systemSettingsService;
     }
 
     public async Task<PDFViewerSession> StartSessionAsync(SharedFile file, string? userId, string ipAddress, string userAgent)
@@ -266,6 +272,7 @@ public class PDFViewerAIService : IPDFViewerAIService
 
     public async Task<double> CalculateSuspicionScoreAsync(PDFViewerSession session)
     {
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
         double score = 0.0;
 
         // Factor 1: Intentos de screenshot (peso alto)
@@ -327,6 +334,53 @@ public class PDFViewerAIService : IPDFViewerAIService
             if (avgTimePerPage < 0.083) // 5 segundos
             {
                 score += 0.2;
+            }
+        }
+
+        // Factor 7: eventos bloqueados por política (detección en vivo)
+        var blockedEvents = await _context.PDFViewerEvents
+            .Where(e => e.SessionId == session.Id && e.WasBlocked)
+            .CountAsync();
+        if (blockedEvents > 0)
+        {
+            var blockedScore = Math.Min(scoring.PdfBlockedEventScore, blockedEvents * 0.05);
+            score += blockedScore;
+        }
+
+        // Factor 8: tasa de acciones sospechosas por minuto
+        var suspiciousActions = session.ScreenshotAttempts + session.CopyAttempts + session.PrintAttempts;
+        var elapsed = session.EndedAt.HasValue
+            ? session.EndedAt.Value - session.StartedAt
+            : DateTime.UtcNow - session.StartedAt;
+        var elapsedMinutes = Math.Max(1.0, elapsed.TotalMinutes);
+        var suspiciousRate = suspiciousActions / elapsedMinutes;
+        if (suspiciousRate > 0.5)
+        {
+            var rateScore = Math.Min(scoring.PdfSuspiciousRateWeight, suspiciousRate * scoring.PdfSuspiciousRateWeight);
+            score += rateScore;
+        }
+
+        // Factor 9: riesgo histórico de comportamiento del usuario
+        if (!string.IsNullOrWhiteSpace(session.ViewerUserId))
+        {
+            var behavior = await _aiSecurityService.AnalyzeUserBehaviorAsync(session.ViewerUserId);
+            score += Math.Min(scoring.PdfUserBehaviorWeight, behavior.RiskScore * scoring.PdfUserBehaviorWeight);
+
+            if (behavior.HasUnusualUploadPattern || behavior.HasUnusualAccessPattern || behavior.AccessingOutsideHours)
+            {
+                score += scoring.PdfBehaviorAnomalyBonus;
+            }
+
+            var lastAccess = await _context.FileAccesses
+                .Where(a => a.AccessedByUserId == session.ViewerUserId)
+                .OrderByDescending(a => a.AccessedAt)
+                .FirstOrDefaultAsync();
+
+            if (lastAccess != null
+                && !string.IsNullOrWhiteSpace(lastAccess.AccessedByIP)
+                && !string.Equals(lastAccess.AccessedByIP, session.ViewerIP, StringComparison.OrdinalIgnoreCase))
+            {
+                score += scoring.PdfIpReputationScore;
             }
         }
 
