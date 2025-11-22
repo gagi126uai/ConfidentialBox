@@ -252,6 +252,26 @@ public class AISecurityService : IAISecurityService
         var localToday = localNow.Date;
         var filesToday = files.Count(f => ConvertToPlatformTime(zone, f.UploadedAt).Date == localToday);
         var currentAvgFileSize = files.Any() ? files.Average(f => f.FileSizeBytes) / (1024.0 * 1024.0) : 0;
+        var recentAccesses = accesses
+            .OrderByDescending(a => a.AccessedAt)
+            .Take(25)
+            .ToList();
+
+        var dominantLocation = recentAccesses
+            .Where(a => !string.IsNullOrWhiteSpace(a.Location))
+            .GroupBy(a => a.Location!.Trim())
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .FirstOrDefault();
+
+        var dominantDevice = recentAccesses
+            .Where(a => !string.IsNullOrWhiteSpace(a.DeviceType))
+            .GroupBy(a => a.DeviceType!.Trim())
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .FirstOrDefault();
+
+        var lastAccess = recentAccesses.FirstOrDefault();
 
         var hasUnusualUploadPattern = filesToday > profile!.AverageFilesPerDay * scoring.UploadAnomalyMultiplier;
         if (hasUnusualUploadPattern)
@@ -272,10 +292,48 @@ public class AISecurityService : IAISecurityService
             anomalies.Add("Acceso fuera del horario habitual");
         }
 
+        var hasLocationDrift = !string.IsNullOrWhiteSpace(lastAccess?.Location)
+            && !string.IsNullOrWhiteSpace(dominantLocation)
+            && !string.Equals(lastAccess.Location, dominantLocation, StringComparison.OrdinalIgnoreCase)
+            && recentAccesses.Count >= 3;
+
+        if (hasLocationDrift)
+        {
+            anomalies.Add($"Cambio de ubicación: última ubicación {lastAccess!.Location}, habitual {dominantLocation}");
+        }
+
+        var hasDeviceShift = !string.IsNullOrWhiteSpace(lastAccess?.DeviceType)
+            && !string.IsNullOrWhiteSpace(dominantDevice)
+            && !string.Equals(lastAccess.DeviceType, dominantDevice, StringComparison.OrdinalIgnoreCase)
+            && recentAccesses.Count >= 3;
+
+        if (hasDeviceShift)
+        {
+            anomalies.Add($"Cambio de dispositivo: actual {lastAccess!.DeviceType}, habitual {dominantDevice}");
+        }
+
+        var accessesLast30Days = accesses
+            .Where(a => EnsureUtc(a.AccessedAt) >= DateTime.UtcNow.AddDays(-30))
+            .ToList();
+        var failedLast30 = accessesLast30Days.Count(a => !a.WasAuthorized);
+        var totalLast30 = accessesLast30Days.Count;
+        var baselineFailedRate = accesses.Count == 0 ? 0 : accesses.Count(a => !a.WasAuthorized) / (double)accesses.Count;
+        var currentFailedRate = totalLast30 == 0 ? 0 : failedLast30 / (double)totalLast30;
+        var failureRateSpike = currentFailedRate >= scoring.MinimumFailedAccessRate
+            && currentFailedRate >= baselineFailedRate * scoring.FailedAccessAnomalyMultiplier;
+
+        if (failureRateSpike)
+        {
+            anomalies.Add($"Incremento de accesos fallidos: {currentFailedRate:P1} últimos 30 días (base {baselineFailedRate:P1})");
+        }
+
         var riskScore = 0.0;
         if (hasUnusualUploadPattern) riskScore += scoring.UnusualUploadsScore;
         if (hasUnusualFileSize) riskScore += scoring.UnusualFileSizeScore;
         if (accessingOutsideHours) riskScore += scoring.OutsideHoursBehaviorScore;
+        if (hasLocationDrift) riskScore += scoring.UserLocationAnomalyScore;
+        if (hasDeviceShift) riskScore += scoring.UserDeviceAnomalyScore;
+        if (failureRateSpike) riskScore += scoring.UserFailedAccessScore;
         riskScore += profile.UnusualActivityCount * scoring.UnusualActivityIncrement;
         riskScore = Math.Min(1.0, riskScore);
 
@@ -311,7 +369,7 @@ public class AISecurityService : IAISecurityService
             AverageFilesPerDay = profile.AverageFilesPerDay,
             CurrentFilesPerDay = filesToday,
             HasUnusualUploadPattern = hasUnusualUploadPattern,
-            HasUnusualAccessPattern = hasUnusualFileSize,
+            HasUnusualAccessPattern = hasUnusualFileSize || hasLocationDrift || hasDeviceShift || failureRateSpike,
             AccessingOutsideHours = accessingOutsideHours,
             IsWhitelisted = false
         };
