@@ -217,6 +217,10 @@ public class AISecurityService : IAISecurityService
         var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
         var zone = ResolveTimeZone(scoring.PlatformTimeZone);
 
+        var accesses = await _context.FileAccesses
+            .Where(a => a.AccessedByUserId == userId)
+            .ToListAsync();
+
         if (await IsUserWhitelistedAsync(userId, scoring))
         {
             await RecordWhitelistBypassAsync(userId, "UserBehavior");
