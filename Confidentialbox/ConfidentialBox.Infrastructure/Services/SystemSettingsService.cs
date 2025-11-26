@@ -388,6 +388,16 @@ public class SystemSettingsService : ISystemSettingsService
         settings.UnusualFileSizeScore = Clamp01(settings.UnusualFileSizeScore);
         settings.OutsideHoursBehaviorScore = Clamp01(settings.OutsideHoursBehaviorScore);
         settings.UnusualActivityIncrement = Clamp01(settings.UnusualActivityIncrement);
+        settings.UserLocationAnomalyScore = Clamp01(settings.UserLocationAnomalyScore);
+        settings.UserDeviceAnomalyScore = Clamp01(settings.UserDeviceAnomalyScore);
+        settings.UserFailedAccessScore = Clamp01(settings.UserFailedAccessScore);
+        settings.FailedAccessAnomalyMultiplier = Math.Max(1.0, settings.FailedAccessAnomalyMultiplier);
+        settings.MinimumFailedAccessRate = Clamp01(settings.MinimumFailedAccessRate);
+        settings.PdfBlockedEventScore = Clamp01(settings.PdfBlockedEventScore);
+        settings.PdfSuspiciousRateWeight = Clamp01(settings.PdfSuspiciousRateWeight);
+        settings.PdfUserBehaviorWeight = Clamp01(settings.PdfUserBehaviorWeight);
+        settings.PdfBehaviorAnomalyBonus = Clamp01(settings.PdfBehaviorAnomalyBonus);
+        settings.PdfIpReputationScore = Clamp01(settings.PdfIpReputationScore);
         settings.MalwareProbabilityWeight = Clamp01(settings.MalwareProbabilityWeight);
         settings.DataExfiltrationWeight = Clamp01(settings.DataExfiltrationWeight);
         settings.MalwareSuspiciousExtensionWeight = Clamp01(settings.MalwareSuspiciousExtensionWeight);

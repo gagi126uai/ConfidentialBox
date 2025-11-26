@@ -14,6 +14,16 @@ public class AIScoringSettings
     public double UnusualFileSizeScore { get; set; } = 0.2;
     public double OutsideHoursBehaviorScore { get; set; } = 0.2;
     public double UnusualActivityIncrement { get; set; } = 0.1;
+    public double UserLocationAnomalyScore { get; set; } = 0.25;
+    public double UserDeviceAnomalyScore { get; set; } = 0.2;
+    public double UserFailedAccessScore { get; set; } = 0.15;
+    public double FailedAccessAnomalyMultiplier { get; set; } = 2.0;
+    public double MinimumFailedAccessRate { get; set; } = 0.1;
+    public double PdfBlockedEventScore { get; set; } = 0.15;
+    public double PdfSuspiciousRateWeight { get; set; } = 0.1;
+    public double PdfUserBehaviorWeight { get; set; } = 0.2;
+    public double PdfBehaviorAnomalyBonus { get; set; } = 0.05;
+    public double PdfIpReputationScore { get; set; } = 0.1;
     public double MalwareProbabilityWeight { get; set; } = 0.4;
     public double DataExfiltrationWeight { get; set; } = 0.3;
     public int BusinessHoursStart { get; set; } = 7;
