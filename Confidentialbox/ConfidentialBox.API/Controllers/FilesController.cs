@@ -332,7 +332,7 @@ public class FilesController : ControllerBase
 
         if (validation.Success)
         {
-            await LogFileAccess(file.Id, "AccessMetadataGranted", true);
+            await LogFileAccess(file.Id, "Metadatos consultados", true);
         }
 
         var dto = new FileAccessResultDto
@@ -421,7 +421,7 @@ public class FilesController : ControllerBase
             });
         }
 
-        await LogFileAccess(file.Id, file.IsPDF ? "ContentRetrievedForViewer" : "ContentDownloaded", true);
+        await LogFileAccess(file.Id, file.IsPDF ? "Contenido abierto en visor" : "Contenido descargado", true);
 
         return Ok(new FileContentResponse
         {
@@ -888,7 +888,7 @@ public class FilesController : ControllerBase
     {
         if (file.IsBlocked)
         {
-            await LogFileAccess(file.Id, "AccessBlocked", false);
+            await LogFileAccess(file.Id, "Acceso bloqueado", false);
             return AccessValidationResult.FromBlocked( // antes: Blocked(
                 file.BlockReason,
                 file.BlockReason != null && file.BlockReason.Contains("IA", StringComparison.OrdinalIgnoreCase));
@@ -901,13 +901,13 @@ public class FilesController : ControllerBase
 
         if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
         {
-            await LogFileAccess(file.Id, "AccessExpired", false);
+            await LogFileAccess(file.Id, "Acceso expirado", false);
             return AccessValidationResult.Fail("Este archivo ha expirado");
         }
 
         if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
         {
-            await LogFileAccess(file.Id, "AccessLimitReached", false);
+            await LogFileAccess(file.Id, "Límite de accesos alcanzado", false);
             return AccessValidationResult.Fail("Se alcanzó el límite de accesos");
         }
 
@@ -915,7 +915,7 @@ public class FilesController : ControllerBase
         {
             if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
             {
-                await LogFileAccess(file.Id, "InvalidPassword", false);
+                await LogFileAccess(file.Id, "Contraseña incorrecta", false);
                 return AccessValidationResult.Fail("Contraseña incorrecta");
             }
         }

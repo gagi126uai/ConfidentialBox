@@ -7,6 +7,7 @@
 @using System.Linq
 @using ConfidentialBox.Core.DTOs
 @using System.Net
+@using System.Globalization
 
 <PageTitle>Archivos de la organización - ConfidentialBox</PageTitle>
 
@@ -267,6 +268,50 @@ else
                     }
                     else
                     {
+                        @{ var latestAccess = accessLogs.OrderByDescending(l => l.AccessedAt).First();
+                           var mapUrl = BuildMapEmbedUrl(latestAccess); }
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-lg-5">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                            <div>
+                                                <h6 class="mb-1">Última actividad</h6>
+                                                <p class="mb-0 small text-muted">@latestAccess.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                                            </div>
+                                            <span class="badge @(latestAccess.WasAuthorized ? "text-bg-success" : "text-bg-danger")">
+                                                @(latestAccess.WasAuthorized ? "Autorizado" : "Denegado")
+                                            </span>
+                                        </div>
+                                        <p class="mb-1"><strong>@latestAccess.Action</strong></p>
+                                        <div class="small">IP: <strong>@latestAccess.AccessedByIp</strong></div>
+                                        <div class="small">Ubicación: <strong>@(string.IsNullOrWhiteSpace(latestAccess.Location) ? "Sin datos" : latestAccess.Location)</strong></div>
+                                        <div class="small">Dispositivo: <strong>@(string.IsNullOrWhiteSpace(latestAccess.DeviceName) ? "Desconocido" : latestAccess.DeviceName)</strong> (@latestAccess.DeviceType)</div>
+                                        <div class="small">Sistema operativo: <strong>@(string.IsNullOrWhiteSpace(latestAccess.OperatingSystem) ? "Sin identificar" : latestAccess.OperatingSystem)</strong></div>
+                                        <div class="small">Navegador: <strong>@(string.IsNullOrWhiteSpace(latestAccess.Browser) ? "Sin identificar" : latestAccess.Browser)</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body">
+                                        <h6 class="mb-2">Mapa de la última conexión</h6>
+                                        @if (!string.IsNullOrEmpty(mapUrl))
+                                        {
+                                            <div class="ratio ratio-16x9 rounded overflow-hidden shadow-sm">
+                                                <iframe title="Ubicación del último acceso" src="@mapUrl" style="border:0"></iframe>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted mb-0">No hay coordenadas disponibles para mostrar el mapa.</p>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table table-sm align-middle">
                                 <thead class="table-light">
@@ -851,6 +896,34 @@ else
         auditLoading = false;
         auditError = null;
         accessLogs = null;
+    }
+
+    private static string? BuildMapEmbedUrl(FileAccessLogDto log)
+    {
+        if (!log.Latitude.HasValue || !log.Longitude.HasValue)
+        {
+            return null;
+        }
+
+        var lat = log.Latitude.Value;
+        var lon = log.Longitude.Value;
+        const double delta = 0.04;
+
+        var bbox = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0},{1},{2},{3}",
+            lon - delta,
+            lat - delta,
+            lon + delta,
+            lat + delta);
+
+        var marker = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0}%2C{1}",
+            lat,
+            lon);
+
+        return $"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={marker}";
     }
 
     private void OpenFile(FileDto file)
