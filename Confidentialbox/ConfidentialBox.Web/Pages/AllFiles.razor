@@ -1,5 +1,5 @@
 @page "/all-files"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Auditor")]
 @inject IFileService FileService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -7,6 +7,7 @@
 @using System.Linq
 @using ConfidentialBox.Core.DTOs
 @using System.Net
+@using System.Globalization
 
 <PageTitle>Archivos de la organización - ConfidentialBox</PageTitle>
 
@@ -127,6 +128,12 @@ else
                                                     @onclick="() => OpenFile(file)">
                                                 <i class="fas fa-eye"></i>
                                             </button>
+                                            <button class="btn btn-outline-info"
+                                                    title="Ver auditoría"
+                                                    disabled="@isProcessing"
+                                                    @onclick="async () => await OpenAuditModalAsync(file)">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </button>
                                             <button class="btn btn-outline-primary"
                                                     title="Renombrar archivo"
                                                     disabled="@isProcessing"
@@ -168,6 +175,12 @@ else
                                     else
                                     {
                                         <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-info"
+                                                    title="Ver auditoría"
+                                                    disabled="@isProcessing"
+                                                    @onclick="async () => await OpenAuditModalAsync(file)">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </button>
                                             <button class="btn btn-outline-success"
                                                     title="Restaurar"
                                                     disabled="@isProcessing"
@@ -217,6 +230,132 @@ else
                         }
                         Guardar cambios
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@if (showAuditModal && selectedFile != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Auditoría de accesos - @selectedFile.OriginalFileName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAuditModal" disabled="@auditLoading"></button>
+                </div>
+                <div class="modal-body">
+                    @if (auditLoading)
+                    {
+                        <div class="text-center my-4">
+                            <div class="spinner-border" role="status"></div>
+                            <p class="mt-3 text-muted">Cargando registros de auditoría...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(auditError))
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <i class="fas fa-triangle-exclamation me-2"></i>@auditError
+                        </div>
+                    }
+                    else if (accessLogs == null || !accessLogs.Any())
+                    {
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>No hay accesos registrados para este archivo.
+                        </div>
+                    }
+                    else
+                    {
+                        @{ var latestAccess = accessLogs.OrderByDescending(l => l.AccessedAt).First();
+                           var mapUrl = BuildMapEmbedUrl(latestAccess); }
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-lg-5">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                            <div>
+                                                <h6 class="mb-1">Última actividad</h6>
+                                                <p class="mb-0 small text-muted">@latestAccess.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                                            </div>
+                                            <span class="badge @(latestAccess.WasAuthorized ? "text-bg-success" : "text-bg-danger")">
+                                                @(latestAccess.WasAuthorized ? "Autorizado" : "Denegado")
+                                            </span>
+                                        </div>
+                                        <p class="mb-1"><strong>@latestAccess.Action</strong></p>
+                                        <div class="small">IP: <strong>@latestAccess.AccessedByIp</strong></div>
+                                        <div class="small">Ubicación: <strong>@(string.IsNullOrWhiteSpace(latestAccess.Location) ? "Sin datos" : latestAccess.Location)</strong></div>
+                                        <div class="small">Dispositivo: <strong>@(string.IsNullOrWhiteSpace(latestAccess.DeviceName) ? "Desconocido" : latestAccess.DeviceName)</strong> (@latestAccess.DeviceType)</div>
+                                        <div class="small">Sistema operativo: <strong>@(string.IsNullOrWhiteSpace(latestAccess.OperatingSystem) ? "Sin identificar" : latestAccess.OperatingSystem)</strong></div>
+                                        <div class="small">Navegador: <strong>@(string.IsNullOrWhiteSpace(latestAccess.Browser) ? "Sin identificar" : latestAccess.Browser)</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body">
+                                        <h6 class="mb-2">Mapa de la última conexión</h6>
+                                        @if (!string.IsNullOrEmpty(mapUrl))
+                                        {
+                                            <div class="ratio ratio-16x9 rounded overflow-hidden shadow-sm">
+                                                <iframe title="Ubicación del último acceso" src="@mapUrl" style="border:0"></iframe>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted mb-0">No hay coordenadas disponibles para mostrar el mapa.</p>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Acción</th>
+                                        <th>Resultado</th>
+                                        <th>Usuario</th>
+                                        <th>IP</th>
+                                        <th>Dispositivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in accessLogs.OrderByDescending(l => l.AccessedAt))
+                                    {
+                                        <tr>
+                                            <td>@log.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@log.Action</td>
+                                            <td>
+                                                @if (log.WasAuthorized)
+                                                {
+                                                    <span class="badge text-bg-success"><i class="fas fa-check"></i> Autorizado</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-danger"><i class="fas fa-ban"></i> Denegado</span>
+                                                }
+                                            </td>
+                                            <td>@(string.IsNullOrWhiteSpace(log.AccessedByUserName) ? "Usuario invitado" : log.AccessedByUserName)</td>
+                                            <td>@log.AccessedByIp</td>
+                                            <td>
+                                                <div class="small text-muted">@log.DeviceName @log.DeviceType</div>
+                                                <div class="small">@log.OperatingSystem</div>
+                                                <div class="small text-muted">@log.Browser</div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseAuditModal" disabled="@auditLoading">Cerrar</button>
                 </div>
             </div>
         </div>
@@ -323,6 +462,7 @@ else
     private bool showRenameModal;
     private bool showOwnerModal;
     private bool showBlockModal;
+    private bool showAuditModal;
     private FileDto? selectedFile;
     private string? newFileName;
     private string? selectedOwnerId;
@@ -330,6 +470,9 @@ else
     private bool blockAction = true;
     private List<UserDto>? cachedUsers;
     private bool usersLoading;
+    private bool auditLoading;
+    private string? auditError;
+    private List<FileAccessLogDto>? accessLogs;
 
     private IEnumerable<FileDto>? CurrentFiles => activeTab == "active" ? activeFiles : deletedFiles;
     private string? CurrentError => activeTab == "active" ? activeError : deletedError;
@@ -722,6 +865,65 @@ else
             CloseBlockModal();
             await EnsureTabDataAsync(activeTab);
         }
+    }
+
+    private async Task OpenAuditModalAsync(FileDto file)
+    {
+        selectedFile = file;
+        auditLoading = true;
+        auditError = null;
+        accessLogs = null;
+        showAuditModal = true;
+
+        try
+        {
+            accessLogs = await FileService.GetAccessLogsAsync(file.Id);
+        }
+        catch (Exception ex)
+        {
+            auditError = $"No se pudieron obtener los accesos: {ex.Message}";
+        }
+        finally
+        {
+            auditLoading = false;
+        }
+    }
+
+    private void CloseAuditModal()
+    {
+        showAuditModal = false;
+        selectedFile = null;
+        auditLoading = false;
+        auditError = null;
+        accessLogs = null;
+    }
+
+    private static string? BuildMapEmbedUrl(FileAccessLogDto log)
+    {
+        if (!log.Latitude.HasValue || !log.Longitude.HasValue)
+        {
+            return null;
+        }
+
+        var lat = log.Latitude.Value;
+        var lon = log.Longitude.Value;
+        const double delta = 0.04;
+
+        var bbox = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0},{1},{2},{3}",
+            lon - delta,
+            lat - delta,
+            lon + delta,
+            lat + delta);
+
+        var marker = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0}%2C{1}",
+            lat,
+            lon);
+
+        return $"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={marker}";
     }
 
     private void OpenFile(FileDto file)
