@@ -56,7 +56,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Auditor")]
     public async Task<ActionResult<List<FileDto>>> GetAll()
     {
         var files = await _fileRepository.GetAllAsync(includeDeleted: false);
@@ -65,7 +65,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("deleted")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Auditor")]
     public async Task<ActionResult<List<FileDto>>> GetDeleted()
     {
         var files = await _fileRepository.GetDeletedAsync();
@@ -80,6 +80,28 @@ public class FilesController : ControllerBase
         {
             return NotFound();
         }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var clientContext = _clientContextResolver.Resolve(HttpContext);
+
+        await _auditLogRepository.AddAsync(new AuditLog
+        {
+            UserId = userId,
+            Action = "FileDetailsViewed",
+            EntityType = "SharedFile",
+            EntityId = id.ToString(),
+            NewValues = file.OriginalFileName,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = clientContext.IpAddress,
+            UserAgent = clientContext.UserAgent,
+            DeviceName = clientContext.DeviceName,
+            DeviceType = clientContext.DeviceType,
+            OperatingSystem = clientContext.OperatingSystem,
+            Browser = clientContext.Browser,
+            Location = clientContext.Location,
+            Latitude = clientContext.Latitude,
+            Longitude = clientContext.Longitude
+        });
 
         return Ok(MapToDto(file));
     }
@@ -310,7 +332,7 @@ public class FilesController : ControllerBase
 
         if (validation.Success)
         {
-            await LogFileAccess(file.Id, "AccessMetadataGranted", true);
+            await LogFileAccess(file.Id, "Metadatos consultados", true);
         }
 
         var dto = new FileAccessResultDto
@@ -399,7 +421,7 @@ public class FilesController : ControllerBase
             });
         }
 
-        await LogFileAccess(file.Id, file.IsPDF ? "ContentRetrievedForViewer" : "ContentDownloaded", true);
+        await LogFileAccess(file.Id, file.IsPDF ? "Contenido abierto en visor" : "Contenido descargado", true);
 
         return Ok(new FileContentResponse
         {
@@ -481,7 +503,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpPut("{id}/rename")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Auditor")]
     public async Task<ActionResult<FileDto>> RenameFile(int id, [FromBody] RenameFileRequest request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.NewName))
@@ -808,6 +830,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("{id}/accesses")]
+    [Authorize(Roles = "Admin,Auditor")]
     public async Task<ActionResult<List<FileAccessLogDto>>> GetFileAccesses(int id)
     {
         var accesses = await _fileAccessRepository.GetByFileIdAsync(id);
@@ -865,7 +888,7 @@ public class FilesController : ControllerBase
     {
         if (file.IsBlocked)
         {
-            await LogFileAccess(file.Id, "AccessBlocked", false);
+            await LogFileAccess(file.Id, "Acceso bloqueado", false);
             return AccessValidationResult.FromBlocked( // antes: Blocked(
                 file.BlockReason,
                 file.BlockReason != null && file.BlockReason.Contains("IA", StringComparison.OrdinalIgnoreCase));
@@ -878,13 +901,13 @@ public class FilesController : ControllerBase
 
         if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
         {
-            await LogFileAccess(file.Id, "AccessExpired", false);
+            await LogFileAccess(file.Id, "Acceso expirado", false);
             return AccessValidationResult.Fail("Este archivo ha expirado");
         }
 
         if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
         {
-            await LogFileAccess(file.Id, "AccessLimitReached", false);
+            await LogFileAccess(file.Id, "Límite de accesos alcanzado", false);
             return AccessValidationResult.Fail("Se alcanzó el límite de accesos");
         }
 
@@ -892,7 +915,7 @@ public class FilesController : ControllerBase
         {
             if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
             {
-                await LogFileAccess(file.Id, "InvalidPassword", false);
+                await LogFileAccess(file.Id, "Contraseña incorrecta", false);
                 return AccessValidationResult.Fail("Contraseña incorrecta");
             }
         }
