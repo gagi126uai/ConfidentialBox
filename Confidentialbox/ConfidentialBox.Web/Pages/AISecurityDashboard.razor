@@ -10,7 +10,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Rendering
 @using ConfidentialBox.Core.Entities
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Auditor")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ISettingsService SettingsService
