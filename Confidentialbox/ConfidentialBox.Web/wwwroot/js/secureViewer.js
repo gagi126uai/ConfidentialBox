@@ -1,5 +1,11 @@
-﻿(function () {
+(function () {
     const ns = (window.ConfidentialBox = window.ConfidentialBox || {});
+
+    // Si el visor avanzado ya está disponible (confidentialbox.js), no lo sobrescribimos.
+    if (ns.initSecurePdfViewer && ns.renderPdf && ns.disposeSecurePdfViewer && ns.notifyPdfPage) {
+        return;
+    }
+
     ns._viewers = ns._viewers || {};
 
     function base64ToBlob(base64, contentType) {
