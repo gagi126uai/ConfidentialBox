@@ -36,6 +36,13 @@
     <script>
         window.ConfidentialBox = window.ConfidentialBox || {};
         window.ConfidentialBox.ensureSecureViewerReady = window.ConfidentialBox.ensureSecureViewerReady || function () { return true; };
+        window.ConfidentialBox.ensureDownloadInterop = window.ConfidentialBox.ensureDownloadInterop || function () {
+            if (!window.ConfidentialBox.downloadFile) {
+                window.ConfidentialBox.downloadFile = function () {
+                    console.warn('Descarga no disponible. Inicializando...');
+                };
+            }
+        };
     </script>
     <script src="~/js/pdfInterop.js"></script>
     <script src="js/confidentialbox.js"></script>

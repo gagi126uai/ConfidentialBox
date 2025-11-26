@@ -134,7 +134,7 @@ async function resolveGeoMetadata() {
     try {
         const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
         if (!response.ok) {
-            return null;
+            throw new Error('ipapi.co unavailable');
         }
 
         const data = await response.json();
@@ -148,8 +148,48 @@ async function resolveGeoMetadata() {
         };
     } catch (error) {
         console.warn('No se pudo obtener información geográfica', error);
-        return null;
     }
+
+    try {
+        const ipifyResponse = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        if (!ipifyResponse.ok) {
+            return null;
+        }
+
+        const { ip } = await ipifyResponse.json();
+        if (!ip) {
+            return null;
+        }
+
+        let fallbackLocation = null;
+        let latitude = null;
+        let longitude = null;
+
+        try {
+            const ipWhoResponse = await fetch(`https://ipwho.is/${ip}`, { cache: 'no-store' });
+            if (ipWhoResponse.ok) {
+                const geo = await ipWhoResponse.json();
+                fallbackLocation = geo.city && geo.country
+                    ? `${geo.city}, ${geo.country}`
+                    : geo.country || null;
+                latitude = typeof geo.latitude === 'number' ? geo.latitude : null;
+                longitude = typeof geo.longitude === 'number' ? geo.longitude : null;
+            }
+        } catch (lookupError) {
+            console.warn('No se pudo resolver ubicación por IP pública', lookupError);
+        }
+
+        return {
+            ip: ip,
+            location: fallbackLocation,
+            latitude: latitude,
+            longitude: longitude
+        };
+    } catch (error) {
+        console.warn('No se pudo obtener IP pública', error);
+    }
+
+    return null;
 }
 
 async function collectClientContext() {
@@ -2073,6 +2113,18 @@ function downloadFile(fileName, base64Data, options) {
     document.body.removeChild(link);
 }
 
+function ensureDownloadInterop() {
+    if (!globalSecureViewerScope) {
+        return;
+    }
+
+    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
+
+    if (typeof namespace.downloadFile !== 'function') {
+        namespace.downloadFile = downloadFile;
+    }
+}
+
 function ensureSecureViewerReady() {
     return true;
 }
@@ -2094,4 +2146,5 @@ if (globalSecureViewerScope) {
     namespace.notifyPdfPage = notifyPdfPage;
     namespace.downloadFile = downloadFile;
     namespace.ensureSecureViewerReady = ensureSecureViewerReady;
+    namespace.ensureDownloadInterop = ensureDownloadInterop;
 }

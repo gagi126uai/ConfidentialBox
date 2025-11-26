@@ -3,6 +3,7 @@
 @inject IFileService FileService
 @inject IJSRuntime JS
 @using System.Security.Cryptography
+@using Microsoft.JSInterop
 @using ConfidentialBox.Core.DTOs
 @implements IAsyncDisposable
 
@@ -134,6 +135,21 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadMetadata();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("ConfidentialBox.ensureDownloadInterop");
+            }
+            catch (JSException jsError)
+            {
+                Console.Error.WriteLine($"No se pudo inicializar la descarga segura: {jsError.Message}");
+            }
+        }
     }
 
     private async Task LoadMetadata()
