@@ -2104,13 +2104,40 @@ function downloadFile(fileName, base64Data, options) {
         return;
     }
 
-    const link = document.createElement('a');
-    link.href = `data:application/octet-stream;base64,${base64Data}`;
-    link.download = fileName || 'archivo';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const safeName = fileName || 'archivo';
+
+    try {
+        const byteString = atob(base64Data || '');
+        const byteArray = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+            byteArray[i] = byteString.charCodeAt(i);
+        }
+
+        const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = safeName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    } catch (error) {
+        console.error('No se pudo iniciar la descarga', error);
+        throw error;
+    }
+}
+
+function ensureDownloadInterop() {
+    if (!globalSecureViewerScope) {
+        return;
+    }
+
+    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
+
+    if (typeof namespace.downloadFile !== 'function') {
+        namespace.downloadFile = downloadFile;
+    }
 }
 
 function ensureDownloadInterop() {

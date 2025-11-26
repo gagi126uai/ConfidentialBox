@@ -328,8 +328,16 @@
 
             var decryptedBytes = DecryptContent(contentResponse.EncryptedContent, contentResponse.EncryptionKey);
             var base64 = Convert.ToBase64String(decryptedBytes);
-            await JS.InvokeVoidAsync("ConfidentialBox.downloadFile", fileMetadata.OriginalFileName, base64);
-            successMessage = "Descarga iniciada.";
+
+            try
+            {
+                await JS.InvokeVoidAsync("ConfidentialBox.downloadFile", fileMetadata.OriginalFileName, base64);
+                successMessage = "Descarga iniciada.";
+            }
+            catch (JSException jsError)
+            {
+                errorMessage = $"No se pudo iniciar la descarga: {jsError.Message}";
+            }
         }
         catch (Exception ex)
         {
