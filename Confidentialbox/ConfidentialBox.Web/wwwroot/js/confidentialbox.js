@@ -1909,6 +1909,11 @@ async function renderPdf(frameId, base64Data, fileName) {
                     } catch (styleErr) {
                         console.warn('No se pudo inyectar estilos anti selección en el visor seguro', styleErr);
                     }
+                }
+            } catch (frameErr) {
+                console.warn('No se pudo preparar el visor seguro', frameErr);
+            }
+        });
 
         const pagesHost = document.createElement('div');
         pagesHost.className = 'secure-pdf-pages';
@@ -2125,18 +2130,6 @@ function downloadFile(fileName, base64Data, options) {
     } catch (error) {
         console.error('No se pudo iniciar la descarga', error);
         throw error;
-    }
-}
-
-function ensureDownloadInterop() {
-    if (!globalSecureViewerScope) {
-        return;
-    }
-
-    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
-
-    if (typeof namespace.downloadFile !== 'function') {
-        namespace.downloadFile = downloadFile;
     }
 }
 
