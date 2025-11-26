@@ -2113,6 +2113,18 @@ function downloadFile(fileName, base64Data, options) {
     document.body.removeChild(link);
 }
 
+function ensureDownloadInterop() {
+    if (!globalSecureViewerScope) {
+        return;
+    }
+
+    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
+
+    if (typeof namespace.downloadFile !== 'function') {
+        namespace.downloadFile = downloadFile;
+    }
+}
+
 function ensureSecureViewerReady() {
     return true;
 }
@@ -2134,4 +2146,5 @@ if (globalSecureViewerScope) {
     namespace.notifyPdfPage = notifyPdfPage;
     namespace.downloadFile = downloadFile;
     namespace.ensureSecureViewerReady = ensureSecureViewerReady;
+    namespace.ensureDownloadInterop = ensureDownloadInterop;
 }
