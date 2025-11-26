@@ -143,107 +143,76 @@ else
 </div>
 }
 
-@if (showAccessLogs && selectedFile != null)
+@if (showFileDetails && selectedFile != null)
 {
     <div class="modal show d-block" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Auditoría de accesos - @selectedFile.OriginalFileName</h5>
-                    <button type="button" class="btn-close" @onclick="CloseAccessLogs"></button>
+                    <h5 class="modal-title">Detalles del archivo - @selectedFile.OriginalFileName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseFileDetails"></button>
                 </div>
                 <div class="modal-body">
-                    @if (accessLogsLoading)
-                    {
-                        <div class="text-center my-4">
-                            <div class="spinner-border" role="status"></div>
-                            <p class="mt-3 text-muted">Cargando historial...</p>
-                        </div>
-                    }
-                    else if (!string.IsNullOrEmpty(accessLogsError))
-                    {
-                        <div class="alert alert-danger">@accessLogsError</div>
-                    }
-                    else if (accessLogs.Any())
-                    {
-                        <div class="row g-3">
-                            <div class="col-lg-7">
-                                <div class="table-responsive access-log-table">
-                                    <table class="table table-hover table-sm align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Fecha</th>
-                                                <th>Usuario</th>
-                                                <th>IP</th>
-                                                <th>Dispositivo</th>
-                                                <th>Sistema</th>
-                                                <th>Navegador</th>
-                                                <th>Ubicación</th>
-                                                <th>Estado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var log in accessLogs)
-                                            {
-                                                <tr class="@(highlightedLog == log ? "table-primary" : string.Empty)" @onclick="() => HighlightLog(log)">
-                                                    <td>@log.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
-                                                    <td>@(string.IsNullOrWhiteSpace(log.AccessedByUserName) ? "-" : log.AccessedByUserName)</td>
-                                                    <td><code>@log.AccessedByIp</code></td>
-                                                    <td>@(string.IsNullOrWhiteSpace(log.DeviceName) ? log.DeviceType ?? "-" : log.DeviceName)</td>
-                                                    <td>@(string.IsNullOrWhiteSpace(log.OperatingSystem) ? "-" : log.OperatingSystem)</td>
-                                                    <td>@(string.IsNullOrWhiteSpace(log.Browser) ? "-" : log.Browser)</td>
-                                                    <td>@(string.IsNullOrWhiteSpace(log.Location) ? "Sin datos" : log.Location)</td>
-                                                    <td>
-                                                        <span class="badge @(log.WasAuthorized ? "bg-success" : "bg-danger")">@FormatAccessStatus(log)</span>
-                                                    </td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="col-lg-5">
-                                <div class="border rounded h-100 p-3">
-                                    @if (highlightedLog != null)
-                                    {
-                                        <h6 class="fw-semibold">Detalle seleccionado</h6>
-                                        <ul class="list-unstyled small mb-3">
-                                            <li><strong>Acción:</strong> @highlightedLog.Action</li>
-                                            <li><strong>Autorizado:</strong> @(highlightedLog.WasAuthorized ? "Sí" : "No")</li>
-                                            <li><strong>IP:</strong> <code>@highlightedLog.AccessedByIp</code></li>
-                                            <li><strong>Dispositivo:</strong> @(string.IsNullOrWhiteSpace(highlightedLog.DeviceType) ? "-" : highlightedLog.DeviceType)</li>
-                                            <li><strong>SO:</strong> @(string.IsNullOrWhiteSpace(highlightedLog.OperatingSystem) ? "-" : highlightedLog.OperatingSystem)</li>
-                                            <li><strong>Navegador:</strong> @(string.IsNullOrWhiteSpace(highlightedLog.Browser) ? "-" : highlightedLog.Browser)</li>
-                                            <li><strong>Ubicación:</strong> @(string.IsNullOrWhiteSpace(highlightedLog.Location) ? "Sin datos" : highlightedLog.Location)</li>
-                                        </ul>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold">Información básica</h6>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">Nombre</dt>
+                                <dd class="col-sm-7">@selectedFile.OriginalFileName</dd>
 
-                                        var mapUrl = BuildMapUrl(highlightedLog);
-                                        if (!string.IsNullOrEmpty(mapUrl))
-                                        {
-                                            <div class="ratio ratio-4x3">
-                                                <iframe src="@mapUrl" loading="lazy" referrerpolicy="no-referrer" title="Ubicación del acceso"></iframe>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <div class="alert alert-light small mb-0">
-                                                <i class="fas fa-map-marker-alt"></i> No hay coordenadas disponibles para este acceso.
-                                            </div>
-                                        }
+                                <dt class="col-sm-5">Tipo</dt>
+                                <dd class="col-sm-7">@selectedFile.FileExtension.ToUpperInvariant()</dd>
+
+                                <dt class="col-sm-5">Tamaño</dt>
+                                <dd class="col-sm-7">@FormatBytes(selectedFile.FileSizeBytes)</dd>
+
+                                <dt class="col-sm-5">Autor</dt>
+                                <dd class="col-sm-7">@(string.IsNullOrWhiteSpace(selectedFile.UploadedByUserName) ? "Tú" : selectedFile.UploadedByUserName)</dd>
+
+                                <dt class="col-sm-5">Fecha de subida</dt>
+                                <dd class="col-sm-7">@selectedFile.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd>
+
+                                <dt class="col-sm-5">Expira</dt>
+                                <dd class="col-sm-7">
+                                    @if (selectedFile.ExpiresAt.HasValue)
+                                    {
+                                        <span>@selectedFile.ExpiresAt.Value.ToLocalTime().ToString("dd/MM/yyyy")</span>
                                     }
+                                    else
+                                    {
+                                        <span class="text-muted">Nunca</span>
+                                    }
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold">Compartir</h6>
+                            <p class="text-muted small">Copia o abre el enlace seguro para compartir el archivo. También puedes usar el botón inferior en la tabla.</p>
+                            @if (string.IsNullOrWhiteSpace(selectedFile.ShareLink))
+                            {
+                                <div class="alert alert-warning mb-0">
+                                    <i class="fas fa-link-slash me-2"></i>Este archivo aún no tiene un enlace público disponible.
                                 </div>
-                            </div>
+                            }
+                            else
+                            {
+                                var shareUrl = BuildShareUrl(selectedFile);
+                                <div class="input-group mb-2">
+                                    <input class="form-control" value="@shareUrl" readonly />
+                                    <button class="btn btn-outline-primary" @onclick="() => CopyShareLink(selectedFile.ShareLink, selectedFile.IsPdf)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <a class="btn btn-outline-secondary" href="@shareUrl" target="_blank" rel="noopener">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                    </a>
+                                </div>
+                                <small class="text-muted">Comparte este link con las personas autorizadas o envíalo por otro canal seguro.</small>
+                            }
                         </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle"></i> Todavía no se registraron accesos para este archivo.
-                        </div>
-                    }
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-outline-secondary" @onclick="CloseAccessLogs">Cerrar</button>
+                    <button class="btn btn-primary" @onclick="CloseFileDetails">Listo</button>
                 </div>
             </div>
         </div>
@@ -257,12 +226,8 @@ else
     private string? successMessage;
     private string? errorMessage;
 
-    private bool showAccessLogs;
+    private bool showFileDetails;
     private FileDto? selectedFile;
-    private List<FileAccessLogDto> accessLogs = new();
-    private bool accessLogsLoading;
-    private string? accessLogsError;
-    private FileAccessLogDto? highlightedLog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -288,10 +253,7 @@ else
 
     private async Task CopyShareLink(string shareLink, bool isPdf)
     {
-        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
-        var fullLink = isPdf
-            ? $"{baseUri}/view-pdf/{shareLink}"
-            : $"{baseUri}/access/{shareLink}";
+        var fullLink = BuildShareUrl(shareLink, isPdf);
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", fullLink);
 
         successMessage = "Link copiado al portapapeles";
@@ -300,27 +262,22 @@ else
 
     private async Task ViewFileDetails(int fileId)
     {
-        selectedFile = files.FirstOrDefault(f => f.Id == fileId);
-        showAccessLogs = true;
-        accessLogsLoading = true;
-        accessLogsError = null;
-        accessLogs.Clear();
-        highlightedLog = null;
-
         try
         {
-            var logs = await FileService.GetAccessLogsAsync(fileId);
-            accessLogs = logs.OrderByDescending(l => l.AccessedAt).ToList();
-            highlightedLog = accessLogs.FirstOrDefault(l => l.Latitude.HasValue && l.Longitude.HasValue)
-                ?? accessLogs.FirstOrDefault();
+            selectedFile = await FileService.GetFileByIdAsync(fileId)
+                ?? files.FirstOrDefault(f => f.Id == fileId);
+
+            if (selectedFile == null)
+            {
+                errorMessage = "No se encontraron los detalles del archivo seleccionado.";
+                return;
+            }
+
+            showFileDetails = true;
         }
         catch (Exception ex)
         {
-            accessLogsError = $"No se pudieron cargar los registros de auditoría: {ex.Message}";
-        }
-        finally
-        {
-            accessLogsLoading = false;
+            errorMessage = $"No se pudieron cargar los detalles del archivo: {ex.Message}";
         }
     }
 
@@ -365,18 +322,10 @@ else
         }
     }
 
-    private void CloseAccessLogs()
+    private void CloseFileDetails()
     {
-        showAccessLogs = false;
+        showFileDetails = false;
         selectedFile = null;
-        accessLogs.Clear();
-        accessLogsError = null;
-        highlightedLog = null;
-    }
-
-    private void HighlightLog(FileAccessLogDto log)
-    {
-        highlightedLog = log;
     }
 
     private static string FormatBytes(long bytes)
@@ -392,16 +341,13 @@ else
         return $"{len:0.##} {sizes[order]}";
     }
 
-    private static string FormatAccessStatus(FileAccessLogDto log)
-        => log.WasAuthorized ? "Autorizado" : "Bloqueado";
+    private string BuildShareUrl(FileDto file) => BuildShareUrl(file.ShareLink, file.IsPdf);
 
-    private string? BuildMapUrl(FileAccessLogDto? log)
+    private string BuildShareUrl(string shareLink, bool isPdf)
     {
-        if (log?.Latitude is null || log.Longitude is null)
-        {
-            return null;
-        }
-
-        return $"https://maps.google.com/maps?q={log.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{log.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}&z=14&output=embed";
+        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+        return isPdf
+            ? $"{baseUri}/view-pdf/{shareLink}"
+            : $"{baseUri}/access/{shareLink}";
     }
 }

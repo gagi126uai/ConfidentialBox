@@ -830,6 +830,7 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("{id}/accesses")]
+    [Authorize(Roles = "Admin,Auditor")]
     public async Task<ActionResult<List<FileAccessLogDto>>> GetFileAccesses(int id)
     {
         var accesses = await _fileAccessRepository.GetByFileIdAsync(id);
