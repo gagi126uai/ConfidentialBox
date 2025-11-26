@@ -52,13 +52,19 @@
                 <i class="fas fa-file-signature"></i>
                 <span>Auditoría</span>
             </NavLink>
-            <NavLink class="cbx-nav__link" href="all-files">
-                <i class="fas fa-folder-tree"></i>
-                <span>Todos los Archivos</span>
-            </NavLink>
             <NavLink class="cbx-nav__link" href="settings">
                 <i class="fas fa-sliders"></i>
                 <span>Configuración</span>
+            </NavLink>
+        </div>
+    </AuthorizeView>
+
+    <AuthorizeView Roles="Admin,Auditor">
+        <div class="cbx-nav__section">
+            <p class="cbx-nav__section-label">Supervisión</p>
+            <NavLink class="cbx-nav__link" href="all-files">
+                <i class="fas fa-folder-tree"></i>
+                <span>Todos los Archivos</span>
             </NavLink>
         </div>
     </AuthorizeView>
