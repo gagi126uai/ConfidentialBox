@@ -19,10 +19,12 @@ public class DatabaseSeeder
         var adminRole = await CreateRoleIfNotExists(roleManager, "Admin", "Administrador del sistema", true);
         var userRole = await CreateRoleIfNotExists(roleManager, "User", "Usuario estándar", true);
         var guestRole = await CreateRoleIfNotExists(roleManager, "Guest", "Usuario invitado", true);
+        var auditorRole = await CreateRoleIfNotExists(roleManager, "Auditor", "Auditor operativo", true);
 
         await EnsureRolePoliciesAsync(roleManager, adminRole);
         await EnsureRolePoliciesAsync(roleManager, userRole);
         await EnsureRolePoliciesAsync(roleManager, guestRole);
+        await EnsureRolePoliciesAsync(roleManager, auditorRole);
 
         // Crear usuario administrador predeterminado
         await CreateUserIfNotExists(
@@ -43,6 +45,15 @@ public class DatabaseSeeder
             "John",
             "Doe",
             new[] { "User" });
+
+        await CreateUserIfNotExists(
+            userManager,
+            "auditor",
+            "auditor@confidentialbox.com",
+            "Auditor123!",
+            "Auditor",
+            "Operaciones",
+            new[] { "Auditor" });
     }
 
     private static async Task<ApplicationRole> CreateRoleIfNotExists(RoleManager<ApplicationRole> roleManager, string roleName, string description, bool isSystemRole)
