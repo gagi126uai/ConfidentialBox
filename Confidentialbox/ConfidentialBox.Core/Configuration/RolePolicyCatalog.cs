@@ -292,6 +292,35 @@ public static class RolePolicyCatalog
                 [PolicyCanViewAuditTrail] = "false",
                 [PolicyAuditRetentionDays] = "180"
             },
+            "auditor" => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [PolicyCanUpload] = "false",
+                [PolicyMaxFileSizeMb] = "100",
+                [PolicyMaxStorageGb] = "2",
+                [PolicyRequiresMfa] = "true",
+                [PolicySessionTimeoutMinutes] = "20",
+                [PolicyMaxConcurrentSessions] = "2",
+                [PolicySessionLockoutMinutes] = "10",
+                [PolicyCanShareExternal] = "false",
+                [PolicyRequireExternalJustification] = "true",
+                [PolicyExternalApproval] = "true",
+                [PolicyForceWatermark] = "true",
+                [PolicyMaxDailyDownloads] = "10",
+                [PolicyAllowOfflineAccess] = "false",
+                [PolicyDownloadJustificationWindowMinutes] = "30",
+                [PolicyCanAccessAi] = "false",
+                [PolicyEnableAiAutoResponse] = "false",
+                [PolicyAiEscalationLevel] = "1",
+                [PolicyAllowedIpRanges] = string.Empty,
+                [PolicyGeoAllowedCountries] = string.Empty,
+                [PolicyIncidentAutoEscalateMinutes] = "15",
+                [PolicyQuarantineOnBreach] = "true",
+                [PolicyNotifyOnRoleChanges] = "true",
+                [PolicyLegalHoldEnabled] = "true",
+                [PolicyDataResidencyRequirement] = "Regional",
+                [PolicyCanViewAuditTrail] = "false",
+                [PolicyAuditRetentionDays] = "365"
+            },
             "guest" => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 [PolicyCanUpload] = "false",
