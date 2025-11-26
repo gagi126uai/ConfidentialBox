@@ -134,7 +134,7 @@ async function resolveGeoMetadata() {
     try {
         const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
         if (!response.ok) {
-            return null;
+            throw new Error('ipapi.co unavailable');
         }
 
         const data = await response.json();
@@ -148,8 +148,48 @@ async function resolveGeoMetadata() {
         };
     } catch (error) {
         console.warn('No se pudo obtener información geográfica', error);
-        return null;
     }
+
+    try {
+        const ipifyResponse = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        if (!ipifyResponse.ok) {
+            return null;
+        }
+
+        const { ip } = await ipifyResponse.json();
+        if (!ip) {
+            return null;
+        }
+
+        let fallbackLocation = null;
+        let latitude = null;
+        let longitude = null;
+
+        try {
+            const ipWhoResponse = await fetch(`https://ipwho.is/${ip}`, { cache: 'no-store' });
+            if (ipWhoResponse.ok) {
+                const geo = await ipWhoResponse.json();
+                fallbackLocation = geo.city && geo.country
+                    ? `${geo.city}, ${geo.country}`
+                    : geo.country || null;
+                latitude = typeof geo.latitude === 'number' ? geo.latitude : null;
+                longitude = typeof geo.longitude === 'number' ? geo.longitude : null;
+            }
+        } catch (lookupError) {
+            console.warn('No se pudo resolver ubicación por IP pública', lookupError);
+        }
+
+        return {
+            ip: ip,
+            location: fallbackLocation,
+            latitude: latitude,
+            longitude: longitude
+        };
+    } catch (error) {
+        console.warn('No se pudo obtener IP pública', error);
+    }
+
+    return null;
 }
 
 async function collectClientContext() {
@@ -1869,6 +1909,11 @@ async function renderPdf(frameId, base64Data, fileName) {
                     } catch (styleErr) {
                         console.warn('No se pudo inyectar estilos anti selección en el visor seguro', styleErr);
                     }
+                }
+            } catch (frameErr) {
+                console.warn('No se pudo preparar el visor seguro', frameErr);
+            }
+        });
 
         const pagesHost = document.createElement('div');
         pagesHost.className = 'secure-pdf-pages';
@@ -2064,13 +2109,40 @@ function downloadFile(fileName, base64Data, options) {
         return;
     }
 
-    const link = document.createElement('a');
-    link.href = `data:application/octet-stream;base64,${base64Data}`;
-    link.download = fileName || 'archivo';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const safeName = fileName || 'archivo';
+
+    try {
+        const byteString = atob(base64Data || '');
+        const byteArray = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+            byteArray[i] = byteString.charCodeAt(i);
+        }
+
+        const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = safeName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    } catch (error) {
+        console.error('No se pudo iniciar la descarga', error);
+        throw error;
+    }
+}
+
+function ensureDownloadInterop() {
+    if (!globalSecureViewerScope) {
+        return;
+    }
+
+    const namespace = globalSecureViewerScope.ConfidentialBox || (globalSecureViewerScope.ConfidentialBox = {});
+
+    if (typeof namespace.downloadFile !== 'function') {
+        namespace.downloadFile = downloadFile;
+    }
 }
 
 function ensureSecureViewerReady() {
@@ -2094,4 +2166,5 @@ if (globalSecureViewerScope) {
     namespace.notifyPdfPage = notifyPdfPage;
     namespace.downloadFile = downloadFile;
     namespace.ensureSecureViewerReady = ensureSecureViewerReady;
+    namespace.ensureDownloadInterop = ensureDownloadInterop;
 }
