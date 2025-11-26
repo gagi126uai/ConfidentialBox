@@ -71,12 +71,72 @@
     ns.initSecurePdfViewer = function (containerId, opts) {
         // guarda mínima metadata de la sesión, por si querés limpiar después
         if (!opts || !opts.sessionId) return;
-        ns._viewers[opts.sessionId] = {
+
+        const viewerState = {
             containerId,
             frameId: opts.frameId,
-            toolbarId: opts.toolbarId
+            toolbarId: opts.toolbarId,
+            cleanup: []
             // acá podrías agregar listeners o UI del toolbar si querés
         };
+
+        const container = document.getElementById(containerId);
+        const disableMenu = opts.disableContextMenu || opts?.settings?.disableContextMenu;
+        const disableSelection = opts?.settings?.disableTextSelection;
+
+        if (container) {
+            container.dataset.contextMenuBlocked = disableMenu ? 'true' : 'false';
+            container.style.userSelect = disableSelection ? 'none' : 'auto';
+            container.style.webkitUserSelect = disableSelection ? 'none' : 'auto';
+            container.style.background = opts?.settings?.backgroundColor || '#0f172a';
+
+            const style = document.createElement('style');
+            style.textContent = `#${containerId} iframe{padding:${opts?.settings?.viewerPadding||'1.5rem'};background:${opts?.settings?.backgroundColor||'#0f172a'};}`;
+            document.head.appendChild(style);
+            viewerState.cleanup.push(() => style.remove());
+
+            if (disableMenu) {
+                const handler = (event) => {
+                    const inside = container.contains(event.target);
+                    if (inside) {
+                        event.preventDefault();
+                    }
+                };
+                document.addEventListener('contextmenu', handler, true);
+                viewerState.cleanup.push(() => document.removeEventListener('contextmenu', handler, true));
+            }
+
+            if (opts.watermarkText) {
+                const wm = document.createElement('div');
+                wm.className = 'secure-pdf-watermark-layer';
+                wm.style.pointerEvents = 'none';
+                wm.style.position = 'absolute';
+                wm.style.inset = '0';
+                wm.style.display = 'grid';
+                wm.style.gridTemplateColumns = 'repeat(auto-fill, minmax(240px,1fr))';
+                wm.style.gap = '2rem';
+                wm.style.padding = '2rem';
+                wm.style.alignItems = 'center';
+                wm.style.justifyItems = 'center';
+                wm.style.transform = 'rotate(-15deg)';
+                wm.style.color = opts?.watermarkStyle?.color || 'rgba(220,53,69,0.18)';
+                wm.style.opacity = opts?.watermarkStyle?.opacity ?? 0.12;
+                wm.style.fontSize = (opts?.watermarkStyle?.fontSize || 48) + 'px';
+                wm.style.fontFamily = opts?.settings?.fontFamily || "'Inter','Segoe UI',sans-serif";
+
+                for (let i = 0; i < 12; i++) {
+                    const span = document.createElement('span');
+                    span.textContent = opts.watermarkText;
+                    wm.appendChild(span);
+                }
+
+                container.style.position = container.style.position || 'relative';
+                container.appendChild(wm);
+                viewerState.cleanup.push(() => wm.remove());
+            }
+        }
+
+        ns._viewers[opts.sessionId] = viewerState;
     };
 
     ns.disposeSecurePdfViewer = function (sessionId) {
@@ -85,6 +145,13 @@
         // limpia toolbar si lo hubieras poblado
         const tb = document.getElementById(v.toolbarId);
         if (tb) tb.innerHTML = "";
+
+        if (Array.isArray(v.cleanup)) {
+            v.cleanup.forEach((fn) => {
+                try { fn(); } catch { /* ignore */ }
+            });
+        }
+
         delete ns._viewers[sessionId];
     };
 

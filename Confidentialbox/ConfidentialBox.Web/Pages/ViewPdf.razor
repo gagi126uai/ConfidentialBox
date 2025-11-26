@@ -381,7 +381,8 @@
                         opacity = viewerConfig.WatermarkOpacity,
                         fontSize = viewerConfig.WatermarkFontSize
                     },
-                    disableContextMenu = viewerConfig.ScreenshotProtectionEnabled,
+                    disableContextMenu = viewerConfig.ScreenshotProtectionEnabled
+                        || (viewerConfig.ViewerSettings?.DisableContextMenu ?? false),
                     maxViewMinutes = viewerConfig.MaxViewTimeMinutes,
                     settings = viewerConfig.ViewerSettings,
                     policy = viewerConfig.EffectivePermissions,
