@@ -127,6 +127,12 @@ else
                                                     @onclick="() => OpenFile(file)">
                                                 <i class="fas fa-eye"></i>
                                             </button>
+                                            <button class="btn btn-outline-info"
+                                                    title="Ver auditoría"
+                                                    disabled="@isProcessing"
+                                                    @onclick="async () => await OpenAuditModalAsync(file)">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </button>
                                             <button class="btn btn-outline-primary"
                                                     title="Renombrar archivo"
                                                     disabled="@isProcessing"
@@ -168,6 +174,12 @@ else
                                     else
                                     {
                                         <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-info"
+                                                    title="Ver auditoría"
+                                                    disabled="@isProcessing"
+                                                    @onclick="async () => await OpenAuditModalAsync(file)">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </button>
                                             <button class="btn btn-outline-success"
                                                     title="Restaurar"
                                                     disabled="@isProcessing"
@@ -217,6 +229,88 @@ else
                         }
                         Guardar cambios
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@if (showAuditModal && selectedFile != null)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Auditoría de accesos - @selectedFile.OriginalFileName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAuditModal" disabled="@auditLoading"></button>
+                </div>
+                <div class="modal-body">
+                    @if (auditLoading)
+                    {
+                        <div class="text-center my-4">
+                            <div class="spinner-border" role="status"></div>
+                            <p class="mt-3 text-muted">Cargando registros de auditoría...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(auditError))
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <i class="fas fa-triangle-exclamation me-2"></i>@auditError
+                        </div>
+                    }
+                    else if (accessLogs == null || !accessLogs.Any())
+                    {
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>No hay accesos registrados para este archivo.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Acción</th>
+                                        <th>Resultado</th>
+                                        <th>Usuario</th>
+                                        <th>IP</th>
+                                        <th>Dispositivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in accessLogs.OrderByDescending(l => l.AccessedAt))
+                                    {
+                                        <tr>
+                                            <td>@log.AccessedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@log.Action</td>
+                                            <td>
+                                                @if (log.WasAuthorized)
+                                                {
+                                                    <span class="badge text-bg-success"><i class="fas fa-check"></i> Autorizado</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-danger"><i class="fas fa-ban"></i> Denegado</span>
+                                                }
+                                            </td>
+                                            <td>@(string.IsNullOrWhiteSpace(log.AccessedByUserName) ? "Usuario invitado" : log.AccessedByUserName)</td>
+                                            <td>@log.AccessedByIp</td>
+                                            <td>
+                                                <div class="small text-muted">@log.DeviceName @log.DeviceType</div>
+                                                <div class="small">@log.OperatingSystem</div>
+                                                <div class="small text-muted">@log.Browser</div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseAuditModal" disabled="@auditLoading">Cerrar</button>
                 </div>
             </div>
         </div>
@@ -323,6 +417,7 @@ else
     private bool showRenameModal;
     private bool showOwnerModal;
     private bool showBlockModal;
+    private bool showAuditModal;
     private FileDto? selectedFile;
     private string? newFileName;
     private string? selectedOwnerId;
@@ -330,6 +425,9 @@ else
     private bool blockAction = true;
     private List<UserDto>? cachedUsers;
     private bool usersLoading;
+    private bool auditLoading;
+    private string? auditError;
+    private List<FileAccessLogDto>? accessLogs;
 
     private IEnumerable<FileDto>? CurrentFiles => activeTab == "active" ? activeFiles : deletedFiles;
     private string? CurrentError => activeTab == "active" ? activeError : deletedError;
@@ -722,6 +820,37 @@ else
             CloseBlockModal();
             await EnsureTabDataAsync(activeTab);
         }
+    }
+
+    private async Task OpenAuditModalAsync(FileDto file)
+    {
+        selectedFile = file;
+        auditLoading = true;
+        auditError = null;
+        accessLogs = null;
+        showAuditModal = true;
+
+        try
+        {
+            accessLogs = await FileService.GetAccessLogsAsync(file.Id);
+        }
+        catch (Exception ex)
+        {
+            auditError = $"No se pudieron obtener los accesos: {ex.Message}";
+        }
+        finally
+        {
+            auditLoading = false;
+        }
+    }
+
+    private void CloseAuditModal()
+    {
+        showAuditModal = false;
+        selectedFile = null;
+        auditLoading = false;
+        auditError = null;
+        accessLogs = null;
     }
 
     private void OpenFile(FileDto file)
