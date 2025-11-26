@@ -300,6 +300,7 @@ function frameAllowsTextSelection(frameId) {
 const PDF_JS_CDN_VERSION = '3.11.174';
 const PDF_JS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.mjs`;
 const PDF_JS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.worker.min.js`;
+const PDF_JS_UMD_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_JS_CDN_VERSION}/build/pdf.min.js`;
 
 const defaultViewerSettings = {
     theme: 'dark',
@@ -355,6 +356,42 @@ const defaultViewerPermissions = {
 };
 
 let pdfjsLibPromise = null;
+let pdfjsScriptPromise = null;
+
+function loadPdfJsViaScript() {
+    if (typeof window === 'undefined') {
+        return Promise.reject(new Error('pdf.js solo está disponible en el cliente.'));
+    }
+
+    if (window.pdfjsLib) {
+        if (window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.pdfjsWorkerSrc || PDF_JS_WORKER_URL;
+        }
+        return Promise.resolve(window.pdfjsLib);
+    }
+
+    if (!pdfjsScriptPromise) {
+        pdfjsScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = PDF_JS_UMD_URL;
+            script.async = true;
+            script.onload = () => {
+                if (window.pdfjsLib) {
+                    if (window.pdfjsLib.GlobalWorkerOptions) {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.pdfjsWorkerSrc || PDF_JS_WORKER_URL;
+                    }
+                    resolve(window.pdfjsLib);
+                } else {
+                    reject(new Error('El script pdf.js se cargó pero no expuso pdfjsLib.'));
+                }
+            };
+            script.onerror = (e) => reject(new Error('No se pudo cargar pdf.js desde el script UMD.'));
+            document.head.appendChild(script);
+        });
+    }
+
+    return pdfjsScriptPromise;
+}
 
 async function ensurePdfJsLibrary() {
     if (typeof window !== 'undefined' && window.pdfjsLib) {
@@ -389,11 +426,11 @@ async function ensurePdfJsLibrary() {
                 if (typeof window !== 'undefined' && window.pdfjsLib) {
                     return window.pdfjsLib;
                 }
-                throw err;
+                return loadPdfJsViaScript();
             });
     }
 
-    return pdfjsLibPromise;
+    return pdfjsLibPromise.catch(() => loadPdfJsViaScript());
 }
 
 function base64ToUint8Array(base64) {
