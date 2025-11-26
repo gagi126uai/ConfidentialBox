@@ -370,9 +370,14 @@ public class FilesController : ControllerBase
             file,
             masterPassword,
             incrementCounter: true,
-            requireMasterPassword: true);
+            requireMasterPassword: true,
+            logValidationEvents: false);
         if (!validation.Success)
         {
+            var deniedAction = validation.Blocked
+                ? "Intento de descarga de archivo bloqueado"
+                : "Intento de descarga denegado";
+            await LogFileAccess(file.Id, deniedAction, false);
             return Ok(new FileContentResponse
             {
                 Success = false,
@@ -884,11 +889,15 @@ public class FilesController : ControllerBase
     SharedFile file,
     string? masterPassword,
     bool incrementCounter,
-    bool requireMasterPassword = true)
+    bool requireMasterPassword = true,
+    bool logValidationEvents = true)
     {
         if (file.IsBlocked)
         {
-            await LogFileAccess(file.Id, "Acceso bloqueado", false);
+            if (logValidationEvents)
+            {
+                await LogFileAccess(file.Id, "Acceso bloqueado", false);
+            }
             return AccessValidationResult.FromBlocked( // antes: Blocked(
                 file.BlockReason,
                 file.BlockReason != null && file.BlockReason.Contains("IA", StringComparison.OrdinalIgnoreCase));
@@ -901,13 +910,19 @@ public class FilesController : ControllerBase
 
         if (file.ExpiresAt.HasValue && file.ExpiresAt.Value < DateTime.UtcNow)
         {
-            await LogFileAccess(file.Id, "Acceso expirado", false);
+            if (logValidationEvents)
+            {
+                await LogFileAccess(file.Id, "Acceso expirado", false);
+            }
             return AccessValidationResult.Fail("Este archivo ha expirado");
         }
 
         if (file.MaxAccessCount.HasValue && file.CurrentAccessCount >= file.MaxAccessCount.Value)
         {
-            await LogFileAccess(file.Id, "Límite de accesos alcanzado", false);
+            if (logValidationEvents)
+            {
+                await LogFileAccess(file.Id, "Límite de accesos alcanzado", false);
+            }
             return AccessValidationResult.Fail("Se alcanzó el límite de accesos");
         }
 
@@ -915,7 +930,10 @@ public class FilesController : ControllerBase
         {
             if (string.IsNullOrEmpty(masterPassword) || !string.Equals(file.MasterPassword, masterPassword, StringComparison.Ordinal))
             {
-                await LogFileAccess(file.Id, "Contraseña incorrecta", false);
+                if (logValidationEvents)
+                {
+                    await LogFileAccess(file.Id, "Contraseña incorrecta", false);
+                }
                 return AccessValidationResult.Fail("Contraseña incorrecta");
             }
         }

@@ -74,23 +74,38 @@
                             </div>
                         }
 
-                        <div class="mb-3">
-                            <label class="form-label">Contraseña Maestra (si es requerida)</label>
-                            <input type="password" class="form-control" @bind="masterPassword" />
-                        </div>
+                        @if (accessSummary?.RequiresPassword == true)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Contraseña Maestra (si es requerida)</label>
+                                <input type="password" class="form-control" @bind="masterPassword" />
+                            </div>
+                        }
 
                         <div class="d-flex gap-2">
-                            <button class="btn btn-primary" @onclick="ValidateAccess" disabled="@(fileBlocked || isProcessing)">
-                                @if (isProcessing)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2"></span>
-                                }
-                                <i class="fas fa-check"></i> Validar Acceso
-                            </button>
+                            @if (accessSummary?.RequiresPassword == true)
+                            {
+                                <button class="btn btn-primary" @onclick="ValidateAccess" disabled="@(fileBlocked || isProcessing)">
+                                    @if (isProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="fas fa-check"></i> Validar Acceso
+                                </button>
+                            }
 
-                            <button class="btn btn-success" disabled="@(fileBlocked || !hasValidatedPassword || isProcessing)" @onclick="DownloadFile">
-                                <i class="fas fa-download"></i> Descargar Archivo
-                            </button>
+                            @if (accessSummary?.RequiresPassword == false || hasValidatedPassword)
+                            {
+                                <button class="@(fileBlocked ? "btn btn-danger" : "btn btn-success")" disabled="@isProcessing" @onclick="DownloadFile">
+                                    <i class="fas @(fileBlocked ? "fa-ban" : "fa-download")"></i> @(fileBlocked ? "Descarga bloqueada" : "Descargar Archivo")
+                                </button>
+                            }
+                            else if (accessSummary?.RequiresPassword == true)
+                            {
+                                <button class="btn btn-success" disabled title="Valida el acceso para habilitar la descarga">
+                                    <i class="fas fa-lock"></i> Descarga protegida
+                                </button>
+                            }
 
                             @if (fileMetadata?.IsPdf == true)
                             {
@@ -270,15 +285,7 @@
             return;
         }
 
-        if (fileBlocked)
-        {
-            errorMessage = blockedByAi
-                ? $"La IA bloqueó este archivo: {blockReason}"
-                : $"El archivo fue bloqueado: {blockReason}";
-            return;
-        }
-
-        if (!hasValidatedPassword && (accessSummary?.RequiresPassword ?? false))
+        if (accessSummary?.RequiresPassword == true && !hasValidatedPassword)
         {
             errorMessage = "Debes validar la contraseña antes de descargar.";
             return;
@@ -291,7 +298,8 @@
             infoMessage = null;
             successMessage = null;
 
-            var contentResponse = await FileService.GetFileContentAsync(ShareLink, masterPassword);
+            var passwordToSend = accessSummary?.RequiresPassword == true ? masterPassword : null;
+            var contentResponse = await FileService.GetFileContentAsync(ShareLink, passwordToSend);
             if (contentResponse == null)
             {
                 errorMessage = "No se pudo obtener el archivo.";
@@ -301,7 +309,7 @@
 
             if (!contentResponse.Success)
             {
-                fileBlocked = contentResponse.BlockReason is not null;
+                fileBlocked = contentResponse.BlockReason is not null || contentResponse.BlockedByAi;
                 blockedByAi = contentResponse.BlockedByAi;
                 blockReason = contentResponse.BlockReason ?? contentResponse.ErrorMessage;
                 errorMessage = contentResponse.ErrorMessage ?? "Acceso denegado.";
@@ -311,7 +319,10 @@
                         ? $"La IA bloqueó este archivo: {blockReason}"
                         : $"El archivo fue bloqueado: {blockReason}";
                 }
-                hasValidatedPassword = false;
+                if (accessSummary?.RequiresPassword == true)
+                {
+                    hasValidatedPassword = false;
+                }
                 return;
             }
 
