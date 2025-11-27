@@ -67,6 +67,12 @@ public class PDFViewerAIService : IPDFViewerAIService
         var allowDownload = policySettings?.AllowDownload ?? true;
         var allowCopy = policySettings?.AllowCopy ?? true;
         var blockContextMenu = policySettings?.DisableContextMenu ?? false;
+        var scoring = await _systemSettingsService.GetAIScoringSettingsAsync();
+        var screenshotThreshold = Math.Max(1, scoring.ScreenshotBlockAttemptThreshold);
+        var screenshotReason = string.IsNullOrWhiteSpace(scoring.ScreenshotBlockReason)
+            ? "Intento de captura de pantalla"
+            : scoring.ScreenshotBlockReason.Trim();
+        var adminOnlyNote = scoring.RequireAdminUnlockOnBlock ? " · requiere desbloqueo de administrador" : string.Empty;
 
         // Crear evento
         var viewerEvent = new PDFViewerEvent
@@ -83,9 +89,9 @@ public class PDFViewerAIService : IPDFViewerAIService
         {
             case "screenshotattempt":
                 session.ScreenshotAttempts++;
-                if (session.ScreenshotAttempts >= MAX_SCREENSHOT_ATTEMPTS)
+                if (session.ScreenshotAttempts >= screenshotThreshold)
                 {
-                    await BlockSessionAsync(session, "Múltiples intentos de captura de pantalla detectados");
+                    await BlockSessionAsync(session, $"{screenshotReason}{adminOnlyNote}");
                     viewerEvent.WasBlocked = true;
                 }
                 break;

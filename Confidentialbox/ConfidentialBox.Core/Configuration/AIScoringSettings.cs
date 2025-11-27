@@ -46,6 +46,9 @@ public class AIScoringSettings
     public double RecommendationMonitorThreshold { get; set; } = 0.4;
     public double RiskLevelHighThreshold { get; set; } = 0.7;
     public double RiskLevelMediumThreshold { get; set; } = 0.4;
+    public int ScreenshotBlockAttemptThreshold { get; set; } = 3;
+    public string ScreenshotBlockReason { get; set; } = "Intento de captura de pantalla";
+    public bool RequireAdminUnlockOnBlock { get; set; } = true;
     public List<string> SuspiciousExtensions { get; set; } = new() { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".js" };
     public string PlatformTimeZone { get; set; } = TimeZoneInfo.Utc.Id;
 

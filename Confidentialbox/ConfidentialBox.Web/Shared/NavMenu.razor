@@ -4,7 +4,7 @@
     <div class="cbx-nav__brand">
         <a href="/" class="cbx-nav__brand-link">
             <div class="cbx-nav__logo">
-                <i class="fas fa-shield-alt"></i>
+                <i class="fa-solid fa-lock"></i>
             </div>
             <div>
                 <span class="cbx-nav__brand-title">ConfidentialBox</span>
@@ -16,19 +16,19 @@
     <div class="cbx-nav__section">
         <p class="cbx-nav__section-label">Principal</p>
         <NavLink class="cbx-nav__link" href="/dashboard" Match="NavLinkMatch.All">
-            <i class="fas fa-gauge"></i>
+            <i class="fa-solid fa-gauge-high"></i>
             <span>Dashboard</span>
         </NavLink>
         <NavLink class="cbx-nav__link" href="profile">
-            <i class="fas fa-user-circle"></i>
+            <i class="fa-solid fa-user"></i>
             <span>Mi Perfil</span>
         </NavLink>
         <NavLink class="cbx-nav__link" href="files">
-            <i class="fas fa-folder-shield"></i>
+            <i class="fa-solid fa-folder-open"></i>
             <span>Mis Archivos</span>
         </NavLink>
         <NavLink class="cbx-nav__link" href="upload">
-            <i class="fas fa-cloud-arrow-up"></i>
+            <i class="fa-solid fa-cloud-arrow-up"></i>
             <span>Subir Archivo</span>
         </NavLink>
     </div>
@@ -36,36 +36,42 @@
     <AuthorizeView Roles="Admin">
         <div class="cbx-nav__section">
             <p class="cbx-nav__section-label">Seguridad</p>
-            <NavLink class="cbx-nav__link" href="ai-security">
-                <i class="fas fa-brain"></i>
-                <span>AI Security</span>
-            </NavLink>
             <NavLink class="cbx-nav__link" href="users">
-                <i class="fas fa-users-gear"></i>
+                <i class="fa-solid fa-users"></i>
                 <span>Usuarios</span>
             </NavLink>
             <NavLink class="cbx-nav__link" href="roles">
-                <i class="fas fa-user-shield"></i>
+                <i class="fa-solid fa-user-shield"></i>
                 <span>Roles y Permisos</span>
             </NavLink>
             <NavLink class="cbx-nav__link" href="audit">
-                <i class="fas fa-file-signature"></i>
+                <i class="fa-solid fa-clipboard-list"></i>
                 <span>Auditoría</span>
             </NavLink>
-            <NavLink class="cbx-nav__link" href="all-files">
-                <i class="fas fa-folder-tree"></i>
-                <span>Todos los Archivos</span>
-            </NavLink>
             <NavLink class="cbx-nav__link" href="settings">
-                <i class="fas fa-sliders"></i>
+                <i class="fa-solid fa-gear"></i>
                 <span>Configuración</span>
+            </NavLink>
+        </div>
+    </AuthorizeView>
+
+    <AuthorizeView Roles="Admin,Auditor">
+        <div class="cbx-nav__section">
+            <p class="cbx-nav__section-label">Supervisión</p>
+            <NavLink class="cbx-nav__link" href="ai-security">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>AI Security</span>
+            </NavLink>
+            <NavLink class="cbx-nav__link" href="all-files">
+                <i class="fa-solid fa-table-list"></i>
+                <span>Todos los Archivos</span>
             </NavLink>
         </div>
     </AuthorizeView>
 
     <div class="cbx-nav__footer">
         <span class="cbx-nav__status">
-            <i class="fas fa-lock"></i>
+            <i class="fa-solid fa-lock"></i>
             Seguridad reforzada
         </span>
     </div>

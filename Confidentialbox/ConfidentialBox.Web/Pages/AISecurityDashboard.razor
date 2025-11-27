@@ -10,7 +10,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Rendering
 @using ConfidentialBox.Core.Entities
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Auditor")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ISettingsService SettingsService
@@ -772,6 +772,26 @@
                             <InputNumberField Label="Peso archivo muy grande" @bind-Value="aiSettings.DataExfiltrationHugeFileWeight" />
                             <InputNumberField Label="Peso archivos comprimidos" @bind-Value="aiSettings.DataExfiltrationArchiveWeight" />
                             <InputNumberField Label="Peso actividad fuera de horario" @bind-Value="aiSettings.DataExfiltrationOffHoursWeight" />
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="border rounded p-3 h-100">
+                                <span class="badge text-bg-danger mb-1">Bloqueo automático</span>
+                                <h6 class="mb-2">Capturas de pantalla</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Intentos antes de bloquear</label>
+                                    <InputNumber @bind-Value="aiSettings.ScreenshotBlockAttemptThreshold" class="form-control" min="1" max="50" />
+                                    <div class="form-text">Ejemplo: 3 intentos activan el bloqueo inmediato.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Motivo registrado</label>
+                                    <InputText @bind-Value="aiSettings.ScreenshotBlockReason" class="form-control" />
+                                    <div class="form-text">Se mostrará y auditará como causa del bloqueo.</div>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <InputCheckbox @bind-Value="aiSettings.RequireAdminUnlockOnBlock" class="form-check-input" id="screenshotAdminUnlock" />
+                                    <label class="form-check-label" for="screenshotAdminUnlock">Solo un administrador puede desbloquear</label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
