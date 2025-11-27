@@ -353,6 +353,7 @@ const defaultViewerSettings = {
     watermarkOpacity: 0.12,
     watermarkFontSize: 48,
     watermarkColor: 'rgba(220,53,69,0.18)',
+    watermarkRotationDegrees: -24,
     maxViewTimeMinutes: 0,
     defaultZoomPercent: 110,
     zoomStepPercent: 15,
@@ -605,6 +606,10 @@ function buildWatermark(container, text, style) {
             const size = typeof style.fontSize === 'number' ? `${style.fontSize}px` : style.fontSize;
             watermark.style.setProperty('--secure-watermark-size', size);
         }
+
+        if (typeof style.rotation === 'number') {
+            watermark.style.setProperty('--secure-watermark-rotation', `${style.rotation}deg`);
+        }
     }
 
     container.appendChild(watermark);
@@ -783,6 +788,7 @@ function normalizeViewerSettings(raw) {
     normalized.toolbarTextColor = coerceString(normalized.toolbarTextColor, defaultViewerSettings.toolbarTextColor);
     normalized.globalWatermarkText = coerceString(normalized.globalWatermarkText, defaultViewerSettings.globalWatermarkText);
     normalized.watermarkColor = coerceString(normalized.watermarkColor, defaultViewerSettings.watermarkColor);
+    normalized.watermarkRotationDegrees = coerceNumber(normalized.watermarkRotationDegrees, defaultViewerSettings.watermarkRotationDegrees);
 
     normalized.showToolbar = coerceBoolean(normalized.showToolbar, defaultViewerSettings.showToolbar);
     normalized.showSearch = coerceBoolean(normalized.showSearch, defaultViewerSettings.showSearch);
@@ -810,6 +816,9 @@ function normalizeViewerSettings(raw) {
 
     const watermarkOpacity = coerceNumber(normalized.watermarkOpacity, defaultViewerSettings.watermarkOpacity);
     normalized.watermarkOpacity = Math.min(Math.max(watermarkOpacity, 0), 1);
+
+    const watermarkRotation = coerceNumber(normalized.watermarkRotationDegrees, defaultViewerSettings.watermarkRotationDegrees);
+    normalized.watermarkRotationDegrees = Math.min(Math.max(watermarkRotation, -90), 90);
 
     const maxViewTime = coerceNumber(normalized.maxViewTimeMinutes, defaultViewerSettings.maxViewTimeMinutes);
     normalized.maxViewTimeMinutes = Math.max(0, Math.round(maxViewTime));
@@ -2066,7 +2075,8 @@ async function renderPdf(frameId, base64Data, fileName) {
             const desiredStyle = state.watermarkOptions?.style || (state.settings ? {
                 color: state.settings.watermarkColor,
                 opacity: state.settings.watermarkOpacity,
-                fontSize: state.settings.watermarkFontSize
+                fontSize: state.settings.watermarkFontSize,
+                rotation: state.settings.watermarkRotationDegrees
             } : null);
 
             state.watermarkElement = buildWatermark(state.watermarkHost || overlay, desiredText, desiredStyle);

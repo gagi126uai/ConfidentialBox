@@ -413,6 +413,10 @@ public class SystemSettingsService : ISystemSettingsService
         settings.RecommendationBlockThreshold = Math.Clamp(settings.RecommendationBlockThreshold, settings.RecommendationReviewThreshold, 1.0);
         settings.RiskLevelMediumThreshold = Clamp01(settings.RiskLevelMediumThreshold);
         settings.RiskLevelHighThreshold = Math.Clamp(settings.RiskLevelHighThreshold, settings.RiskLevelMediumThreshold, 1.0);
+        settings.ScreenshotBlockAttemptThreshold = Math.Max(1, settings.ScreenshotBlockAttemptThreshold);
+        settings.ScreenshotBlockReason = string.IsNullOrWhiteSpace(settings.ScreenshotBlockReason)
+            ? "Intento de captura de pantalla"
+            : settings.ScreenshotBlockReason.Trim();
 
         settings.BusinessHoursStart = Math.Clamp(settings.BusinessHoursStart, 0, 23);
         settings.BusinessHoursEnd = Math.Clamp(settings.BusinessHoursEnd, settings.BusinessHoursStart, 23);
@@ -493,6 +497,12 @@ public class SystemSettingsService : ISystemSettingsService
         settings.ZoomStepPercent = Math.Clamp(settings.ZoomStepPercent, 5, 50);
         settings.WatermarkOpacity = Clamp01(settings.WatermarkOpacity);
         settings.WatermarkFontSize = Math.Clamp(settings.WatermarkFontSize, 16, 120);
+        if (Math.Abs(settings.WatermarkRotationDegrees) < double.Epsilon)
+        {
+            settings.WatermarkRotationDegrees = -24;
+        }
+
+        settings.WatermarkRotationDegrees = Math.Clamp(settings.WatermarkRotationDegrees, -90, 90);
         settings.MaxViewTimeMinutes = Math.Max(0, settings.MaxViewTimeMinutes);
         settings.CustomCss = settings.CustomCss?.Trim() ?? string.Empty;
 

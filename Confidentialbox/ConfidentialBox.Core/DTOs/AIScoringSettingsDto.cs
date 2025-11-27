@@ -99,6 +99,14 @@ public class AIScoringSettingsDto
     [Range(0.0, 1.0)]
     public double RiskLevelMediumThreshold { get; set; } = 0.4;
 
+    [Range(1, 50)]
+    public int ScreenshotBlockAttemptThreshold { get; set; } = 3;
+
+    [Required]
+    public string ScreenshotBlockReason { get; set; } = "Intento de captura de pantalla";
+
+    public bool RequireAdminUnlockOnBlock { get; set; } = true;
+
     public bool EnableAutoBlocking { get; set; } = false;
 
     public bool EnableAutoReview { get; set; } = false;

@@ -194,3 +194,27 @@ a:hover,
     cursor: not-allowed;
     text-decoration: none;
 }
+
+.secure-pdf-watermark,
+.secure-pdf-watermark-layer .secure-pdf-watermark {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    align-content: stretch;
+    justify-content: stretch;
+    pointer-events: none;
+}
+
+.secure-pdf-watermark__tile {
+    display: inline-block;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--secure-watermark-color, rgba(220, 53, 69, 0.18));
+    opacity: var(--secure-watermark-opacity, 0.12);
+    font-size: var(--secure-watermark-size, 48px);
+    transform: rotate(var(--secure-watermark-rotation, -24deg));
+    white-space: nowrap;
+    user-select: none;
+}

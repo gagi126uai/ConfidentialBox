@@ -616,6 +616,11 @@ else
                                                 <InputNumber @bind-Value="pdfViewerSettings.WatermarkFontSize" class="form-control" min="16" max="120" />
                                             </div>
                                             <div class="col-md-4">
+                                                <label class="form-label">Inclinación (°)</label>
+                                                <InputNumber @bind-Value="pdfViewerSettings.WatermarkRotationDegrees" class="form-control" min="-90" max="90" step="1" TValue="double" />
+                                                <div class="form-text">Ángulo ascendente recomendado entre -45° y -15°.</div>
+                                            </div>
+                                            <div class="col-md-4">
                                                 <label class="form-label">Tiempo máximo (min)</label>
                                                 <InputNumber @bind-Value="pdfViewerSettings.MaxViewTimeMinutes" class="form-control" min="0" />
                                                 <div class="form-text">0 = sin límite global. Se combinará con el límite del archivo.</div>
