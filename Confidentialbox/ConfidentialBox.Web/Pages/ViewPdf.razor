@@ -29,35 +29,6 @@
                         <div class="alert alert-info" role="status">@infoMessage</div>
                     }
 
-                    @if (securityAlerts.Count > 0)
-                    {
-                        <div class="secure-alert-stack" aria-live="assertive">
-                            @for (var index = securityAlerts.Count - 1; index >= 0; index--)
-                            {
-                                var alert = securityAlerts[index];
-                                <div class="alert secure-alert @alert.CssClass" role="alert">
-                                    <div class="secure-alert__icon">
-                                        <i class="@alert.Icon"></i>
-                                    </div>
-                                    <div class="secure-alert__body">
-                                        <div class="secure-alert__message">@alert.Message</div>
-                                        <small class="secure-alert__timestamp text-muted">Detectado @FormatAlertTimestamp(alert)</small>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                    }
-
-                    @if (fileBlocked || viewerBlocked)
-                    {
-                        <div class="alert alert-danger">
-                            <i class="fas fa-ban"></i>
-                            @(blockedByAi
-                                ? $"Acceso bloqueado por IA: {blockedReason}"
-                                : $"Acceso bloqueado: {blockedReason}")
-                        </div>
-                    }
-
                     @if (isLoading)
                     {
                         <div class="text-center py-5">
@@ -199,6 +170,7 @@
     private const string ToolbarElementId = "securePdfToolbar";
     private bool shouldAutoStartViewer;
     private bool secureViewerScriptReady;
+    private bool blockerAlertShown;
     private readonly List<ViewerSecurityAlert> securityAlerts = new();
 
     private static readonly IReadOnlyDictionary<string, ViewerSecurityAlertTemplate> SecurityAlertTemplates =
@@ -228,6 +200,7 @@
             blockedReason = null;
             viewerBlocked = false;
             shouldAutoStartViewer = false;
+            blockerAlertShown = false;
             metadataSummary = await FileService.AccessFileAsync(ShareLink, null);
             fileMetadata = metadataSummary?.File;
             viewerBlocked = metadataSummary?.Blocked ?? false;
@@ -249,6 +222,7 @@
                 errorMessage = blockedByAi
                     ? $"La IA bloqueó este archivo: {blockedReason}"
                     : $"Este archivo está bloqueado: {blockedReason}";
+                await ShowBlockerAlertAsync(blockedReason, blockedByAi);
                 return;
             }
 
@@ -279,6 +253,7 @@
     {
         shouldAutoStartViewer = false;
         formModel ??= new SecureViewerForm();
+        blockerAlertShown = false;
 
         if (fileMetadata == null)
         {
@@ -460,6 +435,8 @@
                 await JS.InvokeVoidAsync("ConfidentialBox.disposeSecurePdfViewer", sessionId);
                 sessionId = null;
             }
+
+            await ShowBlockerAlertAsync(blockedReason, true);
         }
 
         // Llamar a StateHasChanged para refrescar el estado
@@ -567,13 +544,17 @@
             var message = triggerText != null
                 ? $"Intento de captura de pantalla detectado ({triggerText}). La actividad quedó registrada."
                 : "Intento de captura de pantalla detectado. La actividad quedó registrada.";
-            AppendSecurityAlert(new ViewerSecurityAlert(eventType, message, "alert-danger", "fas fa-camera", DateTimeOffset.UtcNow));
+            var alert = new ViewerSecurityAlert(eventType, message, "alert-danger", "fas fa-camera", DateTimeOffset.UtcNow);
+            AppendSecurityAlert(alert);
+            TriggerSweetAlert(alert);
             return true;
         }
 
         if (SecurityAlertTemplates.TryGetValue(eventType, out var template))
         {
-            AppendSecurityAlert(new ViewerSecurityAlert(eventType, template.Message, template.CssClass, template.Icon, DateTimeOffset.UtcNow));
+            var alert = new ViewerSecurityAlert(eventType, template.Message, template.CssClass, template.Icon, DateTimeOffset.UtcNow);
+            AppendSecurityAlert(alert);
+            TriggerSweetAlert(alert);
             return true;
         }
 
@@ -595,6 +576,62 @@
         {
             securityAlerts.RemoveAt(0);
         }
+    }
+
+    private void TriggerSweetAlert(ViewerSecurityAlert alert)
+    {
+        var icon = MapCssClassToSweetIcon(alert.CssClass);
+        _ = InvokeAsync(() => ShowSweetAlertAsync("Alerta de seguridad", alert.Message, icon));
+    }
+
+    private static string MapCssClassToSweetIcon(string? cssClass)
+    {
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            return "info";
+        }
+
+        if (cssClass.Contains("danger", StringComparison.OrdinalIgnoreCase))
+        {
+            return "error";
+        }
+
+        if (cssClass.Contains("warning", StringComparison.OrdinalIgnoreCase))
+        {
+            return "warning";
+        }
+
+        if (cssClass.Contains("success", StringComparison.OrdinalIgnoreCase))
+        {
+            return "success";
+        }
+
+        return "info";
+    }
+
+    private ValueTask ShowSweetAlertAsync(string title, string? message, string icon = "info")
+    {
+        return JS.InvokeVoidAsync("ConfidentialBox.showSweetAlert", new
+        {
+            title,
+            message,
+            icon
+        });
+    }
+
+    private async Task ShowBlockerAlertAsync(string? reason, bool byAi)
+    {
+        if (blockerAlertShown)
+        {
+            return;
+        }
+
+        blockerAlertShown = true;
+
+        var title = byAi ? "Acceso bloqueado por IA" : "Acceso bloqueado";
+        var message = string.IsNullOrWhiteSpace(reason) ? "La sesión fue bloqueada." : reason;
+        var icon = byAi ? "error" : "warning";
+        await ShowSweetAlertAsync(title, message, icon);
     }
 
     private static string? ExtractEventValue(string? eventData, string propertyName)

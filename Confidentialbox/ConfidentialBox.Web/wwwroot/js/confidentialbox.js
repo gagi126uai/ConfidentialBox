@@ -1,6 +1,31 @@
 const sessions = new Map();
 const pdfFrames = new Map();
 
+window.ConfidentialBox = window.ConfidentialBox || {};
+
+window.ConfidentialBox.showSweetAlert = function showSweetAlert(options) {
+    const opts = options || {};
+    const title = opts.title || 'Aviso';
+    const message = opts.message || '';
+    const icon = opts.icon || 'info';
+
+    if (window.Swal && typeof window.Swal.fire === 'function') {
+        return window.Swal.fire({
+            icon,
+            title,
+            text: message,
+            confirmButtonText: opts.confirmButtonText || 'OK',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn btn-primary'
+            }
+        });
+    }
+
+    alert(`${title}${message ? '\n' + message : ''}`);
+    return Promise.resolve();
+};
+
 const globalGuards = {
     printStyleElement: null,
     originalPrint: null,

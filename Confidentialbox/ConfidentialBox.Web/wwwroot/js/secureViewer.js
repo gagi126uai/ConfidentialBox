@@ -89,6 +89,8 @@
             container.style.userSelect = disableSelection ? 'none' : 'auto';
             container.style.webkitUserSelect = disableSelection ? 'none' : 'auto';
             container.style.background = opts?.settings?.backgroundColor || '#0f172a';
+            container.style.position = container.style.position || 'relative';
+            container.style.overflow = container.style.overflow || 'hidden';
 
             const style = document.createElement('style');
             style.textContent = `#${containerId} iframe{padding:${opts?.settings?.viewerPadding||'1.5rem'};background:${opts?.settings?.backgroundColor||'#0f172a'};}`;
@@ -114,7 +116,10 @@
                 wm.style.inset = '0';
                 wm.style.display = 'grid';
                 wm.style.gridTemplateColumns = 'repeat(auto-fill, minmax(240px,1fr))';
+                wm.style.gridAutoRows = 'minmax(160px, 1fr)';
                 wm.style.gap = '2rem';
+                wm.style.alignContent = 'space-evenly';
+                wm.style.justifyContent = 'space-evenly';
                 wm.style.padding = '2rem';
                 wm.style.alignItems = 'center';
                 wm.style.justifyItems = 'center';
@@ -123,14 +128,19 @@
                 wm.style.opacity = opts?.watermarkStyle?.opacity ?? 0.12;
                 wm.style.fontSize = (opts?.watermarkStyle?.fontSize || 48) + 'px';
                 wm.style.fontFamily = opts?.settings?.fontFamily || "'Inter','Segoe UI',sans-serif";
+                wm.style.zIndex = '5';
+                wm.style.textAlign = 'center';
+                wm.style.whiteSpace = 'pre-wrap';
+                wm.style.wordBreak = 'break-word';
 
-                for (let i = 0; i < 12; i++) {
+                const watermarkRepeats = Math.max(24, Math.ceil((container.clientHeight || 800) / 80));
+                for (let i = 0; i < watermarkRepeats; i++) {
                     const span = document.createElement('span');
                     span.textContent = opts.watermarkText;
+                    span.style.opacity = '0.9';
                     wm.appendChild(span);
                 }
 
-                container.style.position = container.style.position || 'relative';
                 container.appendChild(wm);
                 viewerState.cleanup.push(() => wm.remove());
             }
