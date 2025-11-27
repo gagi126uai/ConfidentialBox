@@ -338,18 +338,19 @@
                 base64Content,
                 viewerConfig.FileName);
 
-            await JS.InvokeVoidAsync(
-                "ConfidentialBox.initSecurePdfViewer",
-                ViewerContainerElementId,
-                new
-                {
-                    sessionId,
-                    dotNetRef = dotNetReference,
-                    frameId = PdfFrameElementId,
-                    toolbarId = ToolbarElementId,
-                    watermarkText = (viewerConfig.HasWatermark || (viewerConfig.ViewerSettings?.ForceGlobalWatermark ?? false))
-                        ? viewerConfig.WatermarkText
-                        : string.Empty,
+                await JS.InvokeVoidAsync(
+                    "ConfidentialBox.initSecurePdfViewer",
+                    ViewerContainerElementId,
+                    new
+                    {
+                        sessionId,
+                        dotNetRef = dotNetReference,
+                        frameId = PdfFrameElementId,
+                        toolbarId = ToolbarElementId,
+                        hasWatermark = viewerConfig.HasWatermark,
+                        watermarkText = (viewerConfig.HasWatermark || (viewerConfig.ViewerSettings?.ForceGlobalWatermark ?? false))
+                            ? viewerConfig.WatermarkText
+                            : string.Empty,
                     watermarkStyle = new
                     {
                         color = viewerConfig.WatermarkColor,

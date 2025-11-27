@@ -49,7 +49,7 @@
         iframe.src = url;
         iframe.title = fileName || "PDF";
         iframe.style.width = "100%";
-        iframe.style.height = "80vh";
+        iframe.style.height = "100%";
         iframe.style.border = "0";
         host.appendChild(iframe);
     };
@@ -81,19 +81,23 @@
         };
 
         const container = document.getElementById(containerId);
-        const disableMenu = opts.disableContextMenu || opts?.settings?.disableContextMenu;
-        const disableSelection = opts?.settings?.disableTextSelection;
+        const settings = opts?.settings || {};
+        const disableMenu = opts.disableContextMenu || settings.disableContextMenu;
+        const disableSelection = settings.disableTextSelection;
+        const padding = settings.viewerPadding || '1.5rem';
+        const background = settings.backgroundColor || '#0f172a';
+        const watermarkEnabled = !!opts.watermarkText && (settings.forceGlobalWatermark || opts.hasWatermark);
 
         if (container) {
             container.dataset.contextMenuBlocked = disableMenu ? 'true' : 'false';
             container.style.userSelect = disableSelection ? 'none' : 'auto';
             container.style.webkitUserSelect = disableSelection ? 'none' : 'auto';
-            container.style.background = opts?.settings?.backgroundColor || '#0f172a';
+            container.style.background = background;
             container.style.position = container.style.position || 'relative';
-            container.style.overflow = container.style.overflow || 'hidden';
+            container.style.overflow = 'hidden';
 
             const style = document.createElement('style');
-            style.textContent = `#${containerId} iframe{padding:${opts?.settings?.viewerPadding||'1.5rem'};background:${opts?.settings?.backgroundColor||'#0f172a'};}`;
+            style.textContent = `#${containerId}{height:calc(100vh - 220px);}#${containerId} iframe{padding:${padding};background:${background};}`;
             document.head.appendChild(style);
             viewerState.cleanup.push(() => style.remove());
 
@@ -108,7 +112,7 @@
                 viewerState.cleanup.push(() => document.removeEventListener('contextmenu', handler, true));
             }
 
-            if (opts.watermarkText) {
+            if (watermarkEnabled) {
                 const wm = document.createElement('div');
                 wm.className = 'secure-pdf-watermark-layer';
                 wm.style.pointerEvents = 'none';
@@ -123,11 +127,15 @@
                 wm.style.padding = '2rem';
                 wm.style.alignItems = 'center';
                 wm.style.justifyItems = 'center';
-                wm.style.transform = 'rotate(-15deg)';
+                const rotation = typeof opts?.watermarkStyle?.rotation === 'number'
+                    ? `${opts.watermarkStyle.rotation}deg`
+                    : '-15deg';
+
+                wm.style.transform = rotation;
                 wm.style.color = opts?.watermarkStyle?.color || 'rgba(220,53,69,0.18)';
                 wm.style.opacity = opts?.watermarkStyle?.opacity ?? 0.12;
                 wm.style.fontSize = (opts?.watermarkStyle?.fontSize || 48) + 'px';
-                wm.style.fontFamily = opts?.settings?.fontFamily || "'Inter','Segoe UI',sans-serif";
+                wm.style.fontFamily = settings.fontFamily || "'Inter','Segoe UI',sans-serif";
                 wm.style.zIndex = '5';
                 wm.style.textAlign = 'center';
                 wm.style.whiteSpace = 'pre-wrap';

@@ -218,3 +218,17 @@ a:hover,
     white-space: nowrap;
     user-select: none;
 }
+
+.secure-pdf-container {
+    background: transparent;
+    border: 0;
+    min-height: calc(100vh - 200px);
+}
+
+.secure-pdf-container iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+    box-shadow: none;
+}
