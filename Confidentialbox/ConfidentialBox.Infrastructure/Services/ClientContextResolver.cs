@@ -47,6 +47,11 @@ public class ClientContextResolver : IClientContextResolver
             ? explicitBrowser
             : parsedUa.Browser ?? ParseBrowser(userAgent);
 
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            deviceName = parsedUa.DeviceFamily;
+        }
+
         var locationHeader = headers["X-Geo-Location"].ToString();
         string? location = null;
         double? latitude = null;
@@ -82,6 +87,16 @@ public class ClientContextResolver : IClientContextResolver
         var deviceTypeName = !string.IsNullOrWhiteSpace(explicitDeviceType)
             ? explicitDeviceType
             : DetermineDeviceType(userAgent, parsedUa.DeviceType ?? regexDeviceType);
+
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            deviceName = deviceTypeName;
+        }
+
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            deviceName = "Dispositivo desconocido";
+        }
 
         return new ClientContext(
             ip,
@@ -146,11 +161,11 @@ public class ClientContextResolver : IClientContextResolver
         return ("Desconocido", null);
     }
 
-    private static (string? Browser, string? OperatingSystem, string? DeviceType) ParseUserAgent(string userAgent)
+    private static (string? Browser, string? OperatingSystem, string? DeviceType, string? DeviceFamily) ParseUserAgent(string userAgent)
     {
         if (string.IsNullOrWhiteSpace(userAgent))
         {
-            return (null, null, null);
+            return (null, null, null, null);
         }
 
         try
@@ -159,11 +174,12 @@ public class ClientContextResolver : IClientContextResolver
             var os = FormatOperatingSystem(clientInfo.OS);
             var browser = FormatBrowser(clientInfo.UA);
             var deviceType = NormalizeDeviceType(clientInfo.Device);
-            return (browser, os, deviceType);
+            var deviceFamily = NormalizeDeviceFamily(clientInfo.Device);
+            return (browser, os, deviceType, deviceFamily);
         }
         catch
         {
-            return (null, null, null);
+            return (null, null, null, null);
         }
     }
 
@@ -193,6 +209,31 @@ public class ClientContextResolver : IClientContextResolver
         if (userAgent.Contains("MSIE", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("Trident", StringComparison.OrdinalIgnoreCase))
         {
             return "Internet Explorer";
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeDeviceFamily(Device device)
+    {
+        if (device == null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(device.Brand) && !string.Equals(device.Brand, "Generic", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(device.Model) && !string.Equals(device.Model, "Generic", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{device.Brand} {device.Model}".Trim();
+            }
+
+            return device.Brand;
+        }
+
+        if (!string.IsNullOrWhiteSpace(device.Model) && !string.Equals(device.Model, "Generic", StringComparison.OrdinalIgnoreCase))
+        {
+            return device.Model;
         }
 
         return null;

@@ -9,6 +9,7 @@ public class PDFViewerConfigDto
     public double WatermarkOpacity { get; set; } = 0.12;
     public double WatermarkFontSize { get; set; } = 48;
     public string WatermarkColor { get; set; } = "rgba(220,53,69,0.18)";
+    public double WatermarkRotationDegrees { get; set; } = -24;
     public bool ScreenshotProtectionEnabled { get; set; }
     public bool PrintProtectionEnabled { get; set; }
     public bool CopyProtectionEnabled { get; set; }

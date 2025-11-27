@@ -27,6 +27,7 @@ public class PDFViewerSettings
     public double WatermarkOpacity { get; set; } = 0.12;
     public double WatermarkFontSize { get; set; } = 48;
     public string WatermarkColor { get; set; } = "rgba(220,53,69,0.18)";
+    public double WatermarkRotationDegrees { get; set; } = -24;
     public int MaxViewTimeMinutes { get; set; } = 0;
     public int DefaultZoomPercent { get; set; } = 110;
     public int ZoomStepPercent { get; set; } = 15;
